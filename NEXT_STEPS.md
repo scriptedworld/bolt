@@ -153,16 +153,17 @@ Nothing in the architecture mentions time. All of this is unstated.
 
 ## Nested jigs
 
-55. Does a jig task carry a `matching:` of its own at all, or does naming the
-    base do the whole selection? "go-quality on `backend`" names a jig and a
-    subtree and nothing else, which suggests the base is the selector. If a jig
-    task can also filter, is that pattern relative to the parent's base, where
-    it is written, or to the base it sets?
+55. Does a jig task whose selection comes up empty run at all? Reading
+    `matching:` as a precondition says no, and a base with nothing under it
+    should presumably behave the same way, so a jig for a subtree nobody
+    touched never starts.
 56. How does a jig declare it needs the repository root, and what happens when
     a jig task bases it at a subdirectory anyway: refuse the run, or run it at
     the root with the input list still narrowed?
-57. Does the empty-list rule extend to a jig task, which has no command to
-    inspect for a substitution?
+57. May the same jig appear as two jig tasks with different bases, `go-quality`
+    on `backend` and again on `tools`? FR-3.3 makes the task name the work
+    directory prefix, so each needs a distinct name, and it is worth knowing
+    whether that name is the jig's or the task's.
 58. Does a jig task carry a runmode, or is it always handed its filtered list
     once?
 59. Subprocess or in-process? Subprocess gives the five bookkeeping files for
