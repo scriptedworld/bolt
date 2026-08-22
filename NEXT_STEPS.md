@@ -30,12 +30,9 @@ recommendation.
    given a list of them; a jig now runs on a directory, which reads as one jig
    and one place. If several, they share a directory and their results fold
    into one, which is the merge already specified.
-4. `{input_path}` and `{input_paths}` differ by one character and now select
-   between one execution and four hundred. When the mode was declared beside
-   the command, a typo mismatched the declaration and got caught; under
-   inference both spellings are legal and nothing notices. Rename one so they
-   cannot be confused, `{each_path}` against `{all_paths}` or similar, or
-   accept the hazard?
+4. Must task names be unique within a jig? FR-3.3 makes the name the work
+   directory prefix and FR-5.12 has nine subprojects as nine jig tasks, so a
+   duplicate would put two tasks' executions in one place.
 5. Is there any way to express one execution per path where the command does
    not take the path as an argument? Nothing needs it yet, and inference makes
    it inexpressible, which is worth knowing before it turns up rather than
@@ -209,7 +206,7 @@ without any of it and let tools finish.
 
 ## Input paths
 
-59. Does a run over a large tree exceed `ARG_MAX` when `{input_paths}` expands?
+59. Does a run over a large tree exceed `ARG_MAX` when `{all_paths}` expands?
     Whole-project runs make this the ordinary case rather than an edge one.
     Does bolt chunk into several executions, or is it the jig author's problem?
 60. §67's pre-commit overlay wants a gate over what changed, and a

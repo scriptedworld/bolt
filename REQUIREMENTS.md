@@ -88,9 +88,9 @@ composition does not.
 | ID | Requirement | |
 |---|---|---|
 | FR-4.1 | Three locations are separately specifiable and separately available to every task: the project root, the base this run operates from, and the execution's own work directory. The outermost run is assumed to sit at the project root and a nested one is not, so a jig based on a subtree can still reach a config file at the root without giving up its base. | [A] |
-| FR-4.2 | How a task runs is read off its command, not declared beside it. `{input_path}` means one execution per matched path. `{input_paths}` means one execution with the whole selection substituted. Neither means one execution and no paths. A command naming both is a jig error. | [A] |
+| FR-4.2 | How a task runs is read off its command, not declared beside it. `{each_path}` means one execution per matched path. `{all_paths}` means one execution with the whole selection substituted. Neither means one execution and no paths. A command naming both is a jig error. | [A] |
 | FR-4.3 | Every path bolt substitutes is individually quoted, so a path carrying a space, a quote or a semicolon can neither split the command line nor inject into it. | [A] |
-| FR-4.4 | A task whose command names `{input_path}` or `{input_paths}` does not execute when its filtered selection is empty, and produces no output. A task naming neither always executes. | [A] |
+| FR-4.4 | A task whose command names `{each_path}` or `{all_paths}` does not execute when its filtered selection is empty, and produces no output. A task naming neither always executes. | [A] |
 | FR-4.5 | Tasks execute serially. | [A] |
 | FR-4.6 | No task consumes another task's output. Work needing several steps is one script producing one exit code and one output. | [A] |
 | FR-4.7 | Because no task depends on another, the merged result does not vary with the order tasks ran in. | [D] |
