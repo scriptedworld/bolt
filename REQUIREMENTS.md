@@ -56,13 +56,13 @@ composition does not.
 | ID | Requirement | |
 |---|---|---|
 | FR-2.1 | Bolt is given the jigs to run, and everything after them is the input file list. | [A] |
-| FR-2.2 | Bolt discovers no files of its own: no globbing, no gitignore awareness, no changed-since-a-ref. A caller wanting any of those computes the list and passes it. | [A] |
+| FR-2.2 | Bolt does not choose the input set. It has no gitignore awareness and no changed-since-a-ref: a caller wanting either computes the list and passes it. What bolt does walk is a folder a caller named explicitly, to apply filters through it. | [A] |
 | FR-2.3 | `--output-dir` names the directory a run writes into. Given none, a run creates `.bolt-<iso8601>`. | [A] |
 | FR-2.4 | Bolt reads no git. A run over a tree that is not a repository behaves exactly as one over a tree that is. | [D] |
 | FR-2.5 | An argument names the project directory a run is confined to. | [A] |
 | FR-2.6 | Every input path is resolved to an absolute path before anything runs. | [A] |
 | FR-2.7 | A run refuses to start if any input path lies outside the project directory or does not exist. Naming a path that is not there, or that has no business in the run, is a caller error and is not worked around silently. | [A] |
-| FR-2.8 | An input path names a file or a folder. | [A] |
+| FR-2.8 | An input path names a file or a folder. A filter globs through it either way: against the one file, or against the files a folder holds. | [A] |
 
 ## 3. Jigs and tasks
 
@@ -80,9 +80,9 @@ composition does not.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-4.1 | `{project_root}` and `{work_dir}` are available to every task. `{input_files}` is available in batch mode alone, and `{input_file}` in `perPath` mode alone. | [A] |
+| FR-4.1 | `{project_root}` and `{work_dir}` are available to every task. `{input_paths}` is available in batch mode alone, and `{input_path}` in `perPath` mode alone. | [A] |
 | FR-4.2 | Every path bolt substitutes is individually quoted, so a path carrying a space, a quote or a semicolon can neither split the command line nor inject into it. | [A] |
-| FR-4.3 | A task whose command names `{input_file}` or `{input_files}` does not execute when its filtered list is empty, and produces no output. A task naming neither always executes. | [A] |
+| FR-4.3 | A task whose command names `{input_path}` or `{input_paths}` does not execute when its filtered selection is empty, and produces no output. A task naming neither always executes. | [A] |
 | FR-4.4 | Tasks execute serially. | [A] |
 | FR-4.5 | No task consumes another task's output. Work needing several steps is one script producing one exit code and one output. | [A] |
 | FR-4.6 | Because no task depends on another, the merged result does not vary with the order tasks ran in. | [D] |
@@ -104,6 +104,7 @@ composition does not.
 | FR-5.11 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
 | FR-5.12 | A jig task either filters or re-bases, never both. A `matching:` pattern is written against the base it appears in, so re-basing the child would silently change what that pattern meant; giving one therefore keeps the child at its parent's base. Naming a subtree makes the subtree the selector, and no pattern is written. | [A] |
 | FR-5.13 | A jig task's `matching:` is a precondition read before the child runs, stating that the jig is needed for instances of that pattern. | [A] |
+| FR-5.14 | An empty selection stops a jig task starting, by the same rule that stops a `perPath` task. A jig for a subtree nobody touched never runs and contributes nothing. | [A] |
 
 ## 6. Adapters
 
@@ -195,7 +196,7 @@ The questions that would settle them are in `NEXT_STEPS.md`.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-13.1 | A folder given as an input reaches the tasks that should see it, so pointing a run at `src/` is not silently equivalent to pointing it at nothing. | [?] |
+| FR-13.1 | Walking a named folder does not drag in what nobody meant: `.git`, `node_modules`, a virtualenv, build output. Bolt has no gitignore awareness, so nothing currently keeps them out. | [?] |
 | FR-13.2 | An adapter writes its envelope to a defined place, named in the contract that invokes it. | [?] |
 | FR-13.3 | A task that could not execute is distinguishable in `result.yaml` from one that executed and failed. | [?] |
 | FR-13.4 | A task skipped for an empty file list is distinguishable in `result.yaml` from one that was never declared, so a green result cannot mean that nothing was checked. | [?] |

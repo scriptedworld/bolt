@@ -35,12 +35,9 @@ recommendation.
 
 ## Tasks and the jig
 
-10. `perPath` is settled. Are the other two `once` and `batch`? And do the
-    substitution variables follow the rename? An input is a file or a folder,
-    so `{input_file}` naming a directory is misleading, and `{input_path}` with
-    `{input_paths}` would match the mode.
+10. `perPath` is settled. Are the other two `once` and `batch`?
 11. Is `matching:` one glob or a list, and is there an exclude counterpart?
-12. Is naming `{input_files}` in a `perPath` task a jig error caught at parse, or
+12. Is naming `{input_paths}` in a `perPath` task a jig error caught at parse, or
     a runtime failure?
 13. What is the command's working directory: `{project_root}` or `{work_dir}`?
 14. Is the environment handed to a task command inherited wholesale, filtered to
@@ -134,13 +131,15 @@ Nothing in the architecture mentions time. All of this is unstated.
     refuse. Follow links and let callers filter, judge containment by the
     link's own path, or follow links and treat an outward-pointing symlink as
     excluded rather than fatal.
-50. How does `matching:` behave against a folder? `src/` does not match
-    `**/*.py`, so a Python task filters it out and never runs, which makes
-    `bolt py-jig src/` quietly check nothing. Match a folder when anything
-    under it would match, which is the discovery FR-2.2 says bolt does not do;
-    match the folder path against the glob as written; or pass folders to every
-    task regardless. And is a folder meaningful in `perPath` mode, or a jig
-    error there?
+50. Globbing through a folder walks it, and a walk finds `.git`, `node_modules`,
+    `.venv` and build output. Bolt has no gitignore awareness, so `bolt py-jig
+    .` currently means checking every `.py` under `.venv`. Does bolt carry a
+    built-in exclusion set, read the repository's ignore rules after all, take
+    exclusions from the jig, or leave it to callers never to name a folder that
+    contains any of that, which is most folders?
+    Separately: when a folder globs through to several files, does a `perPath`
+    task execute once for the folder or once per matched file? And does
+    `{input_paths}` in a batch task carry the folder or the files under it?
 51. Does bolt dedupe the list and preserve the caller's order? Order decides the
     per-path ordinal, so a caller reordering its `git diff` output renumbers
     every work directory.
@@ -148,7 +147,7 @@ Nothing in the architecture mentions time. All of this is unstated.
     `result.yaml` with `success: false` and a reason naming the offending
     paths, then exiting non-zero? That is the rule already set once, and only a
     bolt that dies leaves nothing behind.
-53. `{input_files}` over a large list will exceed `ARG_MAX`. Does bolt chunk
+53. `{input_paths}` over a large list will exceed `ARG_MAX`. Does bolt chunk
     into several executions, or is that the jig author's problem?
 54. What does an entirely empty file list mean for a jig whose tasks all consume
     files? Every task is skipped and the run reports `success: true` having
