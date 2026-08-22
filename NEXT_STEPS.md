@@ -27,11 +27,11 @@ recommendation.
    the jig is being written, which is where a `matching` typo is cheapest to
    find. It also decides whether the schemas are an artifact or an
    implementation detail.
-2. Which codecs does the shared project ship? YAML is what the ecosystem
-   writes, so a YAML reader and writer are needed and nothing else is, until an
-   adapter wants to read a tool's own output through the same validated path.
-   Cobertura is XML and pytest emits JSON, and those are exactly the files an
-   adapter parses today by hand.
+2. How does `load_formatted_file` know the format, now that `reader` is the IO
+   seam rather than the codec? From the extension, from a fourth argument, or
+   is "formatted" only saying "structured" and YAML the sole answer? It decides
+   whether an adapter can read a tool's own Cobertura XML or pytest JSON
+   through the same validated path, or goes on parsing those by hand.
 3. Where does bolt look for `bolt.<name>.yaml`? The run's directory is the
    obvious place, and `link-jigs` puts shared jigs somewhere a bare name can
    resolve. Whether a nested jig resolves against its own base or against the

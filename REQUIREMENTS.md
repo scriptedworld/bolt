@@ -60,11 +60,12 @@ composition does not.
 | FR-1.11 | The schema and a library for each language that reads or writes an envelope live in one project of their own, `wrench` being the candidate name. A Go producer and a Python producer get the same definition and equivalent code, shipped together, rather than a schema in one repository and implementations elsewhere obliged to keep up with it. | [A] |
 | FR-1.12 | Bolt reads and writes envelopes through that project's Go library, so bolt is one consumer of the contract and not its owner. | [A/D] |
 | FR-1.13 | Bolt validates with nothing else installed beside it. | [A] |
-| FR-1.14 | File handling is two calls, `load_formatted_file` and `save_formatted_file`, each taking the path, the schema to hold the file to, and the codec to read or write it with. Validation sits in the signature: there is no way to read or write without naming what the file must conform to, which makes FR-1.9 a property of the library's surface rather than a discipline every call site has to keep. | [A] |
-| FR-1.15 | The envelope is one schema handed to those calls and a jig is another. The shared project provides structured files with schemas attached, for anything in the ecosystem, rather than an envelope facility or a YAML one. | [A] |
-| FR-1.16 | The schema is JSON Schema whatever the codec, because FR-1.6 validates the decoded structure and by then a file's format has stopped mattering. | [A/D] |
-| FR-1.17 | Canonical form is a property of the YAML writer rather than of the save call, so passing that writer is what makes an emitted file canonical. | [A/D] |
-| FR-1.18 | The signature compels a schema, not the right one. Passing none is impossible; passing the wrong one is not. | [D] |
+| FR-1.14 | File handling is two calls, `load_formatted_file` and `save_formatted_file`, each taking the path, the schema to hold the file to, and the reader or writer that does the IO. Validation sits in the signature: there is no way to read or write without naming what the file must conform to, which makes FR-1.9 a property of the library's surface rather than a discipline every call site has to keep. | [A] |
+| FR-1.15 | The IO boundary is a declared seam, passed in rather than reached for. Loading and saving are exercised without a filesystem, which is what puts the validation paths within reach of the per-file coverage threshold the ecosystem holds every file to. | [A] |
+| FR-1.16 | The envelope is one schema handed to those calls and a jig is another. The shared project provides structured files with schemas attached, for anything in the ecosystem, rather than an envelope-specific facility. | [A] |
+| FR-1.17 | JSON Schema validates the decoded structure, so it is indifferent to how the file was serialised on the way in. | [A/D] |
+| FR-1.18 | Canonical form belongs to the save call, so a caller cannot emit something valid but written another way. | [A/D] |
+| FR-1.19 | The signature compels a schema, not the right one. Passing none is impossible; passing the wrong one is not. | [D] |
 
 ## 2. Invocation
 
