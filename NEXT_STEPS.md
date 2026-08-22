@@ -22,15 +22,16 @@ recommendation.
 
 ## The jig, and reaching it
 
-1. What format is a jig written in?
+1. What format is a jig written in? FR-3.4b narrows it: the format has to carry
+   comments, since that is where an entry's reasoning lives. JSON is out.
 2. How is a jig named on the command line: a path, or a bare name resolved
    against a search path? `link-jigs` gives a bare name somewhere to resolve.
 3. How does bolt know where the jig list ends and the file list begins?
 4. `perPath` is settled. Are the other two `once` and `batch`?
-5. Does an `excluding:` entry carry a reason, and does an excluded file appear
-   in the result? An exclude in a jig is the shape hard rules 4 and 5 exist to
-   prevent and it will get used to silence things, so the difference between an
-   honest exclusion and a hidden one is whether anybody can see it. FR-13.1.
+5. Does the result say what `excluding:` removed? Reasoning lives in a comment
+   beside the entry, which serves whoever opens the jig and nobody reading the
+   gate. Bolt knows which paths it dropped, so reporting the fact costs no
+   schema change and no reason text. FR-13.1.
 6. Can a task be marked required or not, and what is the default? §22's gate is
    "all required constituent results must pass", and FR-8.3 repeats it.
 

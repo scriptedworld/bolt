@@ -76,6 +76,7 @@ composition does not.
 | FR-3.3 | A task's name prefixes its work directories, so a task's evidence is identifiable on disk without opening anything. | [A/D] |
 | FR-3.4 | `matching:` is a condition on a task: a list of patterns or literal paths saying which files inside the run's directory that task acts on, where `**` matches zero or more directory levels. Every Python file through the formatter is one task with one pattern. A task never sees a path its condition rejects. | [A] |
 | FR-3.4a | `excluding:` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching:` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
+| FR-3.4b | The jig format carries comments, and an entry's reasoning sits beside it. Somebody asking why a path is excluded finds the answer where the path is, rather than reconstructing it from git history. | [A/D] |
 | FR-3.5 | Filter patterns are relative to the base directory of the run they are declared in. A jig written for reuse therefore says `**/*.go` and never names the subtree it was dropped into, which is what makes it the same jig at the repository root and at `backend/`. | [A] |
 | FR-3.6 | Organisation-wide, language-specific and repository-specific behaviour compose through jigs, with none of it hard-coded into bolt. | [A] |
 | FR-3.7 | A jig maintained outside the repository and made available inside it, as toolbox's `link-jigs` does, runs without being copied into the tree. | [D] |
@@ -205,7 +206,7 @@ The questions that would settle them are in `NEXT_STEPS.md`.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-13.1 | A file deliberately left out by `excluding:` is visibly left out, carrying why, rather than quietly absent from the result. A known-bad file failing every run trains a reader to stop reading the gate, and an exclusion nobody can see loses the same information the other way. | [?] |
+| FR-13.1 | Somebody reading a result can tell that files were excluded. A comment in the jig answers "why" for whoever opens the jig, and says nothing to whoever reads the gate output, and those are different people. | [?] |
 | FR-13.2 | An adapter writes its envelope to a defined place, named in the contract that invokes it. | [?] |
 | FR-13.3 | A task that could not execute is distinguishable in `result.yaml` from one that executed and failed. | [?] |
 | FR-13.4 | A task skipped for an empty file list is distinguishable in `result.yaml` from one that was never declared, so a green result cannot mean that nothing was checked. | [?] |
