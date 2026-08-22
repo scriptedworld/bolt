@@ -27,12 +27,10 @@ recommendation.
    against a search path? `link-jigs` gives a bare name somewhere to resolve.
 3. How does bolt know where the jig list ends and the file list begins?
 4. `perPath` is settled. Are the other two `once` and `batch`?
-5. Is `matching:` one glob or a list, and is there an exclude counterpart? The
-   case that wants one is a file in a known-bad state that every linter hits on
-   every run until a reader stops reading the gate. Against it: an exclude in a
-   jig is the shape hard rules 4 and 5 exist to prevent, and it will get used to
-   silence things. If it exists, it should carry a reason and appear in the
-   result, so an excluded file is visible rather than invisible.
+5. Does an `excluding:` entry carry a reason, and does an excluded file appear
+   in the result? An exclude in a jig is the shape hard rules 4 and 5 exist to
+   prevent and it will get used to silence things, so the difference between an
+   honest exclusion and a hidden one is whether anybody can see it. FR-13.1.
 6. Can a task be marked required or not, and what is the default? §22's gate is
    "all required constituent results must pass", and FR-8.3 repeats it.
 
@@ -51,12 +49,10 @@ recommendation.
 10. Is the walk order deterministic, sorted rather than whatever the filesystem
     returns? FR-9.4 claims two runs over the same tree produce identical work
     directory names, and that claim rests on this.
-11. Globbing through a folder walks it, and a walk finds `.git`, `node_modules`,
-    `.venv` and build output. Bolt has no gitignore awareness, so `bolt py-jig
-    .` currently means checking every `.py` under `.venv`. A built-in exclusion
-    set, reading the repository's ignore rules after all, exclusions declared in
-    the jig, or callers never naming a folder containing any of that, which is
-    most folders?
+11. Can a task reach a file `.gitignore` excludes? `matching:` narrows what the
+    walk found, and the walk has already dropped ignored files, so there is
+    currently no way back. Generated code somebody does want checked is the
+    case, and it may not be worth an escape hatch until it turns up.
 12. Does the walk follow symlinks? Following one out of the directory breaks
     containment, and `link-jigs` leaves tracked symlinks pointing into toolbox,
     so a project using shared jigs has them sitting in the tree being walked.

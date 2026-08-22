@@ -57,7 +57,10 @@ composition does not.
 | ID | Requirement | |
 |---|---|---|
 | FR-2.1 | A jig is run on a directory. That is the whole of what an invocation says: which jig, and where. | [A] |
-| FR-2.2 | Bolt walks that directory to find the files its tasks act on. It has no gitignore awareness and no changed-since-a-ref. | [A] |
+| FR-2.2 | Bolt walks that directory to find the files its tasks act on. It has no changed-since-a-ref. | [A] |
+| FR-2.2a | The walk honours `.gitignore`. An ignored file is not part of the project and is not checked, which keeps `.git`, `node_modules`, a virtualenv and build output out of every run without a second list to maintain. | [A] |
+| FR-2.2b | Honouring `.gitignore` means reading those files as text. Bolt does not invoke git, read anything under `.git/`, or require a repository, so it does not reach `.git/info/exclude` or a global excludes file either. A tree with no `.gitignore` in it simply excludes nothing. | [A/D] |
+| FR-2.2c | A run never walks another run's output. Bolt's own run directories are excluded whatever `.gitignore` says, because a tree accumulating them would otherwise feed each run the last one's evidence. | [D] |
 | FR-2.3 | The directory is the run's base, and everything a run touches comes from inside it. Containment is how the input is formed, not a check applied to it afterwards. | [A/D] |
 | FR-2.4 | Paths are resolved to absolute before anything runs. | [A] |
 | FR-2.5 | A run refuses to start if the directory it was given is not there. | [A/D] |
@@ -71,10 +74,12 @@ composition does not.
 | FR-3.1 | A jig is the unit of configuration and composition. What bolt executes for a project is read from that project's jig. | [A] |
 | FR-3.2 | A task declares a name, an optional description, a runmode, a `matching:` glob, and a command written as a shell line. | [A] |
 | FR-3.3 | A task's name prefixes its work directories, so a task's evidence is identifiable on disk without opening anything. | [A/D] |
-| FR-3.4 | `matching:` is a condition on a task, saying which files inside the run's directory that task acts on, where `**` matches zero or more directory levels. Every Python file through the formatter is one task with one pattern. A task never sees a path its condition rejects. | [A] |
+| FR-3.4 | `matching:` is a condition on a task: a list of patterns or literal paths saying which files inside the run's directory that task acts on, where `**` matches zero or more directory levels. Every Python file through the formatter is one task with one pattern. A task never sees a path its condition rejects. | [A] |
+| FR-3.4a | `excluding:` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching:` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
 | FR-3.5 | Filter patterns are relative to the base directory of the run they are declared in. A jig written for reuse therefore says `**/*.go` and never names the subtree it was dropped into, which is what makes it the same jig at the repository root and at `backend/`. | [A] |
 | FR-3.6 | Organisation-wide, language-specific and repository-specific behaviour compose through jigs, with none of it hard-coded into bolt. | [A] |
 | FR-3.7 | A jig maintained outside the repository and made available inside it, as toolbox's `link-jigs` does, runs without being copied into the tree. | [D] |
+| FR-3.8 | Bolt draws no line between a shared jig and a project-specific one. The same fields serve both, and every literal path or narrow pattern a jig carries trades reuse for fit. Where a jig sits on that scale is its author's choice and not a rule bolt enforces. | [A/D] |
 
 ## 4. Substitution and execution
 
@@ -200,8 +205,7 @@ The questions that would settle them are in `NEXT_STEPS.md`.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-13.1 | Walking the directory does not drag in what nobody meant: `.git`, `node_modules`, a virtualenv, build output. Bolt has no gitignore awareness, so nothing currently keeps them out, and every run walks. | [?] |
-| FR-13.1a | A file deliberately left out of a task is visibly left out, carrying why, rather than quietly absent from the result. A known-bad file failing every run trains a reader to stop reading the gate, and an exclusion nobody can see is the other way to lose the same information. | [?] |
+| FR-13.1 | A file deliberately left out by `excluding:` is visibly left out, carrying why, rather than quietly absent from the result. A known-bad file failing every run trains a reader to stop reading the gate, and an exclusion nobody can see loses the same information the other way. | [?] |
 | FR-13.2 | An adapter writes its envelope to a defined place, named in the contract that invokes it. | [?] |
 | FR-13.3 | A task that could not execute is distinguishable in `result.yaml` from one that executed and failed. | [?] |
 | FR-13.4 | A task skipped for an empty file list is distinguishable in `result.yaml` from one that was never declared, so a green result cannot mean that nothing was checked. | [?] |
