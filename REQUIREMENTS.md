@@ -42,7 +42,7 @@ composition does not.
 
 ---
 
-## 1. What a run is
+## 1. Runs, and the files bolt reads and writes
 
 | ID | Requirement | |
 |---|---|---|
@@ -60,6 +60,8 @@ composition does not.
 | FR-1.11 | The schema and a library for each language that reads or writes an envelope live in one project of their own, `wrench` being the candidate name. A Go producer and a Python producer get the same definition and equivalent code, shipped together, rather than a schema in one repository and implementations elsewhere obliged to keep up with it. | [A] |
 | FR-1.12 | Bolt reads and writes envelopes through that project's Go library, so bolt is one consumer of the contract and not its owner. | [A/D] |
 | FR-1.13 | Bolt validates with nothing else installed beside it. | [A] |
+| FR-1.14 | Envelope handling is two calls, `load_envelope` and `save_envelope`. Both validate. There is no unvalidated way in or out because no other entry point exists, which is what makes FR-1.9 a property of the library rather than a discipline every call site has to keep. | [A] |
+| FR-1.15 | Canonical form belongs to `save_envelope`, so a caller cannot emit an envelope that is valid but written some other way. | [A/D] |
 
 ## 2. Invocation
 

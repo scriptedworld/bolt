@@ -27,7 +27,12 @@ recommendation.
    the jig is being written, which is where a `matching` typo is cheapest to
    find. It also decides whether the schemas are an artifact or an
    implementation detail.
-2. How is a jig named on the command line: a path, or a bare name resolved
+2. A jig is not an envelope, and FR-1.5 validates it too. Does the shared
+   project expose a generic load-and-validate pair beside `load_envelope` and
+   `save_envelope`, or does bolt validate its own format with its own schema
+   and a stock validator? The second keeps ownership where it belongs: the
+   envelope is an ecosystem contract, and the jig format is bolt's alone.
+   And how is a jig named on the command line: a path, or a bare name resolved
    against a search path? `link-jigs` gives a bare name somewhere to resolve.
 3. May an invocation name more than one jig? An earlier answer said bolt is
    given a list of them; a jig now runs on a directory, which reads as one jig
