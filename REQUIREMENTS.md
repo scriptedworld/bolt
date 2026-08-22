@@ -1,144 +1,196 @@
 # bolt, Requirements
 
-Derived from `silo/docs/ARCHITECTURE.md` and from nothing else. Sections 17 to
-23 describe bolt directly; sections 2, 3, 24 and 25 carry the evidence model and
-the ecosystem contracts it sits inside. No earlier bolt implementation,
-requirements document, design note or test was read while writing this. The
-provenance of that earlier material is unresolved. This document exists to
-establish that the requirements reach from the architecture alone, and reading
-it would have destroyed that.
+Derived from `silo/docs/ARCHITECTURE.md` and from answers given against
+`NEXT_STEPS.md`. No earlier bolt implementation, requirements document, design
+note or test was read while writing this. The provenance of that earlier
+material is unresolved. This document exists to establish that the requirements
+reach from the architecture and from fresh answers alone, and reading it would
+have destroyed that.
 
 Requirements are stated as observable properties. Each says what must be true of
 bolt or of a run, not how anything is built.
 
-**Status markers.** `[A]` traces to a statement in the architecture document.
-`[D]` is derived from one. `[A/D]` is both. `[?]` is open, recorded so it is not
-lost and carrying no test yet.
-
-The architecture document describes an ecosystem, not a program. Much of what a
-requirements document needs is therefore absent from it: the envelope's fields,
-the jig's fields, how an adapter is called, what a timeout does, where artifacts
-land. `NEXT_STEPS.md` lists every one of those gaps as a question. Section 9
-below records the properties that must eventually hold and cannot yet be stated.
+**Status markers.** `[A]` traces to a direct statement, in the architecture
+document or in an answer. `[D]` is derived from one. `[A/D]` is both. `[?]` is
+open, recorded so it is not lost and carrying no test yet.
 
 No test cites any row here, because no implementation exists. Every settled row
 is uncovered under toolbox's traceability gate, and marking them `[?]` to turn
 that green would misreport what is settled.
 
+## Where this departs from the architecture
+
+The architecture document is the origin and is wrong in four places. Each
+departure is deliberate.
+
+§23 shows `passed: false` inside the merged result. The key is `success`.
+
+§22 calls the unit of execution an "execution element". The word is *task*.
+
+§22 spells the merged file `run_result.yaml` and the per-element file
+`foo_output.yaml`. Both names change and so does where they sit. A task
+execution's envelope is `output.yaml` inside that execution's own directory, and
+the run's is `result.yaml` at the top of the output directory. Singular, because
+a run has exactly one result, folded from the results of its tasks.
+
+§17 lists "chains of commands" and "commands consuming earlier artifacts" among
+what a run may execute, and §19 is a section whose worked example is a coverage
+producer feeding a policy analyzer feeding an adapter. No task consumes another
+task's output. That chain still happens inside one script, and bolt sees one
+task, so the capability survives and the architecture's picture of bolt-level
+composition does not.
+
 ---
 
 ## 1. What a run is
 
-*Derives from:* §17 on bolt as task ETL, §2 and §3.1 on evidence being files on
-disk.
+| ID | Requirement | |
+|---|---|---|
+| FR-1.1 | A run executes the command lines its jigs declare and records what happened as files on disk. Nothing a consumer needs to know about the outcome exists only in bolt's own output streams. | [A/D] |
+| FR-1.2 | Bolt holds no knowledge of any particular tool. Which commands run, and what their output means, come from the jig. Adding a language or a checker to the ecosystem changes a jig and an adapter, never bolt. | [A] |
+| FR-1.3 | Task ETL is the abstraction and quality checking is its first use. A jig that runs no checker and reaches no verdict about code is a legitimate run. | [A/D] |
+| FR-1.4 | A run captures each command's native results whatever form they take: stdout, stderr, exit code, and arbitrary files the command generated. Those results survive the run as evidence. | [A/D] |
+
+## 2. Invocation
 
 | ID | Requirement | |
 |---|---|---|
-| FR-1.1 | A run executes the command lines its jig declares and records what happened as files on disk. Nothing a consumer needs to know about the outcome exists only in bolt's own output streams. | [A/D] |
-| FR-1.2 | A run may execute one command or many: a single tool, several tools, scripts, analyzers, a chain in which a later command consumes an artifact an earlier one produced, and other jigs nested inside it. | [A] |
-| FR-1.3 | Bolt holds no knowledge of any particular tool. Which commands run, and what their output means, come from the jig. Adding a language or a checker to the ecosystem changes a jig and an adapter, never bolt. | [A] |
-| FR-1.4 | A run captures each command's native results whatever form they take: stdout, stderr, exit code, JSON, XML, a coverage report, or arbitrary files the command generated. Those results survive the run as evidence. | [A/D] |
-| FR-1.5 | Task ETL is the abstraction and quality checking is its first use. A jig that runs no checker and reaches no verdict about code is a legitimate run. | [A/D] |
+| FR-2.1 | Bolt is given the jigs to run, and everything after them is the input file list. | [A] |
+| FR-2.2 | Bolt discovers no files of its own: no globbing, no gitignore awareness, no changed-since-a-ref. A caller wanting any of those computes the list and passes it. | [A] |
+| FR-2.3 | `--output-dir` names the directory a run writes into. Given none, a run creates `.bolt-<iso8601>`. | [A] |
+| FR-2.4 | Bolt reads no git. A run over a tree that is not a repository behaves exactly as one over a tree that is. | [D] |
 
-## 2. Jigs
-
-*Derives from:* §21 on the jig as configuration and composition unit, §19 on
-composition, §20 on per-file coverage, §24 on toolbox distributing jigs.
+## 3. Jigs and tasks
 
 | ID | Requirement | |
 |---|---|---|
-| FR-2.1 | A jig is the unit of configuration and composition. What bolt executes for a project is read from that project's jig. | [A] |
-| FR-2.2 | A jig may invoke another jig, and an invoked jig may invoke others in turn. | [A] |
-| FR-2.3 | A jig may be scoped to a subtree, so one repository composes a shared quality jig, a secret-scanning jig, and a separate language jig for each of `backend/`, `tooling/` and `frontend/`. | [A] |
-| FR-2.4 | Organisation-wide, language-specific and repository-specific behaviour compose through jigs, with none of it hard-coded into bolt. | [A] |
-| FR-2.5 | A jig maintained outside the repository and made available inside it, as toolbox's `link-jigs` does, runs without being copied into the tree. | [D] |
-| FR-2.6 | A run may apply a policy its producing tool does not implement, by running the producer, feeding that output to an analyzer carrying the policy, and adapting the analyzer's output. | [A] |
-| FR-2.7 | FR-2.6 is sufficient to express a threshold held per file, `each file: branch coverage >= 80%`, wherever the toolchain reports meaningful branch coverage. A project average is a different policy and does not satisfy it, because an average lets a well-tested large file conceal a poorly tested small one. | [A] |
+| FR-3.1 | A jig is the unit of configuration and composition. What bolt executes for a project is read from that project's jig. | [A] |
+| FR-3.2 | A task declares a name, an optional description, a runmode, a `matching:` glob, and a command written as a shell line. | [A] |
+| FR-3.3 | A task's name prefixes its work directories, so a task's evidence is identifiable on disk without opening anything. | [A/D] |
+| FR-3.4 | `matching:` names the subset of the run's input paths a task accepts, where `**` matches zero or more directory levels. A task never sees a path its filter rejects. | [A] |
+| FR-3.5 | Organisation-wide, language-specific and repository-specific behaviour compose through jigs, with none of it hard-coded into bolt. | [A] |
+| FR-3.6 | A jig maintained outside the repository and made available inside it, as toolbox's `link-jigs` does, runs without being copied into the tree. | [D] |
 
-## 3. Adapters
-
-*Derives from:* §17 and §18 on adapters, §23 on child exit codes being data.
+## 4. Substitution and execution
 
 | ID | Requirement | |
 |---|---|---|
-| FR-3.1 | An adapter turns one execution element's native output into a canonical result envelope. Nothing else in bolt decides whether an element passed. | [A/D] |
-| FR-3.2 | A generic adapter treats exit 0 as pass and any other exit code as fail, and retains stdout and stderr as supporting evidence. A command with those semantics needs nothing written for it. | [A] |
-| FR-3.3 | An adapter is chosen by the output format it reads. Any tool emitting a format some adapter understands reuses that adapter, whoever wrote the tool. | [A] |
-| FR-3.4 | Adapters read structured formats as well as exit codes: Cobertura, pytest JSON, and other structured test and coverage reports. | [A] |
-| FR-3.5 | A child process's exit code is data an adapter consumes. Bolt reaches no verdict of its own from it. | [A] |
+| FR-4.1 | `{project_root}` and `{work_dir}` are available to every task. `{input_files}` is available in batch mode alone, and `{input_file}` in per-file mode alone. | [A] |
+| FR-4.2 | Every path bolt substitutes is individually quoted, so a path carrying a space, a quote or a semicolon can neither split the command line nor inject into it. | [A] |
+| FR-4.3 | A task whose command names `{input_file}` or `{input_files}` does not execute when its filtered list is empty, and produces no output. A task naming neither always executes. | [A] |
+| FR-4.4 | Tasks execute serially. | [A] |
+| FR-4.5 | No task consumes another task's output. Work needing several steps is one script producing one exit code and one output. | [A] |
+| FR-4.6 | Because no task depends on another, the merged result does not vary with the order tasks ran in. | [D] |
 
-## 4. Result envelopes
-
-*Derives from:* §3.1 on the shared envelope model, §3.4 on malformed evidence,
-§22 on the files a run produces.
+## 5. Nested jigs
 
 | ID | Requirement | |
 |---|---|---|
-| FR-4.1 | Every execution element produces a result envelope, and so does the merge. | [A] |
-| FR-4.2 | Bolt's envelopes use the ecosystem's shared envelope vocabulary. An element envelope, a merge envelope, a task-node envelope and an azimuth envelope are read the same way by the same consumer. | [A] |
-| FR-4.3 | An envelope bolt writes conforms to the envelope schema. A malformed envelope is a failure of whatever produced it, so bolt emitting one is a defect and never a reportable outcome. | [A/D] |
-| FR-4.4 | An envelope is written whole or not at all. A run killed partway through leaves no half-written envelope for a consumer to read as authoritative. | [D] |
-| FR-4.5 | An element whose adapter could not produce a result is distinguishable from an element whose adapter produced a failing result. A crashed producer has reached no authoritative outcome; a failing one has. | [D] |
-| FR-4.6 | Envelopes are files and survive the process that wrote them. | [A/D] |
-| FR-4.7 | Each execution element writes its own file, named after the element, and the merge writes `run_result.yaml`. | [A] |
+| FR-5.1 | A task may name a jig in place of a command. | [A] |
+| FR-5.2 | A nested run writes into its own subdirectory inside that task's work directory, and its `result.yaml` is linked as the task's `output.yaml` by a relative symlink, so the whole tree survives being moved or archived. | [A/D] |
+| FR-5.3 | A jig task carries the same bookkeeping files as a command task, so nothing reading `work/*/` needs to know which kind it is looking at. | [A/D] |
+| FR-5.4 | The merge does not know that a constituent was a nested run. Nesting is a special case at invocation and nowhere else. | [A/D] |
+| FR-5.5 | A nested jig receives its parent's input file list filtered by the jig task's own `matching:`, so scope narrows monotonically with depth and a jig's reach is readable from its ancestors. | [A] |
+| FR-5.6 | Bolt carries its nesting depth in the environment of every process it spawns, and increments it on finding the variable already set. The depth therefore survives reparenting, backgrounding and a task command that invokes bolt directly rather than through a jig task. | [A/D] |
+| FR-5.7 | The ceiling defaults to 4 and is read from the environment only at the outermost invocation, so a jig cannot raise the limit it is running under. | [A/D] |
+| FR-5.8 | A run refused for depth writes its own `result.yaml` with `success: false` and a reason naming the limit, then exits non-zero. Its parent's link resolves, and the merge folds an ordinary failure. | [A] |
 
-## 5. The merge and the gate
-
-*Derives from:* §22.
-
-| ID | Requirement | |
-|---|---|---|
-| FR-5.1 | The merge passes only when every required constituent result passes. | [A] |
-| FR-5.2 | The merged result carries the reasons, failures, statistics, metadata and evidence references its constituents produced, so what failed and why is readable from the merged file alone. | [A/D] |
-| FR-5.3 | The merged result references its constituent envelopes without replacing them. Both levels stay on disk. | [D] |
-
-## 6. Exit status
-
-*Derives from:* §23, and §3.1 on not inferring success from a child's exit code.
+## 6. Adapters
 
 | ID | Requirement | |
 |---|---|---|
-| FR-6.1 | Bolt's exit status answers one question: could bolt execute the requested task ETL? | [A] |
-| FR-6.2 | A run in which every element executed and some tools reported failures exits 0 and writes `passed: false`. That pairing is correct. | [A] |
-| FR-6.3 | The authoritative quality verdict is the envelope. A caller reading bolt's exit status to learn whether the tools passed has read the wrong thing. | [A] |
-| FR-6.4 | Bolt exits non-zero when it could not carry out the requested ETL, and says why on its own error stream, because in that case there may be no envelope to read. | [D] |
+| FR-6.1 | An adapter is a separate process. It turns one task execution's captured output into a result envelope, and nothing else in bolt decides whether that execution passed. | [A] |
+| FR-6.2 | The default adapter invocation names the captured files: `--stdout`, `--stderr`, `--evidence` and `--exitcode`. A task may write its adapter invocation explicitly in place of the default. | [A] |
+| FR-6.3 | A child process's exit code reaches its adapter as a file. Bolt reaches no verdict of its own from it. | [A] |
+| FR-6.4 | An adapter is chosen by the output format it reads. Any tool emitting a format some adapter understands reuses that adapter, whoever wrote the tool. | [A] |
+| FR-6.5 | Adapters read structured formats as well as exit codes: Cobertura, pytest JSON, and other structured test and coverage reports. | [A] |
+| FR-6.6 | Fixing an adapter and re-folding a finished run costs no re-execution, because every input an adapter reads is already on disk. | [D] |
 
-## 7. Where a run happens
-
-*Derives from:* §4 on the control plane sitting outside worker sandboxes, §63
-and §65 on validating an exact tree state.
-
-| ID | Requirement | |
-|---|---|---|
-| FR-7.1 | A run needs nothing from outside the tree it is given. Control-plane state is absent from a worker sandbox, so a run depending on it could not execute there. | [D] |
-| FR-7.2 | A run's whole effect is the evidence it writes. It changes no graph state, no task state and no other control-plane record. | [D] |
-| FR-7.3 | The same jig runs against whatever tree state it is pointed at, including a throwaway copy prepared to test a prospective merge. | [D] |
-| FR-7.4 | A result identifies the exact repository state it was produced from, so a later reader can tell whether the evidence still describes the tree in front of them. Trust attaches to a tree state and never to a branch name. | [D] |
-
-## 8. The program
-
-*Derives from:* §5 on licensing, §25 on standardised images, §70 on dogfooding.
+## 7. Result envelopes
 
 | ID | Requirement | |
 |---|---|---|
-| NFR-8.1 | Bolt runs itself. Its own quality gate is a bolt run over its own repository. | [A] |
-| NFR-8.2 | Bolt installs into a standardised development image beside a toolchain it knows nothing about. | [D] |
-| NFR-8.3 | Bolt is MIT licensed. | [A] |
+| FR-7.1 | `success`, a boolean, is the only key every envelope carries. | [A] |
+| FR-7.2 | `reasons` is present when `success` is false. Its members are objects whose shape is open, so whatever detail a producer holds can travel with the failure. | [A] |
+| FR-7.3 | `metadata` is optional, and carries `statistics` and `evidence` where a producer has them. | [A] |
+| FR-7.4 | Bolt's envelopes use the ecosystem's shared vocabulary. An envelope from a task, from a merge, from a task node or from azimuth is read the same way by the same consumer. | [A] |
+| FR-7.5 | An envelope is written whole or not at all. A run killed partway leaves no half-written envelope for a consumer to read as authoritative. | [D] |
+| FR-7.6 | A task with no readable `output.yaml` has reached no authoritative result, which is a different condition from having failed. | [A/D] |
 
-## 9. Open
+## 8. The merge
+
+| ID | Requirement | |
+|---|---|---|
+| FR-8.1 | A run has exactly one result. The merge reads every `work/*/output.yaml` and folds them into one `result.yaml`, mechanically, and repeatably over a finished directory. | [A/D] |
+| FR-8.2 | The merge rewrites `evidence` from a list of paths into a mapping keyed by task, each entry carrying that task's args and the filepath of its own result. | [A] |
+| FR-8.3 | The merged result passes only when every required constituent passes. | [A] |
+| FR-8.4 | The merged result carries the reasons, statistics and evidence references its constituents produced, so what failed and why is readable from the merged file alone. | [A/D] |
+| FR-8.5 | Constituent envelopes survive the merge. Both levels stay on disk. | [D] |
+
+## 9. The output directory
+
+A run's whole output is one directory:
+
+```
+<output-dir>/
+  result.yaml
+  work/
+    <task>-####/
+      manifest
+      stdout
+      stderr
+      exitcode
+      <artifacts the command wrote>
+      output.yaml
+```
+
+| ID | Requirement | |
+|---|---|---|
+| FR-9.1 | A run's whole output is one directory, so a run can be archived, moved or handed to somebody as a single artifact. | [A/D] |
+| FR-9.2 | Each task execution gets its own directory holding the command as executed, captured stdout and stderr, the exit code as a file, whatever artifacts the command wrote, and the adapter's `output.yaml`. | [A] |
+| FR-9.3 | One execution's evidence is complete inside one directory. A reader needs nothing outside it to see what ran and what happened. | [D] |
+| FR-9.4 | Serial execution makes the ordinals deterministic, so two runs over the same input file list produce identical work directory names and two run directories diff cleanly. | [D] |
+
+## 10. Exit status
+
+| ID | Requirement | |
+|---|---|---|
+| FR-10.1 | Bolt's exit status answers one question: could bolt execute the requested task ETL? | [A] |
+| FR-10.2 | A run in which every task executed and some tools reported failures exits 0 and writes `success: false`. That pairing is correct. | [A/D] |
+| FR-10.3 | The authoritative quality verdict is the envelope. A caller reading bolt's exit status to learn whether the tools passed has read the wrong thing. | [A] |
+| FR-10.4 | Bolt exits non-zero when it could not carry out the requested ETL. | [A] |
+
+## 11. Where a run happens
+
+| ID | Requirement | |
+|---|---|---|
+| FR-11.1 | A run needs nothing beyond the jigs it was named, the paths it was handed, and the tree those paths sit in. Control-plane state is absent from a worker sandbox, so a run depending on it could not execute there. | [D] |
+| FR-11.2 | A run's whole effect is the directory it writes. It changes no graph state, no task state and no other control-plane record. | [D] |
+| FR-11.3 | The same jig runs against whatever tree state it is pointed at, including a throwaway copy prepared to test a prospective merge. | [D] |
+
+## 12. The program
+
+| ID | Requirement | |
+|---|---|---|
+| NFR-12.1 | Bolt runs itself. Its own quality gate is a bolt run over its own repository. | [A] |
+| NFR-12.2 | Bolt installs into a standardised development image beside a toolchain it knows nothing about. | [D] |
+| NFR-12.3 | Bolt is MIT licensed. | [A] |
+
+## 13. Open
 
 Each row states a property that must eventually hold and cannot be stated yet.
 The questions that would settle them are in `NEXT_STEPS.md`.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-9.1 | The envelope has one defined field schema, published where every producer and consumer validates against it. The architecture names the envelope as a primary contract and does not state its fields. | [?] |
-| FR-9.2 | An execution element declares what it runs, what adapts it, and what it depends on, through a defined set of fields. | [?] |
-| FR-9.3 | An adapter is invoked through a defined contract fixing what it receives and what it must return. | [?] |
-| FR-9.4 | An element that exceeds a time budget reaches a defined outcome, and the run stops or continues by a stated rule. | [?] |
-| FR-9.5 | A run's artifacts are written to defined paths under defined names, so a consumer finds an element's evidence without guessing. | [?] |
-| FR-9.6 | Which files an element runs over is decided by a stated rule. | [?] |
-| FR-9.7 | Element ordering and concurrency follow stated rules, and the merged result does not vary with execution order. | [?] |
-| FR-9.8 | A jig invoking another combines their settings by a stated precedence, and a parent can override or disable what a child declares. | [?] |
-| FR-9.9 | Whether a constituent is required is declared, with a stated default. | [?] |
-| FR-9.10 | The boundary between bolt and the rest of the ecosystem is fixed: what bolt produces, and what ratchet, toolbox and the caller produce around it. | [?] |
+| FR-13.1 | A nested jig and its parent agree on one coordinate system for paths, so a path in a nested envelope means the same thing to a reader of the outermost result. | [?] |
+| FR-13.2 | An adapter writes its envelope to a defined place, named in the contract that invokes it. | [?] |
+| FR-13.3 | A task that could not execute is distinguishable in `result.yaml` from one that executed and failed. | [?] |
+| FR-13.4 | A task skipped for an empty file list is distinguishable in `result.yaml` from one that was never declared, so a green result cannot mean that nothing was checked. | [?] |
+| FR-13.5 | Whether a constituent is required is declared, with a stated default. | [?] |
+| FR-13.6 | A task that exceeds a time budget reaches a defined outcome. | [?] |
+| FR-13.7 | Run directories are removed on a stated rule, so a dogfooding repository does not accumulate them without bound. | [?] |
+| FR-13.8 | Evidence can be tied to the exact tree state it was produced from, as §65 requires, by something. Bolt reads no git, so either it acquires that dependency or the requirement belongs to the caller. | [?] |
+| FR-13.9 | The number of bolt runs a user may have live at once is bounded, if that guard is wanted at all. | [?] |
+| FR-13.10 | The jig is written in a defined format, validated against a schema. | [?] |
+| FR-13.11 | The envelope schema is owned and published somewhere every producer and consumer in the ecosystem can validate against. | [?] |
