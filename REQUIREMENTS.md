@@ -80,7 +80,7 @@ composition does not.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-4.1 | `{project_root}` and `{work_dir}` are available to every task. `{input_files}` is available in batch mode alone, and `{input_file}` in per-file mode alone. | [A] |
+| FR-4.1 | `{project_root}` and `{work_dir}` are available to every task. `{input_files}` is available in batch mode alone, and `{input_file}` in `perPath` mode alone. | [A] |
 | FR-4.2 | Every path bolt substitutes is individually quoted, so a path carrying a space, a quote or a semicolon can neither split the command line nor inject into it. | [A] |
 | FR-4.3 | A task whose command names `{input_file}` or `{input_files}` does not execute when its filtered list is empty, and produces no output. A task naming neither always executes. | [A] |
 | FR-4.4 | Tasks execute serially. | [A] |

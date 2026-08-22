@@ -35,10 +35,12 @@ recommendation.
 
 ## Tasks and the jig
 
-10. What are the runmode values? `once`, `batch` and `perFile` are what the
-    substitution rules imply.
+10. `perPath` is settled. Are the other two `once` and `batch`? And do the
+    substitution variables follow the rename? An input is a file or a folder,
+    so `{input_file}` naming a directory is misleading, and `{input_path}` with
+    `{input_paths}` would match the mode.
 11. Is `matching:` one glob or a list, and is there an exclude counterpart?
-12. Is naming `{input_files}` in a per-file task a jig error caught at parse, or
+12. Is naming `{input_files}` in a `perPath` task a jig error caught at parse, or
     a runtime failure?
 13. What is the command's working directory: `{project_root}` or `{work_dir}`?
 14. Is the environment handed to a task command inherited wholesale, filtered to
@@ -137,9 +139,10 @@ Nothing in the architecture mentions time. All of this is unstated.
     `bolt py-jig src/` quietly check nothing. Match a folder when anything
     under it would match, which is the discovery FR-2.2 says bolt does not do;
     match the folder path against the glob as written; or pass folders to every
-    task regardless.
+    task regardless. And is a folder meaningful in `perPath` mode, or a jig
+    error there?
 51. Does bolt dedupe the list and preserve the caller's order? Order decides the
-    per-file ordinal, so a caller reordering its `git diff` output renumbers
+    per-path ordinal, so a caller reordering its `git diff` output renumbers
     every work directory.
 52. Does a refusal take the same shape as a depth refusal, writing a
     `result.yaml` with `success: false` and a reason naming the offending
