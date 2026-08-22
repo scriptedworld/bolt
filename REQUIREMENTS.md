@@ -57,6 +57,7 @@ composition does not.
 | FR-1.8 | Validation runs before writing as well as after reading. Bolt checks a file against its schema on the way out, so it cannot emit something it would refuse to read back. | [A] |
 | FR-1.9 | Every read and every write goes through one path that requires a schema. Validation is not a step a call site can omit, so a file bolt handles is covered because of how it was handled rather than because somebody remembered. | [A] |
 | FR-1.10 | YAML is written in canonical form: block style, one key to a line, scalars quoted. Flow style is valid YAML and so is JSON, and neither is what bolt emits. Two results then differ by the lines that changed rather than by one long line. | [A] |
+| FR-1.11 | A shared file-and-schema validating mechanism lives in toolbox, for producers that are not bolt and for the conformance tests of FR-6.8. Bolt validates without it installed, so a bolt with no toolbox beside it still refuses a malformed file. | [A/D] |
 
 ## 2. Invocation
 

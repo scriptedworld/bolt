@@ -267,14 +267,18 @@ without any of it and let tools finish.
     wrap it in something of its own?
 75. Does bolt stamp the tree state §65 wants, or does that move to the caller?
     Bolt reads no git for anything else.
-76. Who owns the envelope schema, given §3.1 makes it ecosystem-wide: bolt,
-    toolbox, or a standalone definition none of them owns? This one has moved
-    into blocking territory: FR-1.5 validates everything read as data, and
-    there is nothing to validate against until it is answered.
-77. FR-6.8 makes conformance a boilerplate test an adapter inherits. Does a
-    producer outside bolt get the same thing, and where does it live? Toolbox
-    is the obvious home. Without it, azimuth and a task node discover their
-    mistakes through somebody else's merge.
+76. Where does the envelope schema itself live? The validating mechanism is
+    toolbox's, but FR-1.11 has bolt validating with no toolbox present, so bolt
+    needs the schema without depending on toolbox shipping it. Bolt embeds a
+    copy and toolbox holds the source of truth, which is two files that drift;
+    or bolt owns it and toolbox's validator reads bolt's, which inverts who
+    owns an ecosystem contract; or it is a standalone artifact both depend on.
+    Blocking, because FR-1.5 validates everything and there is nothing to
+    validate against until this is answered.
+77. Is toolbox's validator a standalone tool run as a jig task, or something
+    bolt links against? Standalone keeps the dependency pointing one way:
+    toolbox already holds bolt's adapters, and bolt importing toolbox would
+    close a circle. It also matches how toolbox's other checkers work.
 78. Does bolt have an interface other than a command line? An importable
     library used by another Go component would change what the requirements
     cover.
