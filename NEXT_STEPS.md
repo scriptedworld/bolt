@@ -22,8 +22,10 @@ recommendation.
 
 ## The jig, and reaching it
 
-1. What format is a jig written in? FR-3.4c narrows it: the format has to carry
-   comments, since that is where an entry's reasoning lives. JSON is out.
+1. How is a jig validated, given TOML has no schema language in common use the
+   way JSON Schema serves YAML? Validating the decoded structure rather than
+   the text lets one mechanism cover both a jig and an envelope; hand-written
+   checks in bolt are the alternative and drift from the document faster.
 2. How is a jig named on the command line: a path, or a bare name resolved
    against a search path? `link-jigs` gives a bare name somewhere to resolve.
 3. May an invocation name more than one jig? An earlier answer said bolt is
@@ -55,7 +57,7 @@ recommendation.
 10. Is the walk order deterministic, sorted rather than whatever the filesystem
     returns? FR-9.4 claims two runs over the same tree produce identical work
     directory names, and that claim rests on this.
-11. Can a task reach a file `.gitignore` excludes? `matching:` narrows what the
+11. Can a task reach a file `.gitignore` excludes? `matching` narrows what the
     walk found, and the walk has already dropped ignored files, so there is
     currently no way back. Generated code somebody does want checked is the
     case, and it may not be worth an escape hatch until it turns up.
