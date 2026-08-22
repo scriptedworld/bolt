@@ -39,7 +39,13 @@ recommendation.
 11. Is `matching:` one glob or a list, and is there an exclude counterpart?
 12. Is naming `{input_paths}` in a `perPath` task a jig error caught at parse, or
     a runtime failure?
-13. What is the command's working directory: `{project_root}` or `{work_dir}`?
+13. What is the command's working directory: the project root, the run's base,
+    or the work directory? This is the one thing separate location variables do
+    not solve, because a tool like `go vet ./...` cares where it is standing
+    and not which path it was handed.
+    And what are the three called? `{project_root}` currently means the run's
+    base, so splitting them needs a name for each; `{project_root}`,
+    `{base_dir}` and `{work_dir}` is one spelling.
 14. Is the environment handed to a task command inherited wholesale, filtered to
     an allowlist, or declared per task? Whatever the rule, the depth variable
     has to survive it.
@@ -159,9 +165,12 @@ Nothing in the architecture mentions time. All of this is unstated.
     `matching:` as a precondition says no, and a base with nothing under it
     should presumably behave the same way, so a jig for a subtree nobody
     touched never starts.
-56. How does a jig declare it needs the repository root, and what happens when
-    a jig task bases it at a subdirectory anyway: refuse the run, or run it at
-    the root with the input list still narrowed?
+56. Does FR-5.11's whole-jig override survive separate location variables? A jig
+    that "needs the repository root" usually needs it for one path, a shared
+    config or a header template, and a variable naming the root covers that
+    per-use without surrendering the base. What it does not cover is a tool
+    that must be standing at the root, which is question 13. If the override is
+    only for that, it is about the working directory and not about the base.
 57. May the same jig appear as two jig tasks with different bases, `go-quality`
     on `backend` and again on `tools`? FR-3.3 makes the task name the work
     directory prefix, so each needs a distinct name, and it is worth knowing

@@ -80,12 +80,13 @@ composition does not.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-4.1 | `{project_root}` and `{work_dir}` are available to every task. `{input_paths}` is available in batch mode alone, and `{input_path}` in `perPath` mode alone. | [A] |
-| FR-4.2 | Every path bolt substitutes is individually quoted, so a path carrying a space, a quote or a semicolon can neither split the command line nor inject into it. | [A] |
-| FR-4.3 | A task whose command names `{input_path}` or `{input_paths}` does not execute when its filtered selection is empty, and produces no output. A task naming neither always executes. | [A] |
-| FR-4.4 | Tasks execute serially. | [A] |
-| FR-4.5 | No task consumes another task's output. Work needing several steps is one script producing one exit code and one output. | [A] |
-| FR-4.6 | Because no task depends on another, the merged result does not vary with the order tasks ran in. | [D] |
+| FR-4.1 | Three locations are separately specifiable and separately available to every task: the project root, the base this run operates from, and the execution's own work directory. The outermost run is assumed to sit at the project root and a nested one is not, so a jig based on a subtree can still reach a config file at the root without giving up its base. | [A] |
+| FR-4.2 | `{input_paths}` is available in batch mode alone, and `{input_path}` in `perPath` mode alone. | [A] |
+| FR-4.3 | Every path bolt substitutes is individually quoted, so a path carrying a space, a quote or a semicolon can neither split the command line nor inject into it. | [A] |
+| FR-4.4 | A task whose command names `{input_path}` or `{input_paths}` does not execute when its filtered selection is empty, and produces no output. A task naming neither always executes. | [A] |
+| FR-4.5 | Tasks execute serially. | [A] |
+| FR-4.6 | No task consumes another task's output. Work needing several steps is one script producing one exit code and one output. | [A] |
+| FR-4.7 | Because no task depends on another, the merged result does not vary with the order tasks ran in. | [D] |
 
 ## 5. Nested jigs
 
@@ -100,7 +101,7 @@ composition does not.
 | FR-5.7 | The ceiling defaults to 4 and is read from the environment only at the outermost invocation, so a jig cannot raise the limit it is running under. | [A/D] |
 | FR-5.8 | A run refused for depth writes its own `result.yaml` with `success: false` and a reason naming the limit, then exits non-zero. Its parent's link resolves, and the merge folds an ordinary failure. | [A] |
 | FR-5.9 | Paths are absolute at every depth, so a nested run's evidence folds into its parent with nothing rewritten. A path means the same thing to a child and to its parent. | [A/D] |
-| FR-5.10 | A jig task runs its jig either for the project it is already in or for a named subdirectory. Naming one makes that subdirectory the child's base, narrowing `{project_root}` and the containment check together, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A] |
+| FR-5.10 | A jig task runs its jig either for the project it is already in or for a named subdirectory. Naming one makes that subdirectory the child's base, narrowing the base and the containment check together while the project root stays what it was, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A] |
 | FR-5.11 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
 | FR-5.12 | A jig task either filters or re-bases, never both. A `matching:` pattern is written against the base it appears in, so re-basing the child would silently change what that pattern meant; giving one therefore keeps the child at its parent's base. Naming a subtree makes the subtree the selector, and no pattern is written. | [A] |
 | FR-5.13 | A jig task's `matching:` is a precondition read before the child runs, stating that the jig is needed for instances of that pattern. | [A] |
