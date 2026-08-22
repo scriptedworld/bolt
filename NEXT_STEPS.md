@@ -161,22 +161,22 @@ Nothing in the architecture mentions time. All of this is unstated.
 
 ## Nested jigs
 
-55. Does a jig task whose selection comes up empty run at all? Reading
-    `matching:` as a precondition says no, and a base with nothing under it
-    should presumably behave the same way, so a jig for a subtree nobody
-    touched never starts.
-56. Does FR-5.11's whole-jig override survive separate location variables? A jig
+55. Is a jig task's subdirectory required to be a direct child of the current
+    base, or may it name a deeper path like `services/api/`? "A subdir of your
+    dir" reads as either.
+56. Does FR-5.12's whole-jig override survive separate location variables? A jig
     that "needs the repository root" usually needs it for one path, a shared
     config or a header template, and a variable naming the root covers that
-    per-use without surrendering the base. What it does not cover is a tool
+    per use without surrendering the base. What it does not cover is a tool
     that must be standing at the root, which is question 13. If the override is
     only for that, it is about the working directory and not about the base.
-    What is the base field called on a jig task? `base:` states what it does
-    and needs no flag beside it explaining that it re-bases.
+    It also cuts against FR-5.10: the point of a base is that a nested project
+    has its own root, and a jig reaching past it is working against that.
 57. May the same jig appear as two jig tasks with different bases, `go-quality`
-    on `backend` and again on `tools`? FR-3.3 makes the task name the work
-    directory prefix, so each needs a distinct name, and it is worth knowing
-    whether that name is the jig's or the task's.
+    on `backend` and again on `tools`? Two nested Go modules in one repository
+    is the ordinary case, so presumably yes. FR-3.3 makes the task name the
+    work directory prefix, so each needs a distinct name, and it is worth
+    knowing whether that name is the jig's or the task's.
 58. Does a jig task carry a runmode, or is it always handed its filtered list
     once?
 59. Subprocess or in-process? Subprocess gives the five bookkeeping files for

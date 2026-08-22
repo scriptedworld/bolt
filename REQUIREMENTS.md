@@ -96,16 +96,15 @@ composition does not.
 | FR-5.2 | A nested run writes into its own subdirectory inside that task's work directory, and its `result.yaml` is linked as the task's `output.yaml` by a relative symlink, so the whole tree survives being moved or archived. | [A/D] |
 | FR-5.3 | A jig task carries the same bookkeeping files as a command task, so nothing reading `work/*/` needs to know which kind it is looking at. | [A/D] |
 | FR-5.4 | The merge does not know that a constituent was a nested run. Nesting is a special case at invocation and nowhere else. | [A/D] |
-| FR-5.5 | A nested jig receives its parent's input file list filtered by the jig task's own `matching:`, so scope narrows monotonically with depth and a jig's reach is readable from its ancestors. | [A] |
+| FR-5.5 | A jig task carries no filter. The child receives the input paths lying under its base, and the child jig's own tasks filter from there against that base. Selecting files is the nested jig's business, not its caller's. | [A] |
 | FR-5.6 | Bolt carries its nesting depth in the environment of every process it spawns, and increments it on finding the variable already set. The depth therefore survives reparenting, backgrounding and a task command that invokes bolt directly rather than through a jig task. | [A/D] |
 | FR-5.7 | The ceiling defaults to 4 and is read from the environment only at the outermost invocation, so a jig cannot raise the limit it is running under. | [A/D] |
 | FR-5.8 | A run refused for depth writes its own `result.yaml` with `success: false` and a reason naming the limit, then exits non-zero. Its parent's link resolves, and the merge folds an ordinary failure. | [A] |
 | FR-5.9 | Paths are absolute at every depth, so a nested run's evidence folds into its parent with nothing rewritten. A path means the same thing to a child and to its parent. | [A/D] |
-| FR-5.10 | A jig task runs its jig either for the project it is already in or for a named subdirectory. Naming one makes that subdirectory the child's base, narrowing the base and the containment check together while the project root stays what it was, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A] |
-| FR-5.11 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
-| FR-5.12 | A jig task naming a base re-bases its child there. Naming none runs the child at its parent's base. The field is the statement, with no separate flag beside it. A base and a `matching:` do not appear together, because a pattern is written against the base it sits in and re-basing would silently change what it meant. | [A/D] |
-| FR-5.13 | A jig task's `matching:` is a precondition read before the child runs, stating that the jig is needed for instances of that pattern. | [A] |
-| FR-5.14 | An empty selection stops a jig task starting, by the same rule that stops a `perPath` task. A jig for a subtree nobody touched never runs and contributes nothing. | [A] |
+| FR-5.10 | A jig task names a jig and, optionally, a subdirectory of the current base to run it in. Naming one says something specific: a project of that jig's kind lives there, a Go module with its own `go.mod`, a Python package with its own `pyproject.toml`. The declaration is that applying this jig at this level is worth something, and that directory becomes the child's base. | [A] |
+| FR-5.11 | Naming a subdirectory narrows the base and the containment check together while the project root stays what it was, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A/D] |
+| FR-5.12 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
+| FR-5.13 | A jig task with no input paths under its base does not run, by the same rule that stops a `perPath` task. A nested project nobody touched contributes nothing. | [A] |
 
 ## 6. Adapters
 
