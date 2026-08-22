@@ -271,9 +271,10 @@ without any of it and let tools finish.
     toolbox, or a standalone definition none of them owns? This one has moved
     into blocking territory: FR-1.5 validates everything read as data, and
     there is nothing to validate against until it is answered.
-77. Is there a published validator for FR-7.7's bar that another producer can
-    run against its own output? Toolbox is the obvious home, and without one
-    every producer discovers its mistakes through somebody else's merge.
+77. FR-6.8 makes conformance a boilerplate test an adapter inherits. Does a
+    producer outside bolt get the same thing, and where does it live? Toolbox
+    is the obvious home. Without it, azimuth and a task node discover their
+    mistakes through somebody else's merge.
 78. Does bolt have an interface other than a command line? An importable
     library used by another Go component would change what the requirements
     cover.

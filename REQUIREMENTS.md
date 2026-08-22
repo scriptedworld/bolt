@@ -54,6 +54,9 @@ composition does not.
 | FR-1.6 | Validation is two steps: can the parser load the file at all, and does the structure it produced match the JSON Schema for that kind of file. Schemas apply to decoded maps and lists rather than to text, so one mechanism covers everything bolt reads. | [A] |
 | FR-1.6a | FR-1.5, FR-1.6 and FR-3.4d are ecosystem decisions bolt honours rather than decisions bolt makes. YAML everywhere and JSON Schema over decoded structures apply to every component, and bolt does not get to differ. Filed for the architecture document as `clank/inbox/silo/yaml-and-json-schema-is-a-platform-decision/`. | [A] |
 | FR-1.7 | A schema checks shape, not meaning. A command that parsed differently from how it was written is still a string of the right type, and validation passes it. | [D] |
+| FR-1.8 | Validation runs before writing as well as after reading. Bolt checks a file against its schema on the way out, so it cannot emit something it would refuse to read back. | [A] |
+| FR-1.9 | Every read and every write goes through one path that requires a schema. Validation is not a step a call site can omit, so a file bolt handles is covered because of how it was handled rather than because somebody remembered. | [A] |
+| FR-1.10 | YAML is written in canonical form: block style, one key to a line, scalars quoted. Flow style is valid YAML and so is JSON, and neither is what bolt emits. Two results then differ by the lines that changed rather than by one long line. | [A] |
 
 ## 2. Invocation
 
@@ -130,6 +133,8 @@ composition does not.
 | FR-6.4 | An adapter is chosen by the output format it reads. Any tool emitting a format some adapter understands reuses that adapter, whoever wrote the tool. | [A] |
 | FR-6.5 | Adapters read structured formats as well as exit codes: Cobertura, pytest JSON, and other structured test and coverage reports. | [A] |
 | FR-6.6 | Fixing an adapter and re-folding a finished run costs no re-execution, because every input an adapter reads is already on disk. | [D] |
+| FR-6.7 | Every adapter, and the merge, carries tests asserting that what it produces validates against the envelope schema. FR-1.8's check on the way out is a backstop; the guarantee is that a producer which would emit something invalid fails its own suite first. | [A] |
+| FR-6.8 | Those tests are boilerplate rather than written afresh per adapter, so conformance arrives with writing an adapter instead of being something each author has to remember. | [A] |
 
 ## 7. Result envelopes
 
