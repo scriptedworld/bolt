@@ -267,18 +267,19 @@ without any of it and let tools finish.
     wrap it in something of its own?
 75. Does bolt stamp the tree state §65 wants, or does that move to the caller?
     Bolt reads no git for anything else.
-76. Where does the envelope schema itself live? The validating mechanism is
-    toolbox's, but FR-1.11 has bolt validating with no toolbox present, so bolt
-    needs the schema without depending on toolbox shipping it. Bolt embeds a
-    copy and toolbox holds the source of truth, which is two files that drift;
-    or bolt owns it and toolbox's validator reads bolt's, which inverts who
-    owns an ecosystem contract; or it is a standalone artifact both depend on.
-    Blocking, because FR-1.5 validates everything and there is nothing to
-    validate against until this is answered.
-77. Is toolbox's validator a standalone tool run as a jig task, or something
-    bolt links against? Standalone keeps the dependency pointing one way:
-    toolbox already holds bolt's adapters, and bolt importing toolbox would
-    close a circle. It also matches how toolbox's other checkers work.
+76. What is the project called, and does the name stay `wrench`? Filed as a
+    candidate in `clank/inbox/silo/yaml-and-json-schema-is-a-platform-decision/`
+    along with the argument against it, that a wrench turns a bolt while here
+    bolt depends on wrench.
+77. Inside that project: one C core with bindings, or a library per language
+    wrapping a stock JSON Schema validator? NFR-12.4 argues against C, because
+    a Go binding means cgo, and cgo costs static linking and cross-compilation
+    for the one thing bolt most wants to stay: a single file an image carries.
+    JSON Schema also exists so independent implementations agree, so a C core
+    solves by construction what the specification already solves. What per
+    language costs is the wrapper around validation, canonical emission and
+    error shape, which can drift between bindings, and a shared fixture suite
+    every binding runs would hold them level.
 78. Does bolt have an interface other than a command line? An importable
     library used by another Go component would change what the requirements
     cover.

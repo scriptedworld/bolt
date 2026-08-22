@@ -57,7 +57,9 @@ composition does not.
 | FR-1.8 | Validation runs before writing as well as after reading. Bolt checks a file against its schema on the way out, so it cannot emit something it would refuse to read back. | [A] |
 | FR-1.9 | Every read and every write goes through one path that requires a schema. Validation is not a step a call site can omit, so a file bolt handles is covered because of how it was handled rather than because somebody remembered. | [A] |
 | FR-1.10 | YAML is written in canonical form: block style, one key to a line, scalars quoted. Flow style is valid YAML and so is JSON, and neither is what bolt emits. Two results then differ by the lines that changed rather than by one long line. | [A] |
-| FR-1.11 | A shared file-and-schema validating mechanism lives in toolbox, for producers that are not bolt and for the conformance tests of FR-6.8. Bolt validates without it installed, so a bolt with no toolbox beside it still refuses a malformed file. | [A/D] |
+| FR-1.11 | The schema and a library for each language that reads or writes an envelope live in one project of their own, `wrench` being the candidate name. A Go producer and a Python producer get the same definition and equivalent code, shipped together, rather than a schema in one repository and implementations elsewhere obliged to keep up with it. | [A] |
+| FR-1.12 | Bolt reads and writes envelopes through that project's Go library, so bolt is one consumer of the contract and not its owner. | [A/D] |
+| FR-1.13 | Bolt validates with nothing else installed beside it. | [A] |
 
 ## 2. Invocation
 
@@ -212,6 +214,7 @@ A run's whole output is one directory:
 | NFR-12.1 | Bolt runs itself. Its own quality gate is a bolt run over its own repository. | [A] |
 | NFR-12.2 | Bolt installs into a standardised development image beside a toolchain it knows nothing about. | [D] |
 | NFR-12.3 | Bolt is MIT licensed. | [A] |
+| NFR-12.4 | Bolt builds without a C toolchain and links statically, so an image carries one file and a cross-build needs no target compiler. Anything bolt links against inherits that constraint. | [D] |
 
 ## 13. Open
 
