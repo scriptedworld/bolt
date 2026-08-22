@@ -22,10 +22,11 @@ recommendation.
 
 ## The jig, and reaching it
 
-1. How is a jig validated, given TOML has no schema language in common use the
-   way JSON Schema serves YAML? Validating the decoded structure rather than
-   the text lets one mechanism cover both a jig and an envelope; hand-written
-   checks in bolt are the alternative and drift from the document faster.
+1. Are the schemas shipped as files a jig author can point an editor at? A YAML
+   language server given a JSON Schema gives completion and inline errors while
+   the jig is being written, which is where a `matching` typo is cheapest to
+   find. It also decides whether the schemas are an artifact or an
+   implementation detail.
 2. How is a jig named on the command line: a path, or a bare name resolved
    against a search path? `link-jigs` gives a bare name somewhere to resolve.
 3. May an invocation name more than one jig? An earlier answer said bolt is
