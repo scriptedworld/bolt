@@ -124,15 +124,22 @@ Nothing in the architecture mentions time. All of this is unstated.
 
 ## The input file list
 
-49. Are input paths used verbatim or normalised, and against what root? An
-    absolute path out of a worker sandbox means nothing to a control-plane
-    reader.
+49. Does resolving to absolute follow symlinks? Lexical resolution leaves a
+    symlink inside the project pointing at `/etc/shadow` passing the
+    containment check. Following links closes that and breaks a legitimate
+    call: `link-jigs` leaves tracked symlinks whose targets are in toolbox, so
+    `bolt go-quality $(git ls-files)` in a project using shared jigs would
+    refuse. Follow links and let callers filter, judge containment by the
+    link's own path, or follow links and treat an outward-pointing symlink as
+    excluded rather than fatal.
 50. May a directory appear in the list, and who expands it?
 51. Does bolt dedupe the list and preserve the caller's order? Order decides the
     per-file ordinal, so a caller reordering its `git diff` output renumbers
     every work directory.
-52. Does bolt verify each path exists before running, or pass through whatever
-    it was given?
+52. Does a refusal take the same shape as a depth refusal, writing a
+    `result.yaml` with `success: false` and a reason naming the offending
+    paths, then exiting non-zero? That is the rule already set once, and only a
+    bolt that dies leaves nothing behind.
 53. `{input_files}` over a large list will exceed `ARG_MAX`. Does bolt chunk
     into several executions, or is that the jig author's problem?
 54. What does an entirely empty file list mean for a jig whose tasks all consume
@@ -141,12 +148,12 @@ Nothing in the architecture mentions time. All of this is unstated.
 
 ## Nested jigs
 
-55. The coordinate system. Verbatim paths keep one system across every depth and
-    let the merge fold a child untouched, at the cost of a Go jig that has to
-    know it lives at `backend/`. Rebased paths make a jig drop-in at any depth,
-    at the cost of the parent's merge re-prefixing every path out of a child,
-    which is the one thing FR-5.4 keeps out of the merge.
-56. Is the child's `{project_root}` the parent's root, or the subtree?
+55. May a jig task set its child's project directory? If it can, a shared jig
+    is drop-in at any depth: point it at `backend/`, and `{project_root}` and
+    the containment check both narrow to the subtree while paths stay absolute
+    so nothing needs rewriting. If it cannot, a shared jig has to be written
+    knowing where it was placed.
+56. Does the child inherit the parent's project directory by default?
 57. Does the empty-list rule extend to a jig task, which has no command to
     inspect for a substitution?
 58. Does a jig task carry a runmode, or is it always handed its filtered list

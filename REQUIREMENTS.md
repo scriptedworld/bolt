@@ -59,6 +59,9 @@ composition does not.
 | FR-2.2 | Bolt discovers no files of its own: no globbing, no gitignore awareness, no changed-since-a-ref. A caller wanting any of those computes the list and passes it. | [A] |
 | FR-2.3 | `--output-dir` names the directory a run writes into. Given none, a run creates `.bolt-<iso8601>`. | [A] |
 | FR-2.4 | Bolt reads no git. A run over a tree that is not a repository behaves exactly as one over a tree that is. | [D] |
+| FR-2.5 | An argument names the project directory a run is confined to. | [A] |
+| FR-2.6 | Every input path is resolved to an absolute path before anything runs. | [A] |
+| FR-2.7 | A run refuses to start if any input path lies outside the project directory or does not exist. Naming a path that is not there, or that has no business in the run, is a caller error and is not worked around silently. | [A] |
 
 ## 3. Jigs and tasks
 
@@ -94,6 +97,7 @@ composition does not.
 | FR-5.6 | Bolt carries its nesting depth in the environment of every process it spawns, and increments it on finding the variable already set. The depth therefore survives reparenting, backgrounding and a task command that invokes bolt directly rather than through a jig task. | [A/D] |
 | FR-5.7 | The ceiling defaults to 4 and is read from the environment only at the outermost invocation, so a jig cannot raise the limit it is running under. | [A/D] |
 | FR-5.8 | A run refused for depth writes its own `result.yaml` with `success: false` and a reason naming the limit, then exits non-zero. Its parent's link resolves, and the merge folds an ordinary failure. | [A] |
+| FR-5.9 | Paths are absolute at every depth, so a nested run's evidence folds into its parent with nothing rewritten. A path means the same thing to a child and to its parent. | [A/D] |
 
 ## 6. Adapters
 
@@ -126,6 +130,8 @@ composition does not.
 | FR-8.3 | The merged result passes only when every required constituent passes. | [A] |
 | FR-8.4 | The merged result carries the reasons, statistics and evidence references its constituents produced, so what failed and why is readable from the merged file alone. | [A/D] |
 | FR-8.5 | Constituent envelopes survive the merge. Both levels stay on disk. | [D] |
+| FR-8.6 | Only the outermost invocation relativises. Preparing the final result, a bolt that finds no depth set in its environment rewrites the output and evidence references going into `result.yaml` as relative to the project directory; a nested run leaves them absolute. No root has to be propagated for this, because the only bolt needing one is the bolt doing the conversion. | [A/D] |
+| FR-8.7 | Rewriting reaches the structured path references and stops there. Text a tool emitted, carried up inside a reason, stays as the tool wrote it and may still name an absolute path. | [A/D] |
 
 ## 9. The output directory
 
@@ -183,7 +189,7 @@ The questions that would settle them are in `NEXT_STEPS.md`.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-13.1 | A nested jig and its parent agree on one coordinate system for paths, so a path in a nested envelope means the same thing to a reader of the outermost result. | [?] |
+| FR-13.1 | A jig meant to be dropped in at any depth, as toolbox distributes them, runs against its own subtree without knowing where it was placed. | [?] |
 | FR-13.2 | An adapter writes its envelope to a defined place, named in the contract that invokes it. | [?] |
 | FR-13.3 | A task that could not execute is distinguishable in `result.yaml` from one that executed and failed. | [?] |
 | FR-13.4 | A task skipped for an empty file list is distinguishable in `result.yaml` from one that was never declared, so a green result cannot mean that nothing was checked. | [?] |
