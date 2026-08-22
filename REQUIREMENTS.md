@@ -62,6 +62,7 @@ composition does not.
 | FR-2.5 | An argument names the project directory a run is confined to. | [A] |
 | FR-2.6 | Every input path is resolved to an absolute path before anything runs. | [A] |
 | FR-2.7 | A run refuses to start if any input path lies outside the project directory or does not exist. Naming a path that is not there, or that has no business in the run, is a caller error and is not worked around silently. | [A] |
+| FR-2.8 | An input path names a file or a folder. | [A] |
 
 ## 3. Jigs and tasks
 
@@ -98,6 +99,8 @@ composition does not.
 | FR-5.7 | The ceiling defaults to 4 and is read from the environment only at the outermost invocation, so a jig cannot raise the limit it is running under. | [A/D] |
 | FR-5.8 | A run refused for depth writes its own `result.yaml` with `success: false` and a reason naming the limit, then exits non-zero. Its parent's link resolves, and the merge folds an ordinary failure. | [A] |
 | FR-5.9 | Paths are absolute at every depth, so a nested run's evidence folds into its parent with nothing rewritten. A path means the same thing to a child and to its parent. | [A/D] |
+| FR-5.10 | A jig task runs its jig either for the project it is already in or for a named subdirectory. Naming one makes that subdirectory the child's base, narrowing `{project_root}` and the containment check together, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A] |
+| FR-5.11 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
 
 ## 6. Adapters
 
@@ -189,7 +192,7 @@ The questions that would settle them are in `NEXT_STEPS.md`.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-13.1 | A jig meant to be dropped in at any depth, as toolbox distributes them, runs against its own subtree without knowing where it was placed. | [?] |
+| FR-13.1 | A folder given as an input reaches the tasks that should see it, so pointing a run at `src/` is not silently equivalent to pointing it at nothing. | [?] |
 | FR-13.2 | An adapter writes its envelope to a defined place, named in the contract that invokes it. | [?] |
 | FR-13.3 | A task that could not execute is distinguishable in `result.yaml` from one that executed and failed. | [?] |
 | FR-13.4 | A task skipped for an empty file list is distinguishable in `result.yaml` from one that was never declared, so a green result cannot mean that nothing was checked. | [?] |

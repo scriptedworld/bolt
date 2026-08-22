@@ -132,7 +132,12 @@ Nothing in the architecture mentions time. All of this is unstated.
     refuse. Follow links and let callers filter, judge containment by the
     link's own path, or follow links and treat an outward-pointing symlink as
     excluded rather than fatal.
-50. May a directory appear in the list, and who expands it?
+50. How does `matching:` behave against a folder? `src/` does not match
+    `**/*.py`, so a Python task filters it out and never runs, which makes
+    `bolt py-jig src/` quietly check nothing. Match a folder when anything
+    under it would match, which is the discovery FR-2.2 says bolt does not do;
+    match the folder path against the glob as written; or pass folders to every
+    task regardless.
 51. Does bolt dedupe the list and preserve the caller's order? Order decides the
     per-file ordinal, so a caller reordering its `git diff` output renumbers
     every work directory.
@@ -148,12 +153,12 @@ Nothing in the architecture mentions time. All of this is unstated.
 
 ## Nested jigs
 
-55. May a jig task set its child's project directory? If it can, a shared jig
-    is drop-in at any depth: point it at `backend/`, and `{project_root}` and
-    the containment check both narrow to the subtree while paths stay absolute
-    so nothing needs rewriting. If it cannot, a shared jig has to be written
-    knowing where it was placed.
-56. Does the child inherit the parent's project directory by default?
+55. Is a subdirectory base also the filter, or are both written? A jig task
+    based at `backend/` with `matching: backend/**` states the same restriction
+    twice, and the two can be made to disagree.
+56. How does a jig declare it needs the repository root, and what happens when
+    a jig task bases it at a subdirectory anyway: refuse the run, or run it at
+    the root with the input list still narrowed?
 57. Does the empty-list rule extend to a jig task, which has no command to
     inspect for a substitution?
 58. Does a jig task carry a runmode, or is it always handed its filtered list
