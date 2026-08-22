@@ -102,9 +102,11 @@ composition does not.
 | FR-5.8 | A run refused for depth writes its own `result.yaml` with `success: false` and a reason naming the limit, then exits non-zero. Its parent's link resolves, and the merge folds an ordinary failure. | [A] |
 | FR-5.9 | Paths are absolute at every depth, so a nested run's evidence folds into its parent with nothing rewritten. A path means the same thing to a child and to its parent. | [A/D] |
 | FR-5.10 | A jig task names a jig and, optionally, a subdirectory of the current base to run it in. Naming one says something specific: a project of that jig's kind lives there, a Go module with its own `go.mod`, a Python package with its own `pyproject.toml`. The declaration is that applying this jig at this level is worth something, and that directory becomes the child's base. | [A] |
-| FR-5.11 | Naming a subdirectory narrows the base and the containment check together while the project root stays what it was, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A/D] |
-| FR-5.12 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
-| FR-5.13 | A jig task with no input paths under its base does not run, by the same rule that stops a `perPath` task. A nested project nobody touched contributes nothing. | [A] |
+| FR-5.11 | The subdirectory is a written path, not a pattern. A jig names where its nested projects are, because bolt discovers nothing, which is the same rule the input list follows. | [A] |
+| FR-5.12 | One jig may be named by many jig tasks at different bases. Eight Go subprojects is eight jig tasks, so the work directory prefix is the task's name and never the jig's. | [A] |
+| FR-5.13 | Naming a subdirectory narrows the base and the containment check together while the project root stays what it was, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A/D] |
+| FR-5.14 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
+| FR-5.15 | A jig task with no input paths under its base does not run, by the same rule that stops a `perPath` task. A nested project nobody touched contributes nothing. | [A] |
 
 ## 6. Adapters
 
@@ -127,6 +129,7 @@ composition does not.
 | FR-7.4 | Bolt's envelopes use the ecosystem's shared vocabulary. An envelope from a task, from a merge, from a task node or from azimuth is read the same way by the same consumer. | [A] |
 | FR-7.5 | An envelope is written whole or not at all. A run killed partway leaves no half-written envelope for a consumer to read as authoritative. | [D] |
 | FR-7.6 | A task with no readable `output.yaml` has reached no authoritative result, which is a different condition from having failed. | [A/D] |
+| FR-7.7 | Producing a valid envelope means a well-formed YAML file carrying `success` as a boolean, and `reasons` as a list of objects when `success` is false. Nothing further is required of any producer, inside bolt or outside it. | [A] |
 
 ## 8. The merge
 
