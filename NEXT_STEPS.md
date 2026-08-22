@@ -27,7 +27,12 @@ recommendation.
    against a search path? `link-jigs` gives a bare name somewhere to resolve.
 3. How does bolt know where the jig list ends and the file list begins?
 4. `perPath` is settled. Are the other two `once` and `batch`?
-5. Is `matching:` one glob or a list, and is there an exclude counterpart?
+5. Is `matching:` one glob or a list, and is there an exclude counterpart? The
+   case that wants one is a file in a known-bad state that every linter hits on
+   every run until a reader stops reading the gate. Against it: an exclude in a
+   jig is the shape hard rules 4 and 5 exist to prevent, and it will get used to
+   silence things. If it exists, it should carry a reason and appear in the
+   result, so an excluded file is visible rather than invisible.
 6. Can a task be marked required or not, and what is the default? §22's gate is
    "all required constituent results must pass", and FR-8.3 repeats it.
 
@@ -43,24 +48,24 @@ recommendation.
 
 ## Input paths
 
-10. When a folder globs through to several files, does a `perPath` task execute
-    once for the folder or once per matched file? And does `{input_paths}` in a
-    batch task carry the folder or the files under it?
+10. Is the walk order deterministic, sorted rather than whatever the filesystem
+    returns? FR-9.4 claims two runs over the same tree produce identical work
+    directory names, and that claim rests on this.
 11. Globbing through a folder walks it, and a walk finds `.git`, `node_modules`,
     `.venv` and build output. Bolt has no gitignore awareness, so `bolt py-jig
     .` currently means checking every `.py` under `.venv`. A built-in exclusion
     set, reading the repository's ignore rules after all, exclusions declared in
     the jig, or callers never naming a folder containing any of that, which is
     most folders?
-12. Does bolt dedupe the input list and preserve the caller's order? Order
-    decides the per-path ordinal, so a caller reordering its `git diff` output
-    renumbers every work directory.
-13. Does a path refusal take the same shape as a depth refusal, writing a
-    `result.yaml` with `success: false` and a reason naming the offending
-    paths, then exiting non-zero?
-14. What does an entirely empty input list mean for a jig whose tasks all
-    consume paths? Every task is skipped and the run reports `success: true`
-    having checked nothing.
+12. Does the walk follow symlinks? Following one out of the directory breaks
+    containment, and `link-jigs` leaves tracked symlinks pointing into toolbox,
+    so a project using shared jigs has them sitting in the tree being walked.
+13. Does a missing-directory refusal take the same shape as a depth refusal,
+    writing a `result.yaml` with `success: false` and a reason, then exiting
+    non-zero?
+14. What does a run report when the directory holds nothing any task matches?
+    Every task is skipped and the run reports `success: true` having checked
+    nothing.
 
 ## Adapters
 
@@ -196,16 +201,12 @@ without any of it and let tools finish.
 
 ## Input paths
 
-59. Does resolving to absolute follow symlinks? Lexical resolution leaves a
-    symlink inside the project pointing at `/etc/shadow` passing the
-    containment check. Following links closes that and breaks a legitimate
-    call: `link-jigs` leaves tracked symlinks whose targets are in toolbox, so
-    `bolt go-quality $(git ls-files)` in a project using shared jigs would
-    refuse. Follow links and let callers filter, judge containment by the
-    link's own path, or follow links and treat an outward-pointing symlink as
-    excluded rather than fatal.
-60. `{input_paths}` over a large list will exceed `ARG_MAX`. Does bolt chunk
-    into several executions, or is that the jig author's problem?
+59. Does a run over a large tree exceed `ARG_MAX` when `{input_paths}` expands?
+    Whole-project runs make this the ordinary case rather than an edge one.
+    Does bolt chunk into several executions, or is it the jig author's problem?
+60. §67's pre-commit overlay wants a gate over what changed, and a
+    directory-only invocation cannot express that. Does the overlay run the
+    whole project on every commit, or does something have to give?
 
 ## Nested jigs
 

@@ -56,14 +56,13 @@ composition does not.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-2.1 | Bolt is given the jigs to run, and everything after them is the input file list. | [A] |
-| FR-2.2 | Bolt does not choose the input set. It has no gitignore awareness and no changed-since-a-ref: a caller wanting either computes the list and passes it. What bolt does walk is a folder a caller named explicitly, to apply filters through it. | [A] |
-| FR-2.3 | `--output-dir` names the directory a run writes into. Given none, a run creates `.bolt-<iso8601>`. | [A] |
-| FR-2.4 | Bolt reads no git. A run over a tree that is not a repository behaves exactly as one over a tree that is. | [D] |
-| FR-2.5 | An argument names the project directory a run is confined to. | [A] |
-| FR-2.6 | Every input path is resolved to an absolute path before anything runs. | [A] |
-| FR-2.7 | A run refuses to start if any input path lies outside the project directory or does not exist. Naming a path that is not there, or that has no business in the run, is a caller error and is not worked around silently. | [A] |
-| FR-2.8 | An input path names a file or a folder. A filter globs through it either way: against the one file, or against the files a folder holds. | [A] |
+| FR-2.1 | A jig is run on a directory. That is the whole of what an invocation says: which jig, and where. | [A] |
+| FR-2.2 | Bolt walks that directory to find the files its tasks act on. It has no gitignore awareness and no changed-since-a-ref. | [A] |
+| FR-2.3 | The directory is the run's base, and everything a run touches comes from inside it. Containment is how the input is formed, not a check applied to it afterwards. | [A/D] |
+| FR-2.4 | Paths are resolved to absolute before anything runs. | [A] |
+| FR-2.5 | A run refuses to start if the directory it was given is not there. | [A/D] |
+| FR-2.6 | `--output-dir` names the directory a run writes into. Given none, a run creates `.bolt-<iso8601>`. | [A] |
+| FR-2.7 | Bolt reads no git. A run over a tree that is not a repository behaves exactly as one over a tree that is. | [D] |
 
 ## 3. Jigs and tasks
 
@@ -72,7 +71,7 @@ composition does not.
 | FR-3.1 | A jig is the unit of configuration and composition. What bolt executes for a project is read from that project's jig. | [A] |
 | FR-3.2 | A task declares a name, an optional description, a runmode, a `matching:` glob, and a command written as a shell line. | [A] |
 | FR-3.3 | A task's name prefixes its work directories, so a task's evidence is identifiable on disk without opening anything. | [A/D] |
-| FR-3.4 | `matching:` names the subset of the run's input paths a task accepts, where `**` matches zero or more directory levels. A task never sees a path its filter rejects. | [A] |
+| FR-3.4 | `matching:` is a condition on a task, saying which files inside the run's directory that task acts on, where `**` matches zero or more directory levels. Every Python file through the formatter is one task with one pattern. A task never sees a path its condition rejects. | [A] |
 | FR-3.5 | Filter patterns are relative to the base directory of the run they are declared in. A jig written for reuse therefore says `**/*.go` and never names the subtree it was dropped into, which is what makes it the same jig at the repository root and at `backend/`. | [A] |
 | FR-3.6 | Organisation-wide, language-specific and repository-specific behaviour compose through jigs, with none of it hard-coded into bolt. | [A] |
 | FR-3.7 | A jig maintained outside the repository and made available inside it, as toolbox's `link-jigs` does, runs without being copied into the tree. | [D] |
@@ -94,16 +93,17 @@ composition does not.
 | ID | Requirement | |
 |---|---|---|
 | FR-5.1 | A task may name a jig in place of a command. | [A] |
+| FR-5.1a | A nested run is not a mode. Inside its subdirectory it is identical to the same jig run on that directory from the command line, so there is one operation and one code path, invoked from two places. | [A] |
 | FR-5.2 | A nested run writes into its own subdirectory inside that task's work directory, and its `result.yaml` is linked as the task's `output.yaml` by a relative symlink, so the whole tree survives being moved or archived. | [A/D] |
 | FR-5.3 | A jig task carries the same bookkeeping files as a command task, so nothing reading `work/*/` needs to know which kind it is looking at. | [A/D] |
 | FR-5.4 | The merge does not know that a constituent was a nested run. Nesting is a special case at invocation and nowhere else. | [A/D] |
-| FR-5.5 | A jig task carries no filter. The child receives the input paths lying under its base, and the child jig's own tasks filter from there against that base. Selecting files is the nested jig's business, not its caller's. | [A] |
+| FR-5.5 | A jig task carries no condition. The child walks its own subdirectory and its own tasks decide what they act on. Selecting files is the nested jig's business, never its caller's. | [A] |
 | FR-5.6 | Bolt carries its nesting depth in the environment of every process it spawns, and increments it on finding the variable already set. The depth therefore survives reparenting, backgrounding and a task command that invokes bolt directly rather than through a jig task. | [A/D] |
 | FR-5.7 | The ceiling defaults to 4 and is read from the environment only at the outermost invocation, so a jig cannot raise the limit it is running under. | [A/D] |
 | FR-5.8 | A run refused for depth writes its own `result.yaml` with `success: false` and a reason naming the limit, then exits non-zero. Its parent's link resolves, and the merge folds an ordinary failure. | [A] |
 | FR-5.9 | Paths are absolute at every depth, so a nested run's evidence folds into its parent with nothing rewritten. A path means the same thing to a child and to its parent. | [A/D] |
 | FR-5.10 | A jig task names a jig and, optionally, a subdirectory of the current base to run it in. Naming one says something specific: a project of that jig's kind lives there, a Go module with its own `go.mod`, a Python package with its own `pyproject.toml`. The declaration is that applying this jig at this level is worth something, and that directory becomes the child's base. | [A] |
-| FR-5.11 | The subdirectory is a written path, not a pattern. A jig names where its nested projects are, because bolt discovers nothing, which is the same rule the input list follows. | [A] |
+| FR-5.11 | The subdirectory is a written path, not a pattern. A jig states where its nested projects are, because a pattern can say which files look like Go and never that a directory is a Go module. | [A] |
 | FR-5.12 | One jig may be named by many jig tasks at different bases. Eight Go subprojects is eight jig tasks, so the work directory prefix is the task's name and never the jig's. | [A] |
 | FR-5.13 | Naming a subdirectory narrows the base and the containment check together while the project root stays what it was, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A/D] |
 | FR-5.14 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
@@ -200,7 +200,8 @@ The questions that would settle them are in `NEXT_STEPS.md`.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-13.1 | Walking a named folder does not drag in what nobody meant: `.git`, `node_modules`, a virtualenv, build output. Bolt has no gitignore awareness, so nothing currently keeps them out. | [?] |
+| FR-13.1 | Walking the directory does not drag in what nobody meant: `.git`, `node_modules`, a virtualenv, build output. Bolt has no gitignore awareness, so nothing currently keeps them out, and every run walks. | [?] |
+| FR-13.1a | A file deliberately left out of a task is visibly left out, carrying why, rather than quietly absent from the result. A known-bad file failing every run trains a reader to stop reading the gate, and an exclusion nobody can see is the other way to lose the same information. | [?] |
 | FR-13.2 | An adapter writes its envelope to a defined place, named in the contract that invokes it. | [?] |
 | FR-13.3 | A task that could not execute is distinguishable in `result.yaml` from one that executed and failed. | [?] |
 | FR-13.4 | A task skipped for an empty file list is distinguishable in `result.yaml` from one that was never declared, so a green result cannot mean that nothing was checked. | [?] |
