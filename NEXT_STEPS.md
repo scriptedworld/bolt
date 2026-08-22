@@ -30,10 +30,16 @@ recommendation.
    given a list of them; a jig now runs on a directory, which reads as one jig
    and one place. If several, they share a directory and their results fold
    into one, which is the merge already specified.
-4. `perPath` is settled. Are the other two `once` and `batch`?
-5. What is a task's runmode when it declares none? `once` is the safe default
-   because it needs no path variables, and inferring it from which variable the
-   command names would make the field redundant rather than optional.
+4. `{input_path}` and `{input_paths}` differ by one character and now select
+   between one execution and four hundred. When the mode was declared beside
+   the command, a typo mismatched the declaration and got caught; under
+   inference both spellings are legal and nothing notices. Rename one so they
+   cannot be confused, `{each_path}` against `{all_paths}` or similar, or
+   accept the hazard?
+5. Is there any way to express one execution per path where the command does
+   not take the path as an argument? Nothing needs it yet, and inference makes
+   it inexpressible, which is worth knowing before it turns up rather than
+   after.
 6. Can a task be marked required or not, and what is the default? §22's gate is
    "all required constituent results must pass", and FR-8.3 repeats it.
 
@@ -129,7 +135,8 @@ recommendation.
     a base with no input paths under it does not run. Is a missing directory
     the same as an empty one, or a jig error that refuses the run the way a
     missing input path does?
-36. Does a jig task carry a runmode, or is it always handed its base once?
+36. A jig task has no command to read a mode off, so it runs once against its
+    base. Worth confirming there is no case wanting a jig run per path.
 37. Subprocess or in-process? Subprocess gives the bookkeeping files for free,
     and serial execution removes the argument for in-process.
 
@@ -156,8 +163,9 @@ recommendation.
 
 ## Tasks
 
-44. Is naming `{input_paths}` in a `perPath` task a jig error caught at parse,
-    or a runtime failure?
+44. Are the jig errors FR-3.4b and FR-4.2 name caught when the jig is read, or
+    when the task is reached? Reading catches every one of them before anything
+    runs; reaching catches them after half a gate has executed.
 45. Is the environment handed to a task command inherited wholesale, filtered
     to an allowlist, or declared per task? Whatever the rule, the depth
     variable has to survive it.

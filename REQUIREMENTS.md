@@ -72,11 +72,11 @@ composition does not.
 | ID | Requirement | |
 |---|---|---|
 | FR-3.1 | A jig is the unit of configuration and composition. What bolt executes for a project is read from that project's jig. | [A] |
-| FR-3.2 | A task declares a name, an optional description, a runmode, `matching:` and `excluding:` lists, and a command written as a shell line. | [A] |
+| FR-3.2 | A task declares a name, an optional description, `matching:` and `excluding:` lists, and a command written as a shell line. There is no runmode field. | [A] |
 | FR-3.3 | A task's name prefixes its work directories, so a task's evidence is identifiable on disk without opening anything. | [A/D] |
 | FR-3.4 | `matching:` is a condition on a task: a list of patterns or literal paths saying which files inside the run's directory that task acts on, where `**` matches zero or more directory levels. Every Python file through the formatter is one task with one pattern. A task never sees a path its condition rejects. | [A] |
 | FR-3.4a | `excluding:` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching:` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
-| FR-3.4b | `matching:` and `excluding:` belong to a task that consumes paths. On a `once` task they are a jig error, caught in validation rather than quietly ignored. Whether a whole-project command should run at all is a question about where the jig is pointed, and FR-5.15 already answers it. | [A] |
+| FR-3.4b | `matching:` and `excluding:` belong to a task that consumes paths. On a command naming neither path variable they are a jig error, caught in validation rather than quietly ignored. Whether a whole-project command should run at all is a question about where the jig is pointed, and FR-5.15 already answers it. | [A] |
 | FR-3.4c | The jig format carries comments, and an entry's reasoning sits beside it. Somebody asking why a path is excluded finds the answer where the path is, rather than reconstructing it from git history. | [A/D] |
 | FR-3.5 | Filter patterns are relative to the base directory of the run they are declared in. A jig written for reuse therefore says `**/*.go` and never names the subtree it was dropped into, which is what makes it the same jig at the repository root and at `backend/`. | [A] |
 | FR-3.6 | Organisation-wide, language-specific and repository-specific behaviour compose through jigs, with none of it hard-coded into bolt. | [A] |
@@ -88,7 +88,7 @@ composition does not.
 | ID | Requirement | |
 |---|---|---|
 | FR-4.1 | Three locations are separately specifiable and separately available to every task: the project root, the base this run operates from, and the execution's own work directory. The outermost run is assumed to sit at the project root and a nested one is not, so a jig based on a subtree can still reach a config file at the root without giving up its base. | [A] |
-| FR-4.2 | `{input_paths}` is available in batch mode alone, and `{input_path}` in `perPath` mode alone. | [A] |
+| FR-4.2 | How a task runs is read off its command, not declared beside it. `{input_path}` means one execution per matched path. `{input_paths}` means one execution with the whole selection substituted. Neither means one execution and no paths. A command naming both is a jig error. | [A] |
 | FR-4.3 | Every path bolt substitutes is individually quoted, so a path carrying a space, a quote or a semicolon can neither split the command line nor inject into it. | [A] |
 | FR-4.4 | A task whose command names `{input_path}` or `{input_paths}` does not execute when its filtered selection is empty, and produces no output. A task naming neither always executes. | [A] |
 | FR-4.5 | Tasks execute serially. | [A] |
@@ -114,7 +114,7 @@ composition does not.
 | FR-5.12 | One jig may be named by many jig tasks at different bases. Eight Go subprojects is eight jig tasks, so the work directory prefix is the task's name and never the jig's. | [A] |
 | FR-5.13 | Naming a subdirectory narrows the base and the containment check together while the project root stays what it was, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A/D] |
 | FR-5.14 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
-| FR-5.15 | A jig task with no input paths under its base does not run, by the same rule that stops a `perPath` task. A nested project nobody touched contributes nothing. | [A] |
+| FR-5.15 | A jig task with no input paths under its base does not run, by the same rule that stops a path-consuming task with nothing to consume. A nested project nobody touched contributes nothing. | [A] |
 
 ## 6. Adapters
 
