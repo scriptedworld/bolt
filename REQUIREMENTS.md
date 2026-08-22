@@ -103,7 +103,7 @@ composition does not.
 | FR-5.9 | Paths are absolute at every depth, so a nested run's evidence folds into its parent with nothing rewritten. A path means the same thing to a child and to its parent. | [A/D] |
 | FR-5.10 | A jig task runs its jig either for the project it is already in or for a named subdirectory. Naming one makes that subdirectory the child's base, narrowing the base and the containment check together while the project root stays what it was, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A] |
 | FR-5.11 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
-| FR-5.12 | A jig task either filters or re-bases, never both. A `matching:` pattern is written against the base it appears in, so re-basing the child would silently change what that pattern meant; giving one therefore keeps the child at its parent's base. Naming a subtree makes the subtree the selector, and no pattern is written. | [A] |
+| FR-5.12 | A jig task naming a base re-bases its child there. Naming none runs the child at its parent's base. The field is the statement, with no separate flag beside it. A base and a `matching:` do not appear together, because a pattern is written against the base it sits in and re-basing would silently change what it meant. | [A/D] |
 | FR-5.13 | A jig task's `matching:` is a precondition read before the child runs, stating that the jig is needed for instances of that pattern. | [A] |
 | FR-5.14 | An empty selection stops a jig task starting, by the same rule that stops a `perPath` task. A jig for a subtree nobody touched never runs and contributes nothing. | [A] |
 

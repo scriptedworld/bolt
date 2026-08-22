@@ -171,6 +171,8 @@ Nothing in the architecture mentions time. All of this is unstated.
     per-use without surrendering the base. What it does not cover is a tool
     that must be standing at the root, which is question 13. If the override is
     only for that, it is about the working directory and not about the base.
+    What is the base field called on a jig task? `base:` states what it does
+    and needs no flag beside it explaining that it re-bases.
 57. May the same jig appear as two jig tasks with different bases, `go-quality`
     on `backend` and again on `tools`? FR-3.3 makes the task name the work
     directory prefix, so each needs a distinct name, and it is worth knowing
