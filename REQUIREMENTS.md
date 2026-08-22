@@ -72,8 +72,9 @@ composition does not.
 | FR-3.2 | A task declares a name, an optional description, a runmode, a `matching:` glob, and a command written as a shell line. | [A] |
 | FR-3.3 | A task's name prefixes its work directories, so a task's evidence is identifiable on disk without opening anything. | [A/D] |
 | FR-3.4 | `matching:` names the subset of the run's input paths a task accepts, where `**` matches zero or more directory levels. A task never sees a path its filter rejects. | [A] |
-| FR-3.5 | Organisation-wide, language-specific and repository-specific behaviour compose through jigs, with none of it hard-coded into bolt. | [A] |
-| FR-3.6 | A jig maintained outside the repository and made available inside it, as toolbox's `link-jigs` does, runs without being copied into the tree. | [D] |
+| FR-3.5 | Filter patterns are relative to the base directory of the run they are declared in. A jig written for reuse therefore says `**/*.go` and never names the subtree it was dropped into, which is what makes it the same jig at the repository root and at `backend/`. | [A] |
+| FR-3.6 | Organisation-wide, language-specific and repository-specific behaviour compose through jigs, with none of it hard-coded into bolt. | [A] |
+| FR-3.7 | A jig maintained outside the repository and made available inside it, as toolbox's `link-jigs` does, runs without being copied into the tree. | [D] |
 
 ## 4. Substitution and execution
 

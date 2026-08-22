@@ -153,9 +153,11 @@ Nothing in the architecture mentions time. All of this is unstated.
 
 ## Nested jigs
 
-55. Is a subdirectory base also the filter, or are both written? A jig task
-    based at `backend/` with `matching: backend/**` states the same restriction
-    twice, and the two can be made to disagree.
+55. Does a jig task carry a `matching:` of its own at all, or does naming the
+    base do the whole selection? "go-quality on `backend`" names a jig and a
+    subtree and nothing else, which suggests the base is the selector. If a jig
+    task can also filter, is that pattern relative to the parent's base, where
+    it is written, or to the base it sets?
 56. How does a jig declare it needs the repository root, and what happens when
     a jig task bases it at a subdirectory anyway: refuse the run, or run it at
     the root with the input list still narrowed?
