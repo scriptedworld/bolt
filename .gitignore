@@ -1,0 +1,7 @@
+# Session entry point: ephemeral by design, rewritten each session.
+START_HERE.md
+
+# In-process and working files, including the message a commit is given with
+# -F. Gitignored so that naming it on the command line can never put it into
+# the commit it describes.
+.ephemera/
