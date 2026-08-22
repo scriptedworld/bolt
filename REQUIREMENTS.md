@@ -60,8 +60,11 @@ composition does not.
 | FR-1.11 | The schema and a library for each language that reads or writes an envelope live in one project of their own, `wrench` being the candidate name. A Go producer and a Python producer get the same definition and equivalent code, shipped together, rather than a schema in one repository and implementations elsewhere obliged to keep up with it. | [A] |
 | FR-1.12 | Bolt reads and writes envelopes through that project's Go library, so bolt is one consumer of the contract and not its owner. | [A/D] |
 | FR-1.13 | Bolt validates with nothing else installed beside it. | [A] |
-| FR-1.14 | Envelope handling is two calls, `load_envelope` and `save_envelope`. Both validate. There is no unvalidated way in or out because no other entry point exists, which is what makes FR-1.9 a property of the library rather than a discipline every call site has to keep. | [A] |
-| FR-1.15 | Canonical form belongs to `save_envelope`, so a caller cannot emit an envelope that is valid but written some other way. | [A/D] |
+| FR-1.14 | File handling is two calls, `load_formatted_file` and `save_formatted_file`, each taking the path, the schema to hold the file to, and the codec to read or write it with. Validation sits in the signature: there is no way to read or write without naming what the file must conform to, which makes FR-1.9 a property of the library's surface rather than a discipline every call site has to keep. | [A] |
+| FR-1.15 | The envelope is one schema handed to those calls and a jig is another. The shared project provides structured files with schemas attached, for anything in the ecosystem, rather than an envelope facility or a YAML one. | [A] |
+| FR-1.16 | The schema is JSON Schema whatever the codec, because FR-1.6 validates the decoded structure and by then a file's format has stopped mattering. | [A/D] |
+| FR-1.17 | Canonical form is a property of the YAML writer rather than of the save call, so passing that writer is what makes an emitted file canonical. | [A/D] |
+| FR-1.18 | The signature compels a schema, not the right one. Passing none is impossible; passing the wrong one is not. | [D] |
 
 ## 2. Invocation
 
@@ -94,6 +97,7 @@ composition does not.
 | FR-3.6 | Organisation-wide, language-specific and repository-specific behaviour compose through jigs, with none of it hard-coded into bolt. | [A] |
 | FR-3.7 | A jig maintained outside the repository and made available inside it, as toolbox's `link-jigs` does, runs without being copied into the tree. | [D] |
 | FR-3.8 | Bolt draws no line between a shared jig and a project-specific one. The same fields serve both, and every literal path or narrow pattern a jig carries trades reuse for fit. Where a jig sits on that scale is its author's choice and not a rule bolt enforces. | [A/D] |
+| FR-3.9 | A jig file is `bolt.<name>.yaml`, so jig files are identifiable in a directory holding everything else a project keeps, and a jig is spoken of by its `<name>` rather than by a filename. | [A] |
 
 ## 4. Substitution and execution
 
