@@ -143,9 +143,10 @@ recommendation.
     `evidence`?
 41. Is there a schema version field, given `success` is the only guarantee?
     What does a consumer do with a version it does not recognise?
-42. Does bolt check an envelope against FR-7.7's bar before folding it? A file
-    that parses as YAML but carries no `success` is neither malformed nor
-    authoritative, and §3.4 makes malformed evidence a failure.
+42. FR-1.5 validates everything read as data, and the consequence of failing
+    differs by file. A jig that fails its schema presumably refuses the run. An
+    envelope that fails is a failure under FR-7.6. Is a nested run's
+    `result.yaml` failing validation the child's failure or the parent's?
 43. Does `result.yaml` keep the envelope shape exactly, or carry keys a task
     envelope never has?
 
@@ -158,8 +159,9 @@ recommendation.
     variable has to survive it.
 46. Can a task be disabled in a jig without deleting it, and does a disabled
     task appear in the result?
-47. Is a jig validated against a schema, and does an unrecognised key fail the
-    run or warn?
+47. FR-1.5 validates a jig. Does an unrecognised key fail it or warn? Failing
+    makes a jig written for a newer bolt unusable by an older one; warning lets
+    a typo pass as an ignored field.
 
 ## Adapters
 
@@ -257,7 +259,9 @@ without any of it and let tools finish.
 75. Does bolt stamp the tree state §65 wants, or does that move to the caller?
     Bolt reads no git for anything else.
 76. Who owns the envelope schema, given §3.1 makes it ecosystem-wide: bolt,
-    toolbox, or a standalone definition none of them owns?
+    toolbox, or a standalone definition none of them owns? This one has moved
+    into blocking territory: FR-1.5 validates everything read as data, and
+    there is nothing to validate against until it is answered.
 77. Is there a published validator for FR-7.7's bar that another producer can
     run against its own output? Toolbox is the obvious home, and without one
     every producer discovers its mistakes through somebody else's merge.

@@ -50,6 +50,7 @@ composition does not.
 | FR-1.2 | Bolt holds no knowledge of any particular tool. Which commands run, and what their output means, come from the jig. Adding a language or a checker to the ecosystem changes a jig and an adapter, never bolt. | [A] |
 | FR-1.3 | Task ETL is the abstraction and quality checking is its first use. A jig that runs no checker and reaches no verdict about code is a legitimate run. | [A/D] |
 | FR-1.4 | A run captures each command's native results whatever form they take: stdout, stderr, exit code, and arbitrary files the command generated. Those results survive the run as evidence. | [A/D] |
+| FR-1.5 | Every file bolt reads as data is parsed and validated against a schema before anything acts on it, a jig and a task's envelope and a nested run's result alike. What a schema leaves open stays open; what it requires is checked. | [A] |
 
 ## 2. Invocation
 
@@ -128,7 +129,7 @@ composition does not.
 | FR-7.3 | `metadata` is optional, and carries `statistics` and `evidence` where a producer has them. | [A] |
 | FR-7.4 | Bolt's envelopes use the ecosystem's shared vocabulary. An envelope from a task, from a merge, from a task node or from azimuth is read the same way by the same consumer. | [A] |
 | FR-7.5 | An envelope is written whole or not at all. A run killed partway leaves no half-written envelope for a consumer to read as authoritative. | [D] |
-| FR-7.6 | A task with no readable `output.yaml` has reached no authoritative result, which is a different condition from having failed. | [A/D] |
+| FR-7.6 | Absent and invalid are different conditions. No `output.yaml` means no authoritative result has been reached. One that is present and fails validation is a failure. One that validates is authoritative. | [A] |
 | FR-7.7 | Producing a valid envelope means a well-formed YAML file carrying `success` as a boolean, and `reasons` as a list of objects when `success` is false. Nothing further is required of any producer, inside bolt or outside it. | [A] |
 
 ## 8. The merge
