@@ -28,10 +28,11 @@ recommendation.
    against a search path? `link-jigs` gives a bare name somewhere to resolve.
 3. How does bolt know where the jig list ends and the file list begins?
 4. `perPath` is settled. Are the other two `once` and `batch`?
-5. Does the result say what `excluding:` removed? Reasoning lives in a comment
-   beside the entry, which serves whoever opens the jig and nobody reading the
-   gate. Bolt knows which paths it dropped, so reporting the fact costs no
-   schema change and no reason text. FR-13.1.
+5. Does `matching:` mean anything on a task that consumes no paths? FR-4.4 has
+   such a task always execute, so a `once` task carrying `matching: **/*.go`
+   runs in a tree holding no Go at all. Whoever wrote that pattern probably
+   meant it as a condition. Is it a jig error, or does it gate execution after
+   all?
 6. Can a task be marked required or not, and what is the default? §22's gate is
    "all required constituent results must pass", and FR-8.3 repeats it.
 
@@ -189,9 +190,10 @@ without any of it and let tools finish.
 55. Is a task skipped for an empty selection recorded in `result.yaml`? Absence
     currently reads the same as never declared, so a green result can mean that
     nothing was checked.
-56. Does the envelope or the manifest record which input path that execution
-    was handed? Without it, `shellcheck-0007` traces back to a path only by
-    recomputing the filter and the ordering.
+56. Does a manifest record what the walk found, or only what the task matched?
+    The difference shows when nothing matched: a task that was offered a
+    hundred files and wanted none looks the same as one run against an empty
+    tree.
 57. `manifest` already means the read and write authorization scope in §53 to
     §55, and both kinds land in task evidence trees. Rename bolt's?
 58. Who deletes run directories, and on what rule?

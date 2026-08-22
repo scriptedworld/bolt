@@ -72,7 +72,7 @@ composition does not.
 | ID | Requirement | |
 |---|---|---|
 | FR-3.1 | A jig is the unit of configuration and composition. What bolt executes for a project is read from that project's jig. | [A] |
-| FR-3.2 | A task declares a name, an optional description, a runmode, a `matching:` glob, and a command written as a shell line. | [A] |
+| FR-3.2 | A task declares a name, an optional description, a runmode, `matching:` and `excluding:` lists, and a command written as a shell line. | [A] |
 | FR-3.3 | A task's name prefixes its work directories, so a task's evidence is identifiable on disk without opening anything. | [A/D] |
 | FR-3.4 | `matching:` is a condition on a task: a list of patterns or literal paths saying which files inside the run's directory that task acts on, where `**` matches zero or more directory levels. Every Python file through the formatter is one task with one pattern. A task never sees a path its condition rejects. | [A] |
 | FR-3.4a | `excluding:` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching:` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
@@ -172,7 +172,10 @@ A run's whole output is one directory:
 | FR-9.1 | A run's whole output is one directory, so a run can be archived, moved or handed to somebody as a single artifact. | [A/D] |
 | FR-9.2 | Each task execution gets its own directory holding the command as executed, captured stdout and stderr, the exit code as a file, whatever artifacts the command wrote, and the adapter's `output.yaml`. | [A] |
 | FR-9.3 | One execution's evidence is complete inside one directory. A reader needs nothing outside it to see what ran and what happened. | [D] |
-| FR-9.4 | Serial execution makes the ordinals deterministic, so two runs over the same input file list produce identical work directory names and two run directories diff cleanly. | [D] |
+| FR-9.4 | Serial execution makes the ordinals deterministic, so two runs over the same tree produce identical work directory names and two run directories diff cleanly. | [D] |
+| FR-9.5 | An execution's manifest records which paths `matching:` selected and which `excluding:` removed, for a task that consumes paths. What that task saw, and what it was kept from seeing, sits on disk beside what it did. | [A] |
+| FR-9.6 | A task naming no path variable was handed no list, so its manifest claims none. Recording one would say the command saw files it never received. | [A] |
+| FR-9.7 | What such a task examined is the tool's own business, and bolt does not know it. A run's evidence covers what bolt handed over, never what a tool went and found for itself. | [A/D] |
 
 ## 10. Exit status
 
@@ -206,14 +209,13 @@ The questions that would settle them are in `NEXT_STEPS.md`.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-13.1 | Somebody reading a result can tell that files were excluded. A comment in the jig answers "why" for whoever opens the jig, and says nothing to whoever reads the gate output, and those are different people. | [?] |
-| FR-13.2 | An adapter writes its envelope to a defined place, named in the contract that invokes it. | [?] |
-| FR-13.3 | A task that could not execute is distinguishable in `result.yaml` from one that executed and failed. | [?] |
-| FR-13.4 | A task skipped for an empty file list is distinguishable in `result.yaml` from one that was never declared, so a green result cannot mean that nothing was checked. | [?] |
-| FR-13.5 | Whether a constituent is required is declared, with a stated default. | [?] |
-| FR-13.6 | A task that exceeds a time budget reaches a defined outcome. | [?] |
-| FR-13.7 | Run directories are removed on a stated rule, so a dogfooding repository does not accumulate them without bound. | [?] |
-| FR-13.8 | Evidence can be tied to the exact tree state it was produced from, as §65 requires, by something. Bolt reads no git, so either it acquires that dependency or the requirement belongs to the caller. | [?] |
-| FR-13.9 | The number of bolt runs a user may have live at once is bounded, if that guard is wanted at all. | [?] |
-| FR-13.10 | The jig is written in a defined format, validated against a schema. | [?] |
-| FR-13.11 | The envelope schema is owned and published somewhere every producer and consumer in the ecosystem can validate against. | [?] |
+| FR-13.1 | An adapter writes its envelope to a defined place, named in the contract that invokes it. | [?] |
+| FR-13.2 | A task that could not execute is distinguishable in `result.yaml` from one that executed and failed. | [?] |
+| FR-13.3 | A task skipped for an empty file list is distinguishable in `result.yaml` from one that was never declared, so a green result cannot mean that nothing was checked. | [?] |
+| FR-13.4 | Whether a constituent is required is declared, with a stated default. | [?] |
+| FR-13.5 | A task that exceeds a time budget reaches a defined outcome. | [?] |
+| FR-13.6 | Run directories are removed on a stated rule, so a dogfooding repository does not accumulate them without bound. | [?] |
+| FR-13.7 | Evidence can be tied to the exact tree state it was produced from, as §65 requires, by something. Bolt reads no git, so either it acquires that dependency or the requirement belongs to the caller. | [?] |
+| FR-13.8 | The number of bolt runs a user may have live at once is bounded, if that guard is wanted at all. | [?] |
+| FR-13.9 | The jig is written in a defined format, validated against a schema. | [?] |
+| FR-13.10 | The envelope schema is owned and published somewhere every producer and consumer in the ecosystem can validate against. | [?] |
