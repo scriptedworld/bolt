@@ -22,17 +22,18 @@ recommendation.
 
 ## The jig, and reaching it
 
-1. What format is a jig written in? FR-3.4b narrows it: the format has to carry
+1. What format is a jig written in? FR-3.4c narrows it: the format has to carry
    comments, since that is where an entry's reasoning lives. JSON is out.
 2. How is a jig named on the command line: a path, or a bare name resolved
    against a search path? `link-jigs` gives a bare name somewhere to resolve.
-3. How does bolt know where the jig list ends and the file list begins?
+3. May an invocation name more than one jig? An earlier answer said bolt is
+   given a list of them; a jig now runs on a directory, which reads as one jig
+   and one place. If several, they share a directory and their results fold
+   into one, which is the merge already specified.
 4. `perPath` is settled. Are the other two `once` and `batch`?
-5. Does `matching:` mean anything on a task that consumes no paths? FR-4.4 has
-   such a task always execute, so a `once` task carrying `matching: **/*.go`
-   runs in a tree holding no Go at all. Whoever wrote that pattern probably
-   meant it as a condition. Is it a jig error, or does it gate execution after
-   all?
+5. What is a task's runmode when it declares none? `once` is the safe default
+   because it needs no path variables, and inferring it from which variable the
+   command names would make the field redundant rather than optional.
 6. Can a task be marked required or not, and what is the default? §22's gate is
    "all required constituent results must pass", and FR-8.3 repeats it.
 
