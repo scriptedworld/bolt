@@ -134,11 +134,11 @@ recommendation.
     Does a reason object have a recognisable kind, then, so a consumer can tell
     "the tool was not there" from "the tool found problems" without reading
     English? That is question 21 from the other side.
-32. How far does the jig checker go beyond well-formedness? A jig that parses
-    can still name an adapter that does not resolve, a `requires` entry no
-    image carries, or a subdirectory that is not there. Each of those is
-    checkable without running anything, and each is otherwise found partway
-    through a gate.
+32. Does anything verify that an image carries what the jigs require? Anvil
+    derives its package lists from `requires`, so the two should agree by
+    construction, but nothing closes the loop and an image built before a jig
+    grew an entry would be short one. Discovering that at run time is FR-4.10,
+    which reports it correctly and late.
 33. If bolt fails partway, does it write a partial `result.yaml` or none?
     FR-7.5 argues for none, but a caller then cannot tell a crashed run from
     one that never started.
