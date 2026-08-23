@@ -276,15 +276,12 @@ without any of it and let tools finish.
     candidate in `clank/inbox/silo/yaml-and-json-schema-is-a-platform-decision/`
     along with the argument against it, that a wrench turns a bolt while here
     bolt depends on wrench.
-78. Inside that project: one C core with bindings, or a library per language
-    wrapping a stock JSON Schema validator? NFR-12.4 argues against C, because
-    a Go binding means cgo, and cgo costs static linking and cross-compilation
-    for the one thing bolt most wants to stay: a single file an image carries.
-    JSON Schema also exists so independent implementations agree, so a C core
-    solves by construction what the specification already solves. What per
-    language costs is the wrapper around validation, canonical emission and
-    error shape, which can drift between bindings, and a shared fixture suite
-    every binding runs would hold them level.
+78. What holds the per-language implementations level? Validation itself is
+    covered by JSON Schema's official cross-implementation test suite, which
+    each language's library can be run against. The wrapper is not: canonical
+    emission and the shape of an error are written per language and can drift,
+    and a shared fixture set exercised in every one of them is what would catch
+    it.
 79. Does bolt have an interface other than a command line? An importable
     library used by another Go component would change what the requirements
     cover.
