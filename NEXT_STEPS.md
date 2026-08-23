@@ -241,7 +241,10 @@ answers rather than from it.
     tree.
 56. `manifest` already means the read and write authorization scope in §53 to
     §55, and both kinds land in task evidence trees. Rename bolt's?
-57. Who deletes run directories, and on what rule?
+57. Who deletes run directories, and when? The lifetime is settled by FR-9.1a:
+    wanted while the result is being reviewed, not afterwards. Open is whether
+    bolt prunes its own, whether whoever named `--output-dir` owns removing it,
+    and what a graph node's `.ephemera/` does about it.
 
 ## Input paths
 

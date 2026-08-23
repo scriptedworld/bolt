@@ -234,9 +234,12 @@ A run's whole output is one directory:
 | ID | Requirement | |
 |---|---|---|
 | FR-9.1 | A run's whole output is one directory, so a run can be archived, moved or handed to somebody as a single artifact. | [A/D] |
-| FR-9.2 | Each task execution gets its own directory holding the command as executed, captured stdout and stderr, the exit code as a file, whatever artifacts the command wrote, and the adapter's `output.yaml`. | [A] |
+| FR-9.1a | A run directory lives while its result is being reviewed and is not wanted afterwards. Nothing outside it may depend on it surviving, and `result.yaml` carries whatever has to. | [A] |
+| FR-9.1b | So a reason or a metadata entry references an artifact by its path inside the run directory rather than copying it out. A reader still holding the directory can open the file the tool wrote; a reader holding only the result has what the result carries, which is what it is for. | [A/D] |
+| FR-9.2 | Each task execution gets its own directory holding the command as executed, captured stdout and stderr, the exit code as a file, whatever artifacts the command wrote there, and the adapter's `output.yaml`. | [A] |
 | FR-9.2a | The ordinal is the execution index within the task. Each task numbers its own executions from one, independently of every other task, so a directory name says which task and which of its executions without needing the run's order. For a per-path task the index is the position in the matched list, which FR-9.5's manifest records, so an execution traces back to the path it was handed. | [A] |
 | FR-9.2b | The ordinal is zero-padded to the width that task's execution count needs, so a listing sorts correctly with no arbitrary cap and no wasted digits. The count is known before the first execution, because the matched list is settled before any of it runs. | [A] |
+| FR-9.2c | Bolt puts no artifact there. A command stands at the base under FR-4.1a and writes into the work directory because FR-4.1 named it one, so an artifact arrives by being addressed. One written elsewhere is not in the run's evidence, and going to look for it is the discovery FR-6.2c refuses. | [D] |
 | FR-9.3 | One execution's evidence is complete inside one directory. A reader needs nothing outside it to see what ran and what happened. | [D] |
 | FR-9.4 | Serial execution makes the ordinals deterministic, so two runs over the same tree produce identical work directory names and the two trees line up file for file. | [D] |
 | FR-9.4a | Whether their contents match is a separate matter. Envelopes carry absolute paths, so a run directory named after its own timestamp turns up inside them and two such runs differ wherever a path is recorded. Point both runs at a stable output directory and they do not. | [D] |
