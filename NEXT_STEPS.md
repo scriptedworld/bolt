@@ -122,11 +122,13 @@ recommendation.
     itself once per execution; only its own path loses the context of what the
     task was offered, which is what FR-9.5 exists to preserve.
 25. Does a task that executes exactly once still carry an ordinal?
-26. What is in a manifest besides the command line? Cwd, environment and the
-    input path are all known beforehand and can be. Timings cannot, beyond a
-    start: FR-9.5b closes the manifest before the command runs. So where does
-    a duration go, and an exit status, given both are learned afterwards and
-    the envelope is the adapter's to write?
+26. How does an adapter learn the timings it is to put in `metadata`? It reads
+    the exit status from a file the default invocation names, and nothing
+    equivalent exists for the clock, which the adapter cannot measure because
+    it was not running when the command was. A file beside `exitcode`, or
+    another flag on the invocation.
+    And what else is in a manifest? Cwd, environment and the input path are all
+    known beforehand and can be.
 27. What does bolt do when `--output-dir` already holds a previous run?
 28. Is `--output-dir` created if absent? A graph node's `.ephemera/` may not
     exist yet.
