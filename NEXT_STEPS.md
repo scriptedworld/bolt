@@ -30,11 +30,12 @@ recommendation.
 2. Which codecs and readers ship as defaults? YAML and a local file cover
    everything the ecosystem writes. An adapter reading Cobertura XML or pytest
    JSON needs a codec for each, and nothing yet needs a second reader.
-3. Which arguments may a jig task's command line set? FR-5.13c keeps the output
-   directory and the depth ceiling out of reach, since nesting depends on both.
-   The config directory is clearly in. Whether the rest is an allowlist or
-   everything-but-those decides what a shared jig can do to the run that
-   invoked it.
+3. Should the directory be a third exception alongside the output directory and
+   the depth ceiling? FR-2.1 makes the directory part of an invocation, so an
+   otherwise unrestricted command line can point a child anywhere and step
+   outside the base its subdirectory field established. Containment currently
+   rides entirely on that field, and a command line that can also set the
+   directory takes it away.
    And what is a written path in that command line relative to? FR-3.5 puts
    patterns against the base of the run they are declared in, which would make
    `./nested-config-path` the parent's, not the child's new one.
