@@ -134,11 +134,11 @@ recommendation.
     Does a reason object have a recognisable kind, then, so a consumer can tell
     "the tool was not there" from "the tool found problems" without reading
     English? That is question 21 from the other side.
-32. Does anything verify that an image carries what the jigs require? Anvil
-    derives its package lists from `requires`, so the two should agree by
-    construction, but nothing closes the loop and an image built before a jig
-    grew an entry would be short one. Discovering that at run time is FR-4.10,
-    which reports it correctly and late.
+32. An image is built from a jig, so a shared jig and its image cannot drift.
+    A project's own jig has no image built from it, and its `requires` can
+    exceed what the base image carries. Does a project jig's extra tooling get
+    installed from somewhere, or is FR-4.10 at run time the whole answer for
+    that case?
 33. If bolt fails partway, does it write a partial `result.yaml` or none?
     FR-7.5 argues for none, but a caller then cannot tell a crashed run from
     one that never started.
