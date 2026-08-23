@@ -155,7 +155,9 @@ composition does not.
 | FR-5.13 | Naming a subdirectory narrows the base and the containment check together while the project root stays what it was, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A/D] |
 | FR-5.13a | A jig task may carry an optional command line for the invocation it makes. Absent one, the child runs with what its parent had, so a nested jig inherits the config directory unless the task says otherwise and a subproject carrying its own jigs is something a jig asks for rather than something it gets. | [A] |
 | FR-5.13b | The same substitutions are available in that command line as in a task's command, so `--config-dir={config_dir}` hands the parent's along by naming it and a written path replaces it. Passing something through and replacing it look alike on the page, which is what makes the intent readable. | [A] |
-| FR-5.13c | That command line is otherwise unrestricted. The output directory and the depth ceiling are the exceptions, fixed by FR-5.2 and FR-5.7, because a task overriding either would take apart the structure its parent is relying on. | [A] |
+| FR-5.13c | The parent computes the child's output directory as a subdirectory of that task's work directory and passes it. The child is told where to write rather than stopped from choosing, so nesting needs no special output handling: it is an ordinary invocation given the argument every invocation takes. | [A] |
+| FR-5.13d | The depth ceiling needs no exception either. FR-5.7 has a nested invocation read the propagated ceiling and not the environment it was handed, so an argument setting one is simply not consulted. | [A/D] |
+| FR-5.13e | That command line is otherwise unrestricted. | [A] |
 | FR-5.14 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
 | FR-5.15 | A jig task with no input paths under its base does not run, by the same rule that stops a path-consuming task with nothing to consume. A nested project nobody touched contributes nothing. | [A] |
 

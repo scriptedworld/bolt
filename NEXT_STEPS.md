@@ -30,14 +30,14 @@ recommendation.
 2. Which codecs and readers ship as defaults? YAML and a local file cover
    everything the ecosystem writes. An adapter reading Cobertura XML or pytest
    JSON needs a codec for each, and nothing yet needs a second reader.
-3. Should the directory be a third exception alongside the output directory and
-   the depth ceiling? FR-2.1 makes the directory part of an invocation, so an
-   otherwise unrestricted command line can point a child anywhere and step
-   outside the base its subdirectory field established. Containment currently
-   rides entirely on that field, and a command line that can also set the
-   directory takes it away.
-   And what is a written path in that command line relative to? FR-3.5 puts
-   patterns against the base of the run they are declared in, which would make
+3. Does a jig task's command line add to the invocation the parent builds, or
+   replace it? Adding is what the output directory being computed implies: the
+   parent supplies the jig, the directory from the subdirectory field and that
+   computed path, and the task's line is extra arguments on top. Replacing
+   would let a task name a different directory and step outside the base its
+   own field established, which is the only way containment leaks.
+   And what is a written path in that line relative to? FR-3.5 puts patterns
+   against the base of the run they are declared in, which would make
    `./nested-config-path` the parent's, not the child's new one.
 4. May an invocation name more than one jig? An earlier answer said bolt is
    given a list of them; a jig now runs on a directory, which reads as one jig
