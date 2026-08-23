@@ -56,7 +56,7 @@ composition does not.
 | FR-1.7 | A schema checks shape, not meaning. A command that parsed differently from how it was written is still a string of the right type, and validation passes it. | [D] |
 | FR-1.8 | Validation runs before writing as well as after reading. Bolt checks a file against its schema on the way out, so it cannot emit something it would refuse to read back. | [A] |
 | FR-1.9 | Every read and every write goes through one path that requires a schema. Validation is not a step a call site can omit, so a file bolt handles is covered because of how it was handled rather than because somebody remembered. | [A] |
-| FR-1.10 | YAML is written in canonical form: block style, one key to a line, scalars quoted. Flow style is valid YAML and so is JSON, and neither is what bolt emits. Two results then differ by the lines that changed rather than by one long line. | [A] |
+| FR-1.10 | YAML is written in canonical form: block style, one key to a line, string scalars quoted. A boolean is written bare, because `success: "false"` is a string and FR-7.7 wants a boolean. Flow style is valid YAML and so is JSON, and neither is what bolt emits. Two results then differ by the lines that changed rather than by one long line. | [A] |
 | FR-1.11 | `wrench` is the support library for reading, writing and validating the form of the ecosystem's input and output files. The schemas and a library for each language live there together, so a Go producer and a Python producer get the same definition and equivalent code rather than a schema in one repository and implementations elsewhere obliged to keep up with it. | [A] |
 | FR-1.12 | Bolt reads and writes envelopes through that project's Go library, so bolt is one consumer of the contract and not its owner. | [A/D] |
 | FR-1.13 | Bolt validates with nothing else installed beside it. | [A] |
@@ -126,7 +126,8 @@ composition does not.
 | FR-4.9 | A task may set `short-circuit-failure`, defaulting to false, to stop the run when it fails. Stopping is what a jig asks for rather than what it gets. | [A] |
 | FR-4.10 | A command that cannot start at all produces `success: false` with a reason naming the `requires` entry that was missing. A missing tool is a failing task, and which kind of failure it was is what the reason carries. | [A] |
 | FR-4.11 | A time limit may be set for a task run and for the whole run. Both are options, so unset means a tool is allowed to finish. | [A] |
-| FR-4.11a | A task's limit covers everything that task does, taken together: every command invocation and every adapter invocation. Thirty seconds over four hundred paths is thirty seconds for the task, not for every path in turn, and the adapter runs come out of the same budget. | [A] |
+| FR-4.11c | The limit governs commands. An adapter runs outside it, because the adapter is what records that the limit fired, and a budget exhausted by the command it was killing would leave nothing to write the envelope FR-4.12d requires. | [D] |
+| FR-4.11a | A task's limit covers all of that task's command invocations, taken together. Thirty seconds over four hundred paths is thirty seconds for the task, not for every path in turn. | [A] |
 | FR-4.11b | Reaching it kills the execution in flight and the executions after it do not start. | [A/D] |
 | FR-4.12 | A task exceeding its limit fails, with a reason saying the limit was passed. The run carries on, by FR-4.8, because a slow task is no more reason to discard the rest than a failing one. | [A] |
 | FR-4.12a | A killed command keeps whatever output it managed to gather, and its adapter runs over that. A tool that reported forty problems before hanging reported forty real problems, and discarding them would throw away the only evidence the execution produced. | [A] |
