@@ -122,10 +122,9 @@ recommendation.
     itself once per execution; only its own path loses the context of what the
     task was offered, which is what FR-9.5 exists to preserve.
 25. Does a task that executes exactly once still carry an ordinal?
-26. What else is in a manifest? Cwd, environment and the input path are all
-    known beforehand and can be. Whether the environment goes in raw is the
-    part worth thinking about, since a dump of it carries whatever credentials
-    the shell was holding into a file somebody may hand around as evidence.
+26. Does a manifest record the working directory the command ran in? It is
+    known beforehand and it is the one remaining thing that shapes a command's
+    behaviour and is safe to write down, now that the environment is out.
 27. What does bolt do when `--output-dir` already holds a previous run?
 28. Is `--output-dir` created if absent? A graph node's `.ephemera/` may not
     exist yet.
