@@ -88,7 +88,7 @@ composition does not.
 | ID | Requirement | |
 |---|---|---|
 | FR-3.1 | A jig is the unit of configuration and composition. What bolt executes for a project is read from that project's jig. | [A] |
-| FR-3.2 | A task declares a name, an optional description, `matching` and `excluding` lists, and a command written as a shell line. There is no runmode field. | [A] |
+| FR-3.2 | A task declares a name, an optional description, `matching` and `excluding` lists, its adapter, and a command written as a shell line. There is no runmode field. | [A] |
 | FR-3.3 | A task's name prefixes its work directories, so a task's evidence is identifiable on disk without opening anything. | [A/D] |
 | FR-3.4 | `matching` is a condition on a task: a list of patterns or literal paths saying which files inside the run's directory that task acts on, where `**` matches zero or more directory levels. Every Python file through the formatter is one task with one pattern. A task never sees a path its condition rejects. | [A] |
 | FR-3.4a | `excluding` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
@@ -140,6 +140,8 @@ composition does not.
 |---|---|---|
 | FR-6.1 | An adapter is a separate process. It turns one task execution's captured output into a result envelope, and nothing else in bolt decides whether that execution passed. | [A] |
 | FR-6.2 | The default adapter invocation names the captured files: `--stdout`, `--stderr`, `--evidence` and `--exitcode`. A task may write its adapter invocation explicitly in place of the default. | [A] |
+| FR-6.2a | An adapter is handed the same three locations every task gets, the project root, the run's base and the execution's work directory. | [A] |
+| FR-6.2b | An adapter writes `output.yaml` into that work directory. The path is the work directory it was given and the name never varies, so no flag says where the envelope goes and no task can put it somewhere else. | [A] |
 | FR-6.3 | A child process's exit code reaches its adapter as a file. Bolt reaches no verdict of its own from it. | [A] |
 | FR-6.4 | An adapter is chosen by the output format it reads. Any tool emitting a format some adapter understands reuses that adapter, whoever wrote the tool. | [A] |
 | FR-6.5 | Adapters read structured formats as well as exit codes: Cobertura, pytest JSON, and other structured test and coverage reports. | [A] |

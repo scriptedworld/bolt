@@ -79,9 +79,11 @@ recommendation.
 
 ## Adapters
 
-16. Where does an adapter write `output.yaml`? Stdout captured by bolt, its cwd
-    set to the work directory, or an `--output` flag the default contract does
-    not currently carry.
+16. The adapter writes `output.yaml`, so bolt did not write it and FR-1.8's
+    check on the way out never ran on it. Bolt validates it on the way in
+    instead, at the merge. Does that leave canonical form as the adapter's
+    responsibility, and does an adapter using the shared library get both for
+    free by calling `save_formatted_file`?
 17. What does `--evidence` list: everything the command left in the work
     directory that bolt did not put there, or a set the task declares?
 18. Which adapter runs when a task names none?
