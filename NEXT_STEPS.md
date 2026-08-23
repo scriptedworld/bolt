@@ -27,11 +27,12 @@ recommendation.
    the jig is being written, which is where a `matching` typo is cheapest to
    find. It also decides whether the schemas are an artifact or an
    implementation detail.
-2. How does `load_formatted_file` know the format, now that `reader` is the IO
-   seam rather than the codec? From the extension, from a fourth argument, or
-   is "formatted" only saying "structured" and YAML the sole answer? It decides
-   whether an adapter can read a tool's own Cobertura XML or pytest JSON
-   through the same validated path, or goes on parsing those by hand.
+2. Does the reader take the path, or does the library open the file and hand it
+   a stream? `yaml.safe_load` takes a stream, which puts the open inside the
+   library and means a test substituting the reader still touches disk. A
+   reader taking the path moves the whole boundary out and a test avoids the
+   filesystem entirely. Detail belongs to that project's own requirements; bolt
+   needs only the surface.
 3. Where does bolt look for `bolt.<name>.yaml`? The run's directory is the
    obvious place, and `link-jigs` puts shared jigs somewhere a bare name can
    resolve. Whether a nested jig resolves against its own base or against the
