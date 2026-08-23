@@ -208,15 +208,21 @@ recommendation.
 
 ## Time
 
-Nothing in the architecture mentions time. A first implementation can run
-without any of it and let tools finish.
+Nothing in the architecture mentions time, and what is here now comes from
+answers rather than from it.
 
-52. Does a task have a timeout? Where is it declared, and what is the default?
-53. When a task times out, is the outcome a failed task or a task that could
-    not execute?
-54. How is a timed-out child terminated, which signal and with what grace, and
-    are its descendants killed with it?
-55. Is there a whole-run timeout distinct from the per-task ones?
+52. Where is each limit declared? A task's belongs on the task; a run's could
+    sit on the jig, on the command line, or both, and if both then which wins.
+53. How is a timed-out child terminated, which signal and with what grace, and
+    are its descendants killed with it? A command that spawns its own children
+    leaves them running when only the child is signalled, and they go on
+    writing into a work directory bolt has finished with.
+54. For a per-path task, does the task limit apply to each execution or to all
+    of them together? A limit of thirty seconds means something very different
+    over four hundred paths depending on the answer.
+55. Does a run that times out fold in the constituents that completed, or does
+    its result carry only the timeout? FR-4.14 keeps the evidence; whether the
+    merge runs over what is there is the part that is not settled.
 
 ## The output directory
 
