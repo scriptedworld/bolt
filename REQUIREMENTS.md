@@ -163,7 +163,7 @@ composition does not.
 | FR-6.2a | An adapter is handed the same three locations every task gets, the project root, the run's base and the execution's work directory. | [A] |
 | FR-6.2c | A task declares its evidence files, and those are what `--evidence` names. Discovery would hand an adapter whatever a tool happened to leave behind, a lock file or a temporary or an intermediate, and let something irrelevant ruin a run. An artifact nobody declared still sits in the work directory as evidence on disk; it is simply not passed to the adapter. | [A] |
 | FR-6.2b | An adapter writes `output.yaml` into that work directory. The path is the work directory it was given and the name never varies, so no flag says where the envelope goes and no task can put it somewhere else. | [A] |
-| FR-6.3 | A child process's exit code reaches its adapter as a file. Bolt reaches no verdict of its own from it. | [A] |
+| FR-6.3 | A child process's exit code reaches its adapter as a file. Bolt reaches no verdict of its own from it, and does not record it in the envelope either: whether that number explains anything is the adapter's judgement, not bolt's. | [A] |
 | FR-6.4 | An adapter is chosen by the output format it reads. Any tool emitting a format some adapter understands reuses that adapter, whoever wrote the tool. | [A] |
 | FR-6.5 | Adapters read structured formats as well as exit codes: Cobertura, pytest JSON, and other structured test and coverage reports. | [A] |
 | FR-6.6 | Fixing an adapter and re-folding a finished run costs no re-execution, because every input an adapter reads is already on disk. | [D] |
@@ -177,8 +177,9 @@ composition does not.
 | FR-7.1 | `success`, a boolean, is the only key every envelope carries. | [A] |
 | FR-7.2 | `reasons` is present when `success` is false. Its members are objects whose shape is open, so whatever detail a producer holds can travel with the failure. | [A] |
 | FR-7.3 | `metadata` is optional, and carries `statistics` and `evidence` where a producer has them. | [A] |
-| FR-7.3a | The exit status goes in `metadata` too. It is learned by finishing, so it cannot sit in a manifest closed before the command started, and it belongs with the result it describes. | [A] |
-| FR-7.3b | Timings belong there as well and are not in the first version. Nothing therefore has to hand an adapter a clock it could not read for itself, and the adapter contract stays as it is. | [A] |
+| FR-7.3a | Nothing puts the exit status into the envelope by default. It matters when the adapter says it matters, and then it goes into a reason, because a reason is where an adapter says what a result rests on. | [A] |
+| FR-7.3b | Leaving it out loses nothing. The raw value sits in the `exitcode` file either way, so a reader who wants it has it and a consumer is not handed a number nobody claimed was relevant. | [A/D] |
+| FR-7.3c | Timings go in `metadata` and are not in the first version. Nothing therefore has to hand an adapter a clock it could not read for itself, and the adapter contract stays as it is. | [A] |
 | FR-7.4 | Bolt's envelopes use the ecosystem's shared vocabulary. An envelope from a task, from a merge, from a task node or from azimuth is read the same way by the same consumer. | [A] |
 | FR-7.5 | An envelope is written whole or not at all. A run killed partway leaves no half-written envelope for a consumer to read as authoritative. | [D] |
 | FR-7.5a | Every file bolt or an adapter writes as a unit is written atomically, to a temporary and renamed into place, which is what makes FR-7.5 true rather than hoped for. A process killed mid-write leaves absence, and absence is a state FR-7.6 already knows how to read. | [A] |
