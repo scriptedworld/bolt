@@ -312,3 +312,22 @@ answers rather than from it.
 76. Does bolt have an interface other than a command line? An importable
     library used by another Go component would change what the requirements
     cover.
+
+---
+
+# Rejected from the inbox
+
+Two entries described the retired implementation and were resolved by rejection
+rather than by action, because the tree each names no longer exists and neither
+can be verified against anything. Both concepts survive independently, reached
+without reading either entry.
+
+- **`gate-runs-a-stale-fork-of-the-checkers`**, filed from toolbox, on a jig
+  running a forked copy of shared checkers. The drift it describes is covered
+  by FR-3.11, where an anvil image is generated from a jig's `requires` rather
+  than mirroring it, and by the jig checker filed as
+  `clank/inbox/toolbox/a-checker-that-validates-every-jig-in-the-config-dir/`.
+- **`plan-does-not-evaluate-requires`**, filed from agent-support, on a `plan`
+  subcommand that did not check `requires`. There is no `plan` in this
+  specification. Whether `requires` is checked before anything runs is
+  question 6 above, reached from the architecture rather than from the entry.
