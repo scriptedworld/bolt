@@ -179,6 +179,9 @@ composition does not.
 | FR-7.3 | `metadata` is optional, and carries `statistics` and `evidence` where a producer has them. | [A] |
 | FR-7.4 | Bolt's envelopes use the ecosystem's shared vocabulary. An envelope from a task, from a merge, from a task node or from azimuth is read the same way by the same consumer. | [A] |
 | FR-7.5 | An envelope is written whole or not at all. A run killed partway leaves no half-written envelope for a consumer to read as authoritative. | [D] |
+| FR-7.5a | Every file bolt or an adapter writes as a unit is written atomically, to a temporary and renamed into place, which is what makes FR-7.5 true rather than hoped for. A process killed mid-write leaves absence, and absence is a state FR-7.6 already knows how to read. | [A] |
+| FR-7.5b | The temporary sits beside its target. A temporary somewhere else makes the move a copy across filesystems, which is not atomic and defeats the point. | [A/D] |
+| FR-7.5c | Captured streams are the exception, because they are not written as a unit. FR-4.12a needs a killed command's partial output to survive, and output still arriving cannot be written atomically without discarding exactly what that row keeps. | [A/D] |
 | FR-7.6 | Absent and invalid are different conditions. No `output.yaml` means no authoritative result has been reached. One that is present and fails validation is a failure. One that validates is authoritative. | [A] |
 | FR-7.7 | Producing a valid envelope means a well-formed YAML file carrying `success` as a boolean, and `reasons` as a list of objects when `success` is false. Nothing further is required of any producer, inside bolt or outside it. | [A] |
 

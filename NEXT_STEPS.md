@@ -203,11 +203,10 @@ recommendation.
 
 49. With an explicit adapter invocation, are the same substitutions available,
     and is the envelope still expected in the same place?
-50. Is an envelope written through a temporary file and renamed? FR-7.5 says
-    whole or not at all, and a process killed mid-write cannot honour that on
-    its own. Without the rename, a killed adapter leaves a half-written
-    `output.yaml`, which FR-7.6 reads as invalid and therefore a failure, when
-    what happened is that nothing finished writing.
+50. Is a manifest written before the command runs or after it finishes? Before
+    means a killed execution still has a record of what was attempted, which is
+    the case that most wants one. After means the only executions that say what
+    they ran are the ones that survived to say it.
 51. May an adapter read the repository tree, or only the files it was handed?
 
 ## Time
