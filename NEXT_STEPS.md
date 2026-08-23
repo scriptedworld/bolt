@@ -216,7 +216,8 @@ answers rather than from it.
 53. How is a timed-out child terminated, which signal and with what grace, and
     are its descendants killed with it? A command that spawns its own children
     leaves them running when only the child is signalled, and they go on
-    writing into a work directory bolt has finished with.
+    writing into a work directory bolt has finished with, and into the streams
+    an adapter is about to read under FR-4.12a.
 54. For a per-path task, does the task limit apply to each execution or to all
     of them together? A limit of thirty seconds means something very different
     over four hundred paths depending on the answer.

@@ -123,6 +123,9 @@ composition does not.
 | FR-4.10 | A command that cannot start at all produces `success: false` with a reason naming the `requires` entry that was missing. A missing tool is a failing task, and which kind of failure it was is what the reason carries. | [A] |
 | FR-4.11 | A time limit may be set for a task run and for the whole run. Both are options, so unset means a tool is allowed to finish. | [A] |
 | FR-4.12 | A task exceeding its limit fails, with a reason saying the limit was passed. The run carries on, by FR-4.8, because a slow task is no more reason to discard the rest than a failing one. | [A] |
+| FR-4.12a | A killed execution keeps whatever output it managed to gather, and its adapter runs over that. A tool that reported forty problems before hanging reported forty real problems, and discarding them would throw away the only evidence the execution produced. | [A] |
+| FR-4.12b | It fails regardless of what its adapter concluded, and its reasons carry at least the limit being passed. A partial run cannot report a pass, because what it did not reach is exactly what is unknown about it. | [A] |
+| FR-4.12c | A timed-out execution therefore has a valid envelope, which distinguishes it from one whose adapter died and left none. Under FR-7.6 a timeout is an authoritative failure and a crash is no result at all. | [A/D] |
 | FR-4.13 | A run exceeding its limit fails, with a reason saying the limit was passed. | [A] |
 | FR-4.14 | A run that times out still writes its result, carrying what completed before the limit. Bolt is alive and in control when the limit passes, so the rule is the one FR-5.8 already sets for a refusal: only a bolt that dies leaves nothing behind. | [A/D] |
 
@@ -152,7 +155,7 @@ composition does not.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-6.1 | An adapter is a separate process. It turns one task execution's captured output into a result envelope, and nothing else in bolt decides whether that execution passed. | [A] |
+| FR-6.1 | An adapter is a separate process. It turns one task execution's captured output into a result envelope, and nothing else in bolt decides whether that execution passed. The single exception is FR-4.12b: an execution bolt terminated cannot pass, whatever its adapter made of what it gathered. | [A] |
 | FR-6.2 | The default adapter invocation names the captured files: `--stdout`, `--stderr`, `--evidence` and `--exitcode`. A task may write its adapter invocation explicitly in place of the default. | [A] |
 | FR-6.2a | An adapter is handed the same three locations every task gets, the project root, the run's base and the execution's work directory. | [A] |
 | FR-6.2c | A task declares its evidence files, and those are what `--evidence` names. Discovery would hand an adapter whatever a tool happened to leave behind, a lock file or a temporary or an intermediate, and let something irrelevant ruin a run. An artifact nobody declared still sits in the work directory as evidence on disk; it is simply not passed to the adapter. | [A] |
