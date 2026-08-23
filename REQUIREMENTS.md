@@ -101,6 +101,8 @@ composition does not.
 | FR-3.7 | A jig maintained outside the repository and made available inside it, as toolbox's `link-jigs` does, runs without being copied into the tree. | [D] |
 | FR-3.8 | Bolt draws no line between a shared jig and a project-specific one. The same fields serve both, and every literal path or narrow pattern a jig carries trades reuse for fit. Where a jig sits on that scale is its author's choice and not a rule bolt enforces. | [A/D] |
 | FR-3.9 | A jig file is `bolt.<name>.yaml`, so jig files are identifiable in a directory holding everything else a project keeps, and a jig is spoken of by its `<name>` rather than by a filename. | [A] |
+| FR-3.10 | A jig declares `requires`, the executable tools that must exist for it to function. It is the jig saying what toolchain it is written against. | [A] |
+| FR-3.11 | Those declarations are readable by things other than bolt. Anvil derives the package lists for its images from them, so what an image carries comes from the jigs needing it rather than from a second list maintained beside them and drifting. | [A] |
 
 ## 4. Substitution and execution
 
@@ -115,7 +117,7 @@ composition does not.
 | FR-4.7 | Because no task depends on another, the merged result does not vary with the order tasks ran in. | [D] |
 | FR-4.8 | A failing task does not stop the run. The tasks after it still execute, because a run that stops early throws away the evidence they would have produced and leaves a reader unable to tell what else was wrong. | [A] |
 | FR-4.9 | A task may set `short-circuit-failure`, defaulting to false, to stop the run when it fails. Stopping is what a jig asks for rather than what it gets. | [A] |
-| FR-4.10 | A command that cannot start at all produces `success: false` with a reason naming the requirement that was missing. A missing tool is a failing task, and which kind of failure it was is what the reason carries. | [A] |
+| FR-4.10 | A command that cannot start at all produces `success: false` with a reason naming the `requires` entry that was missing. A missing tool is a failing task, and which kind of failure it was is what the reason carries. | [A] |
 
 ## 5. Nested jigs
 
@@ -172,7 +174,7 @@ composition does not.
 |---|---|---|
 | FR-8.1 | A run has exactly one result. The merge reads every `work/*/output.yaml` and folds them into one `result.yaml`, mechanically, and repeatably over a finished directory. | [A/D] |
 | FR-8.2 | The merge rewrites `evidence` from a list of paths into a mapping keyed by task, each entry carrying that task's args and the filepath of its own result. | [A] |
-| FR-8.3 | The merged result passes only when every required constituent passes. | [A] |
+| FR-8.3 | The merged result passes only when every constituent passes. There is no constituent whose failure does not count: a check nobody wants enforced is a check not in the jig. | [A/D] |
 | FR-8.4 | The merged result carries the reasons, statistics and evidence references its constituents produced, so what failed and why is readable from the merged file alone. | [A/D] |
 | FR-8.5 | Constituent envelopes survive the merge. Both levels stay on disk. | [D] |
 | FR-8.6 | Only the outermost invocation relativises. Preparing the final result, a bolt that finds no depth set in its environment rewrites the output and evidence references going into `result.yaml` as relative to the project directory; a nested run leaves them absolute. No root has to be propagated for this, because the only bolt needing one is the bolt doing the conversion. | [A/D] |

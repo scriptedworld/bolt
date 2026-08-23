@@ -47,8 +47,12 @@ recommendation.
    not take the path as an argument? Nothing needs it yet, and inference makes
    it inexpressible, which is worth knowing before it turns up rather than
    after.
-7. Can a task be marked required or not, and what is the default? §22's gate is
-   "all required constituent results must pass", and FR-8.3 repeats it.
+7. Is `requires` checked before anything runs, or discovered when a command
+   fails to start? Up front tells you the toolchain is incomplete before half a
+   gate has executed. Discovered means FR-4.10 does the reporting and the
+   remaining tasks still contribute what they can, which is what FR-4.8 asks
+   for. Both together would also work: check up front, and still fail the task
+   if a command cannot start for some other reason.
 
 ## Locations
 
@@ -128,11 +132,10 @@ recommendation.
     Does a reason object have a recognisable kind, then, so a consumer can tell
     "the tool was not there" from "the tool found problems" without reading
     English? That is question 21 from the other side.
-32. `short-circuit-failure` stops the run and `required` decides whether a
-    constituent's failure fails the merge. Both are per task and they are
-    orthogonal, so a task can be short-circuiting and not required, or
-    required and not short-circuiting. Is that intended, or is one of them
-    meant to imply the other?
+32. Does a nested jig's `requires` roll up to its parent? Anvil needs the
+    toolchain for a whole tree, and reading only the outermost jig would miss
+    what a Go subproject's jig asks for. Rolling up also means one list to
+    check before a run rather than one per depth.
 33. If bolt fails partway, does it write a partial `result.yaml` or none?
     FR-7.5 argues for none, but a caller then cannot tell a crashed run from
     one that never started.
