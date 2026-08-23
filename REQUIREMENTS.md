@@ -122,10 +122,13 @@ composition does not.
 | FR-4.9 | A task may set `short-circuit-failure`, defaulting to false, to stop the run when it fails. Stopping is what a jig asks for rather than what it gets. | [A] |
 | FR-4.10 | A command that cannot start at all produces `success: false` with a reason naming the `requires` entry that was missing. A missing tool is a failing task, and which kind of failure it was is what the reason carries. | [A] |
 | FR-4.11 | A time limit may be set for a task run and for the whole run. Both are options, so unset means a tool is allowed to finish. | [A] |
+| FR-4.11a | A task's limit covers everything that task does, taken together: every command invocation and every adapter invocation. Thirty seconds over four hundred paths is thirty seconds for the task, not for every path in turn, and the adapter runs come out of the same budget. | [A] |
+| FR-4.11b | Reaching it kills the execution in flight and the executions after it do not start. | [A/D] |
 | FR-4.12 | A task exceeding its limit fails, with a reason saying the limit was passed. The run carries on, by FR-4.8, because a slow task is no more reason to discard the rest than a failing one. | [A] |
-| FR-4.12a | A killed execution keeps whatever output it managed to gather, and its adapter runs over that. A tool that reported forty problems before hanging reported forty real problems, and discarding them would throw away the only evidence the execution produced. | [A] |
+| FR-4.12a | A killed command keeps whatever output it managed to gather, and its adapter runs over that. A tool that reported forty problems before hanging reported forty real problems, and discarding them would throw away the only evidence the execution produced. | [A] |
 | FR-4.12b | It fails regardless of what its adapter concluded, and its reasons carry at least the limit being passed. A partial run cannot report a pass, because what it did not reach is exactly what is unknown about it. | [A] |
-| FR-4.12c | A timed-out execution therefore has a valid envelope, which distinguishes it from one whose adapter died and left none. Under FR-7.6 a timeout is an authoritative failure and a crash is no result at all. | [A/D] |
+| FR-4.12c | Where the limit catches the adapter rather than the command, bolt writes that envelope itself. Nothing else is left to write one, and the guarantee below has to hold whichever of the two was running. | [A/D] |
+| FR-4.12d | A timed-out execution therefore has a valid envelope, which distinguishes it from one whose adapter died of its own accord and left none. Under FR-7.6 a timeout is an authoritative failure and a crash is no result at all. | [A/D] |
 | FR-4.13 | A run exceeding its limit fails, with a reason saying the limit was passed. | [A] |
 | FR-4.14 | A run that times out still writes its result, carrying what completed before the limit. Bolt is alive and in control when the limit passes, so the rule is the one FR-5.8 already sets for a refusal: only a bolt that dies leaves nothing behind. | [A/D] |
 

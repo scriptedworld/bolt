@@ -203,7 +203,11 @@ recommendation.
 
 49. With an explicit adapter invocation, are the same substitutions available,
     and is the envelope still expected in the same place?
-50. Does an adapter get its own timeout, separate from the task's?
+50. Is an envelope written through a temporary file and renamed? FR-7.5 says
+    whole or not at all, and a process killed mid-write cannot honour that on
+    its own. Without the rename, a killed adapter leaves a half-written
+    `output.yaml`, which FR-7.6 reads as invalid and therefore a failure, when
+    what happened is that nothing finished writing.
 51. May an adapter read the repository tree, or only the files it was handed?
 
 ## Time
@@ -218,9 +222,10 @@ answers rather than from it.
     leaves them running when only the child is signalled, and they go on
     writing into a work directory bolt has finished with, and into the streams
     an adapter is about to read under FR-4.12a.
-54. For a per-path task, does the task limit apply to each execution or to all
-    of them together? A limit of thirty seconds means something very different
-    over four hundred paths depending on the answer.
+54. What records the executions a task never reached? A per-path task cut off
+    at path fifty leaves fifty work directories and nothing saying the other
+    three hundred and fifty were never attempted. The run fails, correctly, and
+    a reader still cannot see how much went unchecked.
 55. Does a run that times out fold in the constituents that completed, or does
     its result carry only the timeout? FR-4.14 keeps the evidence; whether the
     merge runs over what is there is the part that is not settled.
