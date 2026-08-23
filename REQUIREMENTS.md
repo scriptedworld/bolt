@@ -160,7 +160,10 @@ composition does not.
 | FR-5.13c | `output-dir` names the child's output directory rather than placing it. Whatever it is set to, the result is a subdirectory of that task's work directory, so renaming is expressible and relocating is not sayable, and FR-5.2's layout cannot be undone by a field. | [A] |
 | FR-5.13d | There is no field for the directory a child runs on. It comes from FR-5.13's subdirectory and from nowhere else, which is what makes containment a property rather than a habit. | [A/D] |
 | FR-5.13e | There is no field for the depth ceiling. FR-5.7 has a nested invocation read the propagated one, so a field would have nothing to act on. | [A/D] |
-| FR-5.13f | Every one of these is schema-checkable, which a command line would not have been. FR-1.5 validates a jig, and the part with the most power over a nested run is not the part exempt from it. | [A/D] |
+| FR-5.13f | Substitutions work in a field's value as they do in a command, so `config-dir: {project_root}/tooling` says where it means instead of counting directories up from the base. | [A] |
+| FR-5.13g | A substituted location is already absolute, so FR-2.9's rule never applies to it. Naming a location and writing a relative path are two ways of saying where, and they do not compose into a third. | [A/D] |
+| FR-5.13h | The location variables are what is available there. A jig task has no command consuming paths, so `{each_path}` and `{all_paths}` have nothing to stand for. | [A/D] |
+| FR-5.13i | Every one of these is schema-checkable, which a command line would not have been. FR-1.5 validates a jig, and the part with the most power over a nested run is not the part exempt from it. | [A/D] |
 | FR-5.14 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
 | FR-5.15 | A jig task with no input paths under its base does not run, by the same rule that stops a path-consuming task with nothing to consume. A nested project nobody touched contributes nothing. | [A] |
 
