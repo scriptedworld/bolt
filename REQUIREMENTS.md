@@ -189,7 +189,7 @@ A run's whole output is one directory:
 <output-dir>/
   result.yaml
   work/
-    <task>-####/
+    <task>-<ordinal>/
       manifest
       stdout
       stderr
@@ -202,7 +202,8 @@ A run's whole output is one directory:
 |---|---|---|
 | FR-9.1 | A run's whole output is one directory, so a run can be archived, moved or handed to somebody as a single artifact. | [A/D] |
 | FR-9.2 | Each task execution gets its own directory holding the command as executed, captured stdout and stderr, the exit code as a file, whatever artifacts the command wrote, and the adapter's `output.yaml`. | [A] |
-| FR-9.2a | `####` is the execution index within the task. Each task numbers its own executions from one, independently of every other task, so a directory name says which task and which of its executions without needing the run's order. For a per-path task the index is the position in the matched list, which FR-9.5's manifest records, so an execution traces back to the path it was handed. | [A] |
+| FR-9.2a | The ordinal is the execution index within the task. Each task numbers its own executions from one, independently of every other task, so a directory name says which task and which of its executions without needing the run's order. For a per-path task the index is the position in the matched list, which FR-9.5's manifest records, so an execution traces back to the path it was handed. | [A] |
+| FR-9.2b | The ordinal is zero-padded to the width that task's execution count needs, so a listing sorts correctly with no arbitrary cap and no wasted digits. The count is known before the first execution, because the matched list is settled before any of it runs. | [A] |
 | FR-9.3 | One execution's evidence is complete inside one directory. A reader needs nothing outside it to see what ran and what happened. | [D] |
 | FR-9.4 | Serial execution makes the ordinals deterministic, so two runs over the same tree produce identical work directory names and two run directories diff cleanly. | [D] |
 | FR-9.5 | An execution's manifest records which paths `matching` selected and which `excluding` removed, for a task that consumes paths. What that task saw, and what it was kept from seeing, sits on disk beside what it did. | [A] |

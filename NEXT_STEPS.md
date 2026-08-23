@@ -113,9 +113,10 @@ recommendation.
 
 ## The output directory
 
-24. How wide is `####`? Four digits caps a task at 9999 executions, which a
-    per-path task over a large tree could reach. Fixed width sorts correctly in
-    a directory listing and a variable one does not.
+24. For a per-path task, does each execution's manifest record the whole matched
+    list or only the path that execution was handed? The whole list repeats
+    itself once per execution; only its own path loses the context of what the
+    task was offered, which is what FR-9.5 exists to preserve.
 25. Does a task that executes exactly once still carry an ordinal?
 26. What is in `manifest` besides the command line: cwd, environment, timings,
     the input path?
