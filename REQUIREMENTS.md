@@ -112,6 +112,8 @@ composition does not.
 | ID | Requirement | |
 |---|---|---|
 | FR-4.1 | Three locations are separately specifiable and separately available to every task: the project root, the base this run operates from, and the execution's own work directory. The outermost run is assumed to sit at the project root and a nested one is not, so a jig based on a subtree can still reach a config file at the root without giving up its base. | [A] |
+| FR-4.1a | A command runs at the base directory. A tool has to stand where the jig's frame of reference is, or `./...` and a bare relative path mean something other than what the jig meant, and FR-3.5 already puts the patterns there. FR-5.12's override is the exception, running a jig that needs the repository root at the repository root. | [A] |
+| FR-4.1b | The base is where a command stands rather than the only place it can reach. The project root, the config directory and the work directory are all named to it, so needing one is not a reason to stand somewhere else. | [A/D] |
 | FR-4.2 | How a task runs is read off its command, not declared beside it. `{each_path}` means one execution per matched path. `{all_paths}` means one execution with the whole selection substituted. Neither means one execution and no paths. A command naming both is a jig error. | [A] |
 | FR-4.3 | Every path bolt substitutes is individually quoted, so a path carrying a space, a quote or a semicolon can neither split the command line nor inject into it. | [A] |
 | FR-4.4 | A task whose command names `{each_path}` or `{all_paths}` does not execute when its filtered selection is empty, and produces no output. A task naming neither always executes. | [A] |
