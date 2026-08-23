@@ -287,16 +287,12 @@ without any of it and let tools finish.
     wrap it in something of its own?
 76. Does bolt stamp the tree state §65 wants, or does that move to the caller?
     Bolt reads no git for anything else.
-77. What is the project called, and does the name stay `wrench`? Filed as a
-    candidate in `clank/inbox/silo/yaml-and-json-schema-is-a-platform-decision/`
-    along with the argument against it, that a wrench turns a bolt while here
-    bolt depends on wrench.
-78. What holds the per-language implementations level? Validation itself is
+77. What holds the per-language implementations level? Validation itself is
     covered by JSON Schema's official cross-implementation test suite, which
     each language's library can be run against. The wrapper is not: canonical
     emission and the shape of an error are written per language and can drift,
     and a shared fixture set exercised in every one of them is what would catch
     it.
-79. Does bolt have an interface other than a command line? An importable
+78. Does bolt have an interface other than a command line? An importable
     library used by another Go component would change what the requirements
     cover.
