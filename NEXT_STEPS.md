@@ -27,12 +27,9 @@ recommendation.
    the jig is being written, which is where a `matching` typo is cheapest to
    find. It also decides whether the schemas are an artifact or an
    implementation detail.
-2. Does the reader take the path, or does the library open the file and hand it
-   a stream? `yaml.safe_load` takes a stream, which puts the open inside the
-   library and means a test substituting the reader still touches disk. A
-   reader taking the path moves the whole boundary out and a test avoids the
-   filesystem entirely. Detail belongs to that project's own requirements; bolt
-   needs only the surface.
+2. Which codecs and readers ship as defaults? YAML and a local file cover
+   everything the ecosystem writes. An adapter reading Cobertura XML or pytest
+   JSON needs a codec for each, and nothing yet needs a second reader.
 3. Where does bolt look for `bolt.<name>.yaml`? The run's directory is the
    obvious place, and `link-jigs` puts shared jigs somewhere a bare name can
    resolve. Whether a nested jig resolves against its own base or against the
