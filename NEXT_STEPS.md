@@ -113,8 +113,9 @@ recommendation.
 
 ## The output directory
 
-24. What does `####` count: execution index within the task, or position in the
-    run's order?
+24. How wide is `####`? Four digits caps a task at 9999 executions, which a
+    per-path task over a large tree could reach. Fixed width sorts correctly in
+    a directory listing and a variable one does not.
 25. Does a task that executes exactly once still carry an ordinal?
 26. What is in `manifest` besides the command line: cwd, environment, timings,
     the input path?
@@ -132,10 +133,11 @@ recommendation.
     Does a reason object have a recognisable kind, then, so a consumer can tell
     "the tool was not there" from "the tool found problems" without reading
     English? That is question 21 from the other side.
-32. Does a nested jig's `requires` roll up to its parent? Anvil needs the
-    toolchain for a whole tree, and reading only the outermost jig would miss
-    what a Go subproject's jig asks for. Rolling up also means one list to
-    check before a run rather than one per depth.
+32. A parent does not read a child jig, so a child that will not parse is
+    discovered when it runs rather than when the run starts. A typo in a
+    subproject's jig then surfaces halfway through a gate as a failing
+    constituent. Intended, or does something check every reachable jig up
+    front?
 33. If bolt fails partway, does it write a partial `result.yaml` or none?
     FR-7.5 argues for none, but a caller then cannot tell a crashed run from
     one that never started.

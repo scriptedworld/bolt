@@ -102,7 +102,7 @@ composition does not.
 | FR-3.8 | Bolt draws no line between a shared jig and a project-specific one. The same fields serve both, and every literal path or narrow pattern a jig carries trades reuse for fit. Where a jig sits on that scale is its author's choice and not a rule bolt enforces. | [A/D] |
 | FR-3.9 | A jig file is `bolt.<name>.yaml`, so jig files are identifiable in a directory holding everything else a project keeps, and a jig is spoken of by its `<name>` rather than by a filename. | [A] |
 | FR-3.10 | A jig declares `requires`, the executable tools that must exist for it to function. It is the jig saying what toolchain it is written against. | [A] |
-| FR-3.11 | Those declarations are readable by things other than bolt. Anvil derives the package lists for its images from them, so what an image carries comes from the jigs needing it rather than from a second list maintained beside them and drifting. | [A] |
+| FR-3.11 | Those declarations are readable by things other than bolt. Anvil derives the package lists for its images from them, reading the jig files themselves, so what an image carries comes from the jigs needing it rather than from a second list maintained beside them and drifting. Nothing depends on bolt gathering them up. | [A] |
 
 ## 4. Substitution and execution
 
@@ -125,6 +125,7 @@ composition does not.
 |---|---|---|
 | FR-5.1 | A task may name a jig in place of a command. | [A] |
 | FR-5.1a | A nested run is not a mode. Inside its subdirectory it is identical to the same jig run on that directory from the command line, so there is one operation and one code path, invoked from two places. | [A] |
+| FR-5.1b | A parent knows a jig's name and where to run it, and nothing about what is inside it. The child follows its own process when invoked: its own `requires`, its own tasks, its own filtering. Nothing rolls up and no parent reads a child's content. | [A] |
 | FR-5.2 | A nested run writes into its own subdirectory inside that task's work directory, and its `result.yaml` is linked as the task's `output.yaml` by a relative symlink, so the whole tree survives being moved or archived. | [A/D] |
 | FR-5.3 | A jig task carries the same bookkeeping files as a command task, so nothing reading `work/*/` needs to know which kind it is looking at. | [A/D] |
 | FR-5.4 | The merge does not know that a constituent was a nested run. Nesting is a special case at invocation and nowhere else. | [A/D] |
@@ -201,6 +202,7 @@ A run's whole output is one directory:
 |---|---|---|
 | FR-9.1 | A run's whole output is one directory, so a run can be archived, moved or handed to somebody as a single artifact. | [A/D] |
 | FR-9.2 | Each task execution gets its own directory holding the command as executed, captured stdout and stderr, the exit code as a file, whatever artifacts the command wrote, and the adapter's `output.yaml`. | [A] |
+| FR-9.2a | `####` is the execution index within the task. Each task numbers its own executions from one, independently of every other task, so a directory name says which task and which of its executions without needing the run's order. For a per-path task the index is the position in the matched list, which FR-9.5's manifest records, so an execution traces back to the path it was handed. | [A] |
 | FR-9.3 | One execution's evidence is complete inside one directory. A reader needs nothing outside it to see what ran and what happened. | [D] |
 | FR-9.4 | Serial execution makes the ordinals deterministic, so two runs over the same tree produce identical work directory names and two run directories diff cleanly. | [D] |
 | FR-9.5 | An execution's manifest records which paths `matching` selected and which `excluding` removed, for a task that consumes paths. What that task saw, and what it was kept from seeing, sits on disk beside what it did. | [A] |
