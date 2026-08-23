@@ -83,6 +83,8 @@ composition does not.
 | FR-2.6 | `--output-dir` names the directory a run writes into. Given none, a run creates `.bolt-<iso8601>`. | [A] |
 | FR-2.7 | Bolt reads no git. A run over a tree that is not a repository behaves exactly as one over a tree that is. | [D] |
 | FR-2.8 | A config directory argument says where `bolt.<name>.yaml` files are found, so where jigs live is told to bolt rather than inferred from the directory being run on. | [A] |
+| FR-2.9 | A relative path is resolved against the base directory of the invocation it is written in. One rule covers filter patterns, a jig task's subdirectory, a `config-dir` field and anything else written as a path, so nobody has to remember which kind of path follows which convention. | [A] |
+| FR-2.9a | For a field on a jig task that is the parent's base, because the parent's jig is where the field is written. A path configuring the child is still read in the frame of whoever wrote it. | [A/D] |
 
 ## 3. Jigs and tasks
 

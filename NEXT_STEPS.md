@@ -30,10 +30,10 @@ recommendation.
 2. Which codecs and readers ship as defaults? YAML and a local file cover
    everything the ecosystem writes. An adapter reading Cobertura XML or pytest
    JSON needs a codec for each, and nothing yet needs a second reader.
-3. What is a written path in `config-dir` relative to, and are substitutions
-   available in it? FR-3.5 puts patterns against the base of the run they are
-   declared in, which would make `./nested-config-path` the parent's base
-   rather than the child's new one.
+3. Are substitutions available in a field's value, now that a jig task declares
+   fields rather than a command line? `config-dir: {project_root}/tooling` is
+   the case: a path known relative to a location rather than to the base
+   FR-2.9 resolves against.
 4. May an invocation name more than one jig? An earlier answer said bolt is
    given a list of them; a jig now runs on a directory, which reads as one jig
    and one place. If several, they share a directory and their results fold
