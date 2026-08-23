@@ -82,13 +82,14 @@ composition does not.
 | FR-2.5 | A run refuses to start if the directory it was given is not there. | [A/D] |
 | FR-2.6 | `--output-dir` names the directory a run writes into. Given none, a run creates `.bolt-<iso8601>`. | [A] |
 | FR-2.7 | Bolt reads no git. A run over a tree that is not a repository behaves exactly as one over a tree that is. | [D] |
+| FR-2.8 | A config directory argument says where `bolt.<name>.yaml` files are found, so where jigs live is told to bolt rather than inferred from the directory being run on. | [A] |
 
 ## 3. Jigs and tasks
 
 | ID | Requirement | |
 |---|---|---|
 | FR-3.1 | A jig is the unit of configuration and composition. What bolt executes for a project is read from that project's jig. | [A] |
-| FR-3.2 | A task declares a name, an optional description, `matching` and `excluding` lists, its adapter, and a command written as a shell line. There is no runmode field. | [A] |
+| FR-3.2 | A task declares a name, an optional description, `matching` and `excluding` lists, its adapter, its evidence files, `short-circuit-failure`, and a command written as a shell line. There is no runmode field. | [A] |
 | FR-3.3 | A task's name prefixes its work directories, so a task's evidence is identifiable on disk without opening anything. | [A/D] |
 | FR-3.4 | `matching` is a condition on a task: a list of patterns or literal paths saying which files inside the run's directory that task acts on, where `**` matches zero or more directory levels. Every Python file through the formatter is one task with one pattern. A task never sees a path its condition rejects. | [A] |
 | FR-3.4a | `excluding` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
@@ -112,6 +113,9 @@ composition does not.
 | FR-4.5 | Tasks execute serially. | [A] |
 | FR-4.6 | No task consumes another task's output. Work needing several steps is one script producing one exit code and one output. | [A] |
 | FR-4.7 | Because no task depends on another, the merged result does not vary with the order tasks ran in. | [D] |
+| FR-4.8 | A failing task does not stop the run. The tasks after it still execute, because a run that stops early throws away the evidence they would have produced and leaves a reader unable to tell what else was wrong. | [A] |
+| FR-4.9 | A task may set `short-circuit-failure`, defaulting to false, to stop the run when it fails. Stopping is what a jig asks for rather than what it gets. | [A] |
+| FR-4.10 | A command that cannot start at all produces `success: false` with a reason naming the requirement that was missing. A missing tool is a failing task, and which kind of failure it was is what the reason carries. | [A] |
 
 ## 5. Nested jigs
 
@@ -141,6 +145,7 @@ composition does not.
 | FR-6.1 | An adapter is a separate process. It turns one task execution's captured output into a result envelope, and nothing else in bolt decides whether that execution passed. | [A] |
 | FR-6.2 | The default adapter invocation names the captured files: `--stdout`, `--stderr`, `--evidence` and `--exitcode`. A task may write its adapter invocation explicitly in place of the default. | [A] |
 | FR-6.2a | An adapter is handed the same three locations every task gets, the project root, the run's base and the execution's work directory. | [A] |
+| FR-6.2c | A task declares its evidence files, and those are what `--evidence` names. Discovery would hand an adapter whatever a tool happened to leave behind, a lock file or a temporary or an intermediate, and let something irrelevant ruin a run. An artifact nobody declared still sits in the work directory as evidence on disk; it is simply not passed to the adapter. | [A] |
 | FR-6.2b | An adapter writes `output.yaml` into that work directory. The path is the work directory it was given and the name never varies, so no flag says where the envelope goes and no task can put it somewhere else. | [A] |
 | FR-6.3 | A child process's exit code reaches its adapter as a file. Bolt reaches no verdict of its own from it. | [A] |
 | FR-6.4 | An adapter is chosen by the output format it reads. Any tool emitting a format some adapter understands reuses that adapter, whoever wrote the tool. | [A] |

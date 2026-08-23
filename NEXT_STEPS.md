@@ -30,10 +30,12 @@ recommendation.
 2. Which codecs and readers ship as defaults? YAML and a local file cover
    everything the ecosystem writes. An adapter reading Cobertura XML or pytest
    JSON needs a codec for each, and nothing yet needs a second reader.
-3. Where does bolt look for `bolt.<name>.yaml`? The run's directory is the
-   obvious place, and `link-jigs` puts shared jigs somewhere a bare name can
-   resolve. Whether a nested jig resolves against its own base or against the
-   outermost directory decides whether a subproject can carry a jig of its own.
+3. Is the config directory a fourth location available to a command, beside the
+   project root, the base and the work directory? A jig shipped with tools
+   beside it needs to name them, and the config directory is where they would
+   sit. It also decides whether a nested jig inherits its parent's config
+   directory or gets one of its own, which is what says whether a subproject
+   can carry jigs.
 4. May an invocation name more than one jig? An earlier answer said bolt is
    given a list of them; a jig now runs on a directory, which reads as one jig
    and one place. If several, they share a directory and their results fold
@@ -84,8 +86,10 @@ recommendation.
     instead, at the merge. Does that leave canonical form as the adapter's
     responsibility, and does an adapter using the shared library get both for
     free by calling `save_formatted_file`?
-17. What does `--evidence` list: everything the command left in the work
-    directory that bolt did not put there, or a set the task declares?
+17. What happens when a declared evidence file was not produced? A tool that
+    died before writing `coverage.xml` leaves the task declaring a path that is
+    not there. Bolt passes it anyway and lets the adapter cope, drops it from
+    the list, or treats the absence as the task failing.
 18. Which adapter runs when a task names none?
 19. How is an adapter resolved by name: a search path, a directory inside
     toolbox, a symlink placed by `link-jigs`?
@@ -120,12 +124,15 @@ recommendation.
 
 ## Failure
 
-31. When a task's command cannot start at all, because the binary is missing or
-    is not executable, is that a failed task or a bolt failure? A missing tool
-    means the gate did not run, and reporting it as a normal failure conceals
-    that.
-32. Does a failing task stop the run, or does a run always execute every task
-    and decide at the merge?
+31. FR-4.10 has a missing binary carried by the reason rather than by a status.
+    Does a reason object have a recognisable kind, then, so a consumer can tell
+    "the tool was not there" from "the tool found problems" without reading
+    English? That is question 21 from the other side.
+32. `short-circuit-failure` stops the run and `required` decides whether a
+    constituent's failure fails the merge. Both are per task and they are
+    orthogonal, so a task can be short-circuiting and not required, or
+    required and not short-circuiting. Is that intended, or is one of them
+    meant to imply the other?
 33. If bolt fails partway, does it write a partial `result.yaml` or none?
     FR-7.5 argues for none, but a caller then cannot tell a crashed run from
     one that never started.
