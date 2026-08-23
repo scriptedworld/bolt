@@ -88,8 +88,12 @@ recommendation.
 16. The adapter writes `output.yaml`, so bolt did not write it and FR-1.8's
     check on the way out never ran on it. Bolt validates it on the way in
     instead, at the merge. Does that leave canonical form as the adapter's
-    responsibility, and does an adapter using the shared library get both for
-    free by calling `save_formatted_file`?
+    responsibility, and does an adapter using wrench get both for free by
+    calling `save_formatted_file`? Checking canonical form on load, by dumping
+    what was parsed and comparing, is not the answer: comments do not survive a
+    round trip, so it fails every jig that documents itself under FR-3.4c, and
+    for envelopes it inspects output where FR-1.9 would rather remove the
+    unvalidated path. Byte comparison belongs in wrench's fixture suite.
 17. What happens when a declared evidence file was not produced? A tool that
     died before writing `coverage.xml` leaves the task declaring a path that is
     not there. Bolt passes it anyway and lets the adapter cope, drops it from
