@@ -134,11 +134,11 @@ recommendation.
     Does a reason object have a recognisable kind, then, so a consumer can tell
     "the tool was not there" from "the tool found problems" without reading
     English? That is question 21 from the other side.
-32. A parent does not read a child jig, so a child that will not parse is
-    discovered when it runs rather than when the run starts. A typo in a
-    subproject's jig then surfaces halfway through a gate as a failing
-    constituent. Intended, or does something check every reachable jig up
-    front?
+32. How far does the jig checker go beyond well-formedness? A jig that parses
+    can still name an adapter that does not resolve, a `requires` entry no
+    image carries, or a subdirectory that is not there. Each of those is
+    checkable without running anything, and each is otherwise found partway
+    through a gate.
 33. If bolt fails partway, does it write a partial `result.yaml` or none?
     FR-7.5 argues for none, but a caller then cannot tell a crashed run from
     one that never started.

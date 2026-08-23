@@ -103,6 +103,8 @@ composition does not.
 | FR-3.9 | A jig file is `bolt.<name>.yaml`, so jig files are identifiable in a directory holding everything else a project keeps, and a jig is spoken of by its `<name>` rather than by a filename. | [A] |
 | FR-3.10 | A jig declares `requires`, the executable tools that must exist for it to function. It is the jig saying what toolchain it is written against. | [A] |
 | FR-3.11 | Those declarations are readable by things other than bolt. Anvil derives the package lists for its images from them, reading the jig files themselves, so what an image carries comes from the jigs needing it rather than from a second list maintained beside them and drifting. Nothing depends on bolt gathering them up. | [A] |
+| FR-3.12 | Bolt validates the jig it is handed and does not go looking for others. Every reachable jig being well-formed is a checker's job, run over the config directory as a task like any other, so a broken jig fails a gate instead of surfacing halfway through one. | [A] |
+| FR-3.13 | That leaves no bootstrap hole. The jig bolt is given is validated as it loads, so a broken one fails at once, and the checker covers the jigs bolt was never asked to read. | [A/D] |
 
 ## 4. Substitution and execution
 
