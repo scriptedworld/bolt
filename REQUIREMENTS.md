@@ -153,6 +153,9 @@ composition does not.
 | FR-5.11 | The subdirectory is a written path, not a pattern. A jig states where its nested projects are, because a pattern can say which files look like Go and never that a directory is a Go module. | [A] |
 | FR-5.12 | One jig may be named by many jig tasks at different bases. Eight Go subprojects is eight jig tasks, so the work directory prefix is the task's name and never the jig's. | [A] |
 | FR-5.13 | Naming a subdirectory narrows the base and the containment check together while the project root stays what it was, so a jig distributed by toolbox drops in at any depth without being written to know where it was placed. | [A/D] |
+| FR-5.13a | A jig task may carry an optional command line for the invocation it makes. Absent one, the child runs with what its parent had, so a nested jig inherits the config directory unless the task says otherwise and a subproject carrying its own jigs is something a jig asks for rather than something it gets. | [A] |
+| FR-5.13b | The same substitutions are available in that command line as in a task's command, so `--config-dir={config_dir}` hands the parent's along by naming it and a written path replaces it. Passing something through and replacing it look alike on the page, which is what makes the intent readable. | [A] |
+| FR-5.13c | The arguments nesting itself depends on are not a jig task's to set. The output directory is fixed by FR-5.2 and the depth ceiling by FR-5.7, and a task overriding either would take apart the structure the parent is relying on. | [D] |
 | FR-5.14 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
 | FR-5.15 | A jig task with no input paths under its base does not run, by the same rule that stops a path-consuming task with nothing to consume. A nested project nobody touched contributes nothing. | [A] |
 

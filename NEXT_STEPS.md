@@ -30,10 +30,14 @@ recommendation.
 2. Which codecs and readers ship as defaults? YAML and a local file cover
    everything the ecosystem writes. An adapter reading Cobertura XML or pytest
    JSON needs a codec for each, and nothing yet needs a second reader.
-3. Does a nested jig inherit its parent's config directory, or get one of its
-   own? Inheriting means every jig in a tree comes from one place. Its own
-   means a subproject can carry jigs nobody else sees, which is either the
-   point or the thing that makes a tree's gate unreadable from the top.
+3. Which arguments may a jig task's command line set? FR-5.13c keeps the output
+   directory and the depth ceiling out of reach, since nesting depends on both.
+   The config directory is clearly in. Whether the rest is an allowlist or
+   everything-but-those decides what a shared jig can do to the run that
+   invoked it.
+   And what is a written path in that command line relative to? FR-3.5 puts
+   patterns against the base of the run they are declared in, which would make
+   `./nested-config-path` the parent's, not the child's new one.
 4. May an invocation name more than one jig? An earlier answer said bolt is
    given a list of them; a jig now runs on a directory, which reads as one jig
    and one place. If several, they share a directory and their results fold
@@ -58,7 +62,10 @@ recommendation.
    are five now: the project root, the run's base, the execution's work
    directory, the config directory and the output directory. `{project_root}`
    currently means the base in the earlier rows, so the naming has to separate
-   them, and `--output-dir` is the only argument spelled out so far.
+   them. And the two conventions have drifted: arguments are hyphenated,
+   `--config-dir` and `--output-dir`, while variables are underscored,
+   `{project_root}` and `{each_path}`. One rule for both, or hyphens for flags
+   and underscores for variables stated as the rule rather than as an accident.
 9. Are the config directory and the output directory exposed as template
    variables too, or only the three a task acts within? A jig shipped with
    tools beside it needs to name the config directory; nothing yet needs to
