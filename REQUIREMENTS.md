@@ -209,6 +209,7 @@ composition does not.
 | FR-8.1 | A run has exactly one result. The merge reads every `work/*/output.yaml` and folds them into one `result.yaml`, mechanically, and repeatably over a finished directory. | [A/D] |
 | FR-8.2 | The merge rewrites `evidence` from a list of paths into a mapping keyed by task, each entry carrying that task's args and the filepath of its own result. | [A] |
 | FR-8.3 | The merged result passes only when every constituent passes. There is no constituent whose failure does not count: a check nobody wants enforced is a check not in the jig. | [A/D] |
+| FR-8.3a | A merge finding no constituent fails, with a reason saying no task produced a result. FR-8.3 on its own passes that run, because every constituent passing holds when there are none, and a green result is read as checked and fine, which over zero checks it is not. | [A] |
 | FR-8.4 | The merged result carries the reasons, statistics and evidence references its constituents produced, so what failed and why is readable from the merged file alone. | [A/D] |
 | FR-8.5 | Constituent envelopes survive the merge. Both levels stay on disk. | [D] |
 | FR-8.6 | Only the outermost invocation relativises. Preparing the final result, a bolt that finds no depth set in its environment rewrites the output and evidence references going into `result.yaml` as relative to the project directory; a nested run leaves them absolute. No root has to be propagated for this, because the only bolt needing one is the bolt doing the conversion. | [A/D] |
@@ -288,7 +289,6 @@ The questions that would settle them are in `NEXT_STEPS.md`.
 |---|---|---|
 | FR-13.1 | An adapter writes its envelope to a defined place, named in the contract that invokes it. | [?] |
 | FR-13.2 | A task that could not execute is distinguishable in `result.yaml` from one that executed and failed. | [?] |
-| FR-13.3 | A task skipped for an empty file list is distinguishable in `result.yaml` from one that was never declared, so a green result cannot mean that nothing was checked. | [?] |
 | FR-13.4 | Whether a constituent is required is declared, with a stated default. | [?] |
 | FR-13.5 | A task that exceeds a time budget reaches a defined outcome. | [?] |
 | FR-13.6 | Run directories are removed on a stated rule, so a dogfooding repository does not accumulate them without bound. | [?] |
