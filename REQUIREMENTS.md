@@ -62,16 +62,8 @@ composition does not.
 | FR-1.8 | Validation runs before writing as well as after reading. Bolt checks a file against its schema on the way out, so it cannot emit something it would refuse to read back. | [A] |
 | FR-1.9 | Every read and every write goes through one path that requires a schema. Validation is not a step a call site can omit, so a file bolt handles is covered because of how it was handled rather than because somebody remembered. | [A] |
 | FR-1.10 | YAML is written in canonical form: block style, one key to a line, and a scalar quoted exactly when it is meant to be a string, so its type is never in question. Booleans and numbers stay bare. `no`, `1.20` and `null` therefore survive a round trip as the strings they were, and `success` stays a boolean. Flow style is valid YAML and so is JSON, and neither is what bolt emits. Two results then differ by the lines that changed rather than by one long line. | [A] |
-| FR-1.11 | `wrench` is the support library for reading, writing and validating the form of the ecosystem's input and output files. The schemas and a library for each language live there together, so a Go producer and a Python producer get the same definition and equivalent code rather than a schema in one repository and implementations elsewhere obliged to keep up with it. | [A] |
-| FR-1.12 | Bolt reads and writes envelopes through that project's Go library, so bolt is one consumer of the contract and not its owner. | [A/D] |
+| FR-1.12 | Bolt reads and writes every structured file through wrench's Go library, so bolt is one consumer of that contract and not its owner. What the contract is belongs to `wrench/REQUIREMENTS.md`, and bolt does not restate it. | [A/D] |
 | FR-1.13 | Bolt validates with nothing else installed beside it. | [A] |
-| FR-1.14 | File handling is two calls, `load_formatted_file(path, schema, codec, reader)` and `save_formatted_file(data, path, schema, codec, writer)`. Validation sits in the signature: there is no way to read or write without naming what the file must conform to, which makes FR-1.9 a property of the library's surface rather than a discipline every call site has to keep. | [A] |
-| FR-1.15 | The codec is the format and the reader or writer is the IO, declared separately. A format is then added without inventing a source and a source without inventing a format, rather than needing one function per combination of the two. | [A] |
-| FR-1.15a | Separating them puts the IO boundary wholly outside the call. A reader is handed the path, so substituting it in a test exercises the validation paths against no filesystem at all rather than only replacing the parse. | [A/D] |
-| FR-1.16 | The envelope is one schema handed to those calls and a jig is another. The shared project provides structured files with schemas attached, for anything in the ecosystem, rather than an envelope-specific facility. | [A] |
-| FR-1.17 | JSON Schema validates the decoded structure, so it is indifferent to how the file was serialised on the way in. | [A/D] |
-| FR-1.18 | Canonical form belongs to the save call, so a caller cannot emit something valid but written another way. | [A/D] |
-| FR-1.19 | The signature compels a schema, not the right one. Passing none is impossible; passing the wrong one is not. | [D] |
 
 ## 2. Invocation
 
@@ -123,7 +115,7 @@ composition does not.
 | FR-3.10b | `requires` is checked before any task executes and the run refuses, naming what is missing. An incomplete toolchain is known before half a gate has run rather than partway through it. | [D] |
 | FR-3.10c | FR-4.10 still stands for a command that cannot start for any other reason. Checking up front is a guarantee about `requires`, not about every way a process fails to launch. | [D] |
 | FR-3.10d | A project's own jig has no image built from it, so `requires` naming a tool the base image lacks is caught by FR-3.10b at the start of the run. Installing it is not bolt's to do. | [D] |
-| FR-3.11 | Those declarations are readable by things other than bolt. An anvil image is built from a jig, with its install logic driven by that jig's `requires`, so what an image carries is generated from the list rather than mirroring it. There is one source and nothing to reconcile, and nothing depends on bolt gathering anything up. | [A] |
+| FR-3.11 | A jig's `requires` is readable by things other than bolt, and nothing depends on bolt gathering anything up. What a consumer builds from that list is the consumer's business. | [A] |
 | FR-3.12 | Bolt validates the jig it is handed and does not go looking for others. Every reachable jig being well-formed is a checker's job, run over the config directory as a task like any other, so a broken jig fails a gate instead of surfacing halfway through one. | [A] |
 | FR-3.13 | That leaves no bootstrap hole. The jig bolt is given is validated as it loads, so a broken one fails at once, and the checker covers the jigs bolt was never asked to read. | [A/D] |
 
@@ -204,10 +196,8 @@ composition does not.
 | FR-6.2b | An adapter writes `output.yaml` into that work directory. The path is the work directory it was given and the name never varies, so no flag says where the envelope goes and no task can put it somewhere else. | [A] |
 | FR-6.3 | A child process's exit code reaches its adapter as a file. Bolt reaches no verdict of its own from it, and does not record it in the envelope either: whether that number explains anything is the adapter's judgement, not bolt's. | [A] |
 | FR-6.4 | An adapter is chosen by the output format it reads. Any tool emitting a format some adapter understands reuses that adapter, whoever wrote the tool. | [A] |
-| FR-6.5 | Adapters read structured formats as well as exit codes: Cobertura, pytest JSON, and other structured test and coverage reports. | [A] |
 | FR-6.6 | Fixing an adapter and re-folding a finished run costs no re-execution, because every input an adapter reads is already on disk. | [D] |
-| FR-6.7 | Every adapter, and the merge, carries tests asserting that what it produces validates against the envelope schema. FR-1.8's check on the way out is a backstop; the guarantee is that a producer which would emit something invalid fails its own suite first. | [A] |
-| FR-6.8 | Those tests are boilerplate rather than written afresh per adapter, so conformance arrives with writing an adapter instead of being something each author has to remember. | [A] |
+| FR-6.7 | The merge carries tests asserting that what it produces validates against the envelope schema. FR-1.8's check on the way out is a backstop; the guarantee is that a producer which would emit something invalid fails its own suite first. | [A] |
 | FR-6.9 | A task naming no adapter gets the generic exit-code adapter, reporting success on a zero exit and failure otherwise. Every command has an exit status, so it is the one adapter that needs to know nothing about the tool it is reading. | [D] |
 | FR-6.10 | An adapter is resolved by name from the config directory, where FR-2.8 already finds jigs. A jig and the adapters it names then travel together, so `link-jigs` places both or neither. | [D] |
 | FR-6.11 | An adapter that exits non-zero, writes no `output.yaml`, or writes one that will not parse has produced no authoritative result under FR-7.6. Bolt writes the envelope itself carrying `success: false`, and the reason says which of the three happened, because they have different causes. | [D] |
