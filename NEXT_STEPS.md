@@ -253,6 +253,15 @@ than a list, so nothing rested on the count, and it now says five.
 `jig`, `envelope` and `manifest` today and would need a fourth for FR-4.20 to be
 checkable. The jig schema also grows a `definitions` block, by FR-3.15.
 
+**And one hazard, recorded rather than decided.** Under FR-4.17's update
+semantics a key matching no placeholder does nothing, so `line_lenght: 100`
+leaves the jig's default standing and the gate runs on a value nobody chose.
+It is detectable, because a jig's placeholders are readable from its commands,
+but refusing it is a check on top of plain update rather than something the
+semantics give. FR-4.18 covers the opposite case, a placeholder no layer fills.
+Not numbered with 1 to 37, because `wrench/gate/10` cites that range and
+renumbering it would move what those citations point at.
+
 
 29. When a jig invokes another, what does the child inherit: environment,
     timeouts, the required default?
