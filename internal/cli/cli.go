@@ -142,6 +142,7 @@ func execute(req request, stdout, stderr io.Writer) int {
 		OutputDir:   output,
 		Definitions: defined,
 		Now:         req.now,
+		Fold:        merge.Fold,
 		Progress:    stdout,
 	})
 	if err != nil {
@@ -149,7 +150,7 @@ func execute(req request, stdout, stderr io.Writer) int {
 		return refuseInto(output, base, err, stderr)
 	}
 
-	passed, err := merge.Fold(outcome.OutputDir, base)
+	passed, err := merge.Fold(outcome.OutputDir, base, true)
 	if err != nil {
 		fmt.Fprintf(stderr, "bolt: %v\n", err)
 		return Refused

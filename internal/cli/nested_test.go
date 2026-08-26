@@ -25,13 +25,19 @@ tasks:
 `,
 		"go/one.src":     "",
 		"python/two.src": "",
-		"empty/note.txt": "",
 	}
 	for name, contents := range extra {
 		files[name] = contents
 	}
 
 	root := project(t, projectJig, files)
+
+	// Genuinely empty, which is what FR-5.15 is about. A directory holding a
+	// file the child's tasks happen not to match is not this case: the child
+	// runs, and failing to match is its own business.
+	if err := os.MkdirAll(filepath.Join(root, "empty"), 0o755); err != nil {
+		t.Fatalf("making the empty base: %v", err)
+	}
 	return root
 }
 

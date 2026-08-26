@@ -21,7 +21,7 @@ import (
 // base is the directory the run was pointed at. It goes into the result,
 // because it is the first thing anybody reading one asks and the per-execution
 // manifests answer it only for somebody already inside the run directory.
-func Fold(outputDir, base string) (bool, error) {
+func Fold(outputDir, base string, outermost bool) (bool, error) {
 	workRoot := filepath.Join(outputDir, run.WorkSubdir)
 	entries, err := os.ReadDir(workRoot)
 	if err != nil {
@@ -64,7 +64,7 @@ func Fold(outputDir, base string) (bool, error) {
 		}
 		record := map[string]any{
 			"args":   args,
-			"result": relativise(filepath.Join(workDir, run.EnvelopeFile), base),
+			"result": reference(filepath.Join(workDir, run.EnvelopeFile), base, outermost),
 		}
 		appendEvidence(evidence, task, record)
 	}
@@ -140,9 +140,19 @@ func appendEvidence(evidence map[string]any, task string, record map[string]any)
 	evidence[task] = append(existing, record)
 }
 
-// relativise rewrites a path as relative to the project directory. Only the
-// outermost invocation does this, and the skeleton is always outermost.
-func relativise(path, base string) string {
+// reference is how a path goes into a result.
+//
+// Only the outermost invocation relativises. Paths are absolute at every depth
+// so a nested run's evidence folds into its parent with nothing rewritten, and
+// a path means the same thing to a child and to its parent. Rewriting at each
+// level would rewrite the same path twice.
+//
+// It reaches the structured path references and stops there. Text a tool
+// emitted, carried up inside a reason, stays as the tool wrote it.
+func reference(path, base string, outermost bool) string {
+	if !outermost {
+		return path
+	}
 	relative, err := filepath.Rel(base, path)
 	if err != nil {
 		return path

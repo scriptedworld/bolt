@@ -52,6 +52,37 @@ type Task struct {
 	Evidence []string
 	// ShortCircuit stops the run when this task fails.
 	ShortCircuit bool
+
+	// Jig names a jig to run in place of a command. A jig task declares what it
+	// changes about the invocation it makes, as fields rather than as a command
+	// line, and what it does not declare is inherited.
+	Jig string
+	// In is a subdirectory of the current base to run that jig in, and the only
+	// thing that sets a child's base.
+	In string
+	// ConfigDir is where the child looks for jigs.
+	ConfigDir string
+	// OutputDir names the child's output directory rather than placing it.
+	OutputDir string
+	// Definitions names the child's definitions file, as --definitions does for
+	// an invocation from the command line.
+	Definitions string
+}
+
+// IsJig says whether the task runs a jig in place of a command. The schema
+// refuses a task that names both.
+func (t Task) IsJig() bool {
+	return t.Jig != ""
+}
+
+// fields are a jig task's values, which take substitutions as a command does.
+func (t Task) fields() map[string]string {
+	return map[string]string{
+		"in":          t.In,
+		"config-dir":  t.ConfigDir,
+		"output-dir":  t.OutputDir,
+		"definitions": t.Definitions,
+	}
 }
 
 // Filename is the shape of a jig file. A jig is named by its <name>, and the
@@ -114,6 +145,11 @@ func readTask(item any) (Task, error) {
 		AdapterCommand: text(mapping["adapter-command"]),
 		Evidence:       strings_(mapping["evidence"]),
 		ShortCircuit:   short,
+		Jig:            text(mapping["jig"]),
+		In:             text(mapping["in"]),
+		ConfigDir:      text(mapping["config-dir"]),
+		OutputDir:      text(mapping["output-dir"]),
+		Definitions:    text(mapping["definitions"]),
 	}, nil
 }
 
@@ -134,6 +170,10 @@ func (j *Jig) check() error {
 }
 
 func (t Task) check() error {
+	if t.IsJig() {
+		return t.checkJig()
+	}
+
 	each := strings.Contains(t.Command, EachPath)
 	all := strings.Contains(t.Command, AllPaths)
 
@@ -147,6 +187,27 @@ func (t Task) check() error {
 		return fmt.Errorf("writes an adapter-command but names no adapter, so there is nothing to invoke")
 	}
 	return nil
+}
+
+// checkJig holds a jig task to what the schema cannot state.
+//
+// The location variables are what is available in a field. A jig task has no
+// command consuming paths, so a path variable there has nothing to stand for,
+// and substituting it would put the text into a directory name.
+func (t Task) checkJig() error {
+	for field, value := range t.fields() {
+		for _, name := range Placeholders(value) {
+			if name == bare(EachPath) || name == bare(AllPaths) {
+				return fmt.Errorf("%s names {%s}, and a jig task has no command for it to stand for", field, name)
+			}
+		}
+	}
+	return nil
+}
+
+// bare strips the braces a variable is written with.
+func bare(variable string) string {
+	return variable[1 : len(variable)-1]
 }
 
 // ConsumesPaths says whether the task's command names a path variable, which

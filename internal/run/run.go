@@ -28,6 +28,18 @@ type Options struct {
 	// The jig's own block is on the jig, and bolt's own values are per
 	// execution, so this is the only layer a caller supplies.
 	Definitions map[string]string
+	// ProjectRoot is where the project starts. Empty means this invocation is
+	// the outermost, which is assumed to sit at the base; a nested one carries
+	// its parent's, because narrowing the base leaves the root what it was.
+	ProjectRoot string
+	// Ceiling is the nesting limit in force, resolved by the outermost.
+	Ceiling int
+	// Depth is how many invocations deep this one is, zero at the outermost.
+	Depth int
+	// Fold turns a finished run directory into its one result. A nested run
+	// needs it, and the package that folds reads what this package writes, so
+	// it arrives as a value rather than as an import that would be a cycle.
+	Fold func(outputDir, base string, outermost bool) (bool, error)
 	// Now stamps the default output directory. Passed in so a test does not
 	// have to reach for a clock.
 	Now time.Time
@@ -63,6 +75,14 @@ func Execute(options Options) (*Outcome, error) {
 	if err := prepareOutput(absoluteOutput); err != nil {
 		return nil, err
 	}
+
+	// Checked before anything runs, and after the output directory exists so
+	// the refusal has somewhere to be written that a caller will look.
+	depth, ceiling := resolveDepth(options)
+	if err := tooDeep(depth, ceiling); err != nil {
+		return nil, err
+	}
+	options.Depth, options.Ceiling = depth, ceiling
 
 	base, err := filepath.Abs(options.BaseDir)
 	if err != nil {
@@ -121,6 +141,10 @@ func Execute(options Options) (*Outcome, error) {
 }
 
 func runTask(task jig.Task, options Options, base, configDir, outputDir string, found []string, executable string) (int, error) {
+	if task.IsJig() {
+		return runNestedJig(task, options, base, configDir, outputDir)
+	}
+
 	selection := found
 	if task.ConsumesPaths() {
 		var err error
@@ -155,7 +179,7 @@ func runOnce(task jig.Task, options Options, base, configDir, outputDir string, 
 	}
 
 	locations := Locations{
-		ProjectRoot: base,
+		ProjectRoot: options.projectRoot(base),
 		BaseDir:     base,
 		WorkDir:     workDir,
 		ConfigDir:   configDir,
@@ -183,7 +207,7 @@ func runOnce(task jig.Task, options Options, base, configDir, outputDir string, 
 		fmt.Fprintf(options.Progress, "%s\n", filepath.Base(workDir))
 	}
 
-	status, err := runCommand(command, base, workDir)
+	status, err := runCommand(command, base, workDir, options)
 	if err != nil {
 		return err
 	}
@@ -197,7 +221,7 @@ func runOnce(task jig.Task, options Options, base, configDir, outputDir string, 
 // The captured streams are written as the process produces them rather than
 // atomically. They are not written as a unit, and a killed command's partial
 // output is exactly what has to survive.
-func runCommand(command, base, workDir string) (int, error) {
+func runCommand(command, base, workDir string, options Options) (int, error) {
 	stdout, err := os.Create(filepath.Join(workDir, StdoutFile))
 	if err != nil {
 		return 0, err
@@ -215,6 +239,9 @@ func runCommand(command, base, workDir string) (int, error) {
 	process.Stdout = stdout
 	process.Stderr = stderr
 	process.Stdin = nil
+	// The depth and the ceiling ride in the environment of every process bolt
+	// spawns, so a task command that invokes bolt directly is nested too.
+	process.Env = environment(options.Depth, options.Ceiling)
 
 	status := 0
 	if err := process.Run(); err != nil {
@@ -264,6 +291,40 @@ func writeManifest(workDir string, task jig.Task, mapping definitions.Mapping, c
 // else, so a reader of a manifest meets one shape rather than two.
 func boltValue(value any) map[string]any {
 	return map[string]any{"value": value, "from": string(definitions.FromBolt)}
+}
+
+// saveManifest writes one execution's manifest, validated on the way out.
+func saveManifest(workDir string, manifest map[string]any) error {
+	path := filepath.Join(workDir, ManifestFile)
+	return wrench.SaveFormattedFile(manifest, path, wrench.ManifestSchema, wrench.YAML, wrench.LocalFile)
+}
+
+// projectRoot is where the project starts. The outermost run is assumed to sit
+// there and a nested one is not, so a jig based on a subtree still reaches a
+// config file at the root without giving up its base.
+func (o Options) projectRoot(base string) string {
+	if o.ProjectRoot != "" {
+		return o.ProjectRoot
+	}
+	return base
+}
+
+// Refuse writes a refusal where a caller will find it, in the shape every
+// refusal takes: a result carrying success false and a reason, so a caller
+// parses one thing whatever went wrong.
+func Refuse(outputDir, base string, cause error) error {
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return err
+	}
+	result := map[string]any{
+		"success": false,
+		"reasons": []any{
+			map[string]any{"kind": "bolt-refused", "message": cause.Error()},
+		},
+		"metadata": map[string]any{"base": base},
+	}
+	path := filepath.Join(outputDir, ResultFile)
+	return wrench.SaveFormattedFile(result, path, wrench.EnvelopeSchema, wrench.YAML, wrench.LocalFile)
 }
 
 func asAny(items []string) []any {
