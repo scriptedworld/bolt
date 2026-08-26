@@ -212,6 +212,29 @@ answers rather than from it.
 
 ---
 
+# Files here that belong to another repository
+
+Not a question. Recorded here because bolt has no `docs/` tree yet, and a
+session that does not know this will edit a file it cannot commit.
+
+`bin/test-traceability.py` is a **symlink** to
+`toolbox/bin/test-traceability.py`. That is how a project adopts a shared
+checker: the file lands at the same relative path in the adopter, and
+`{config_dir}` resolves it back through the link.
+
+    bin/test-traceability.py -> ../../toolbox/bin/test-traceability.py
+
+**Editing it from here edits toolbox**, and the change belongs to a repository
+this one cannot commit to. It then sits in toolbox's working tree looking like
+toolbox's own uncommitted work. Fix the checker in toolbox and it arrives here
+through the link.
+
+The same applies to anything `link-jigs` places later, which is the shared
+jigs and every adapter they name. `toolbox/jigs.yaml` says which files each set
+carries.
+
+---
+
 # Rejected from the inbox
 
 Two entries described the retired implementation and were resolved by rejection

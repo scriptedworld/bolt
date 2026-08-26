@@ -43,6 +43,12 @@ tasks:
     description: the compiler-adjacent checks that need no configuration
     command: go vet ./...
 
+  # THE CHECKER IS NOT BOLT'S FILE. `bin/test-traceability.py` is a symlink to
+  # `toolbox/bin/test-traceability.py`, which is how a project adopts a shared
+  # checker. Editing it here edits toolbox, and the change can be committed
+  # from nowhere on this side of the link. Fix it in toolbox and it arrives
+  # here; fix it here and it silently belongs to another repository.
+  #
   # A requirements document nobody is held to becomes decoration. Both
   # directions fail: a test citing nothing, and a settled requirement no test
   # cites.
