@@ -118,7 +118,8 @@ composition does not.
 | FR-4.1b | The base is where a command stands rather than the only place it can reach. The project root, the config directory and the work directory are all named to it, so needing one is not a reason to stand somewhere else. | [A/D] |
 | FR-4.2 | How a task runs is read off its command, not declared beside it. `{each_path}` means one execution per matched path. `{all_paths}` means one execution with the whole selection substituted. Neither means one execution and no paths. A command naming both is a jig error. | [A] |
 | FR-4.3 | Every path bolt substitutes is individually quoted, so a path carrying a space, a quote or a semicolon can neither split the command line nor inject into it. | [A] |
-| FR-4.4 | A task whose command names `{each_path}` or `{all_paths}` does not execute when its filtered selection is empty, and produces no output. A task naming neither always executes. | [A] |
+| FR-4.4 | A command task whose command names `{each_path}` or `{all_paths}` does not execute when its filtered selection is empty, and produces no output. A command task naming neither always executes. | [A] |
+| FR-4.4a | That is a rule about command tasks. A jig task has no command to name a path variable, by FR-5.13h, so FR-5.15 carries its rule instead: it does not run when its base holds no input paths. The same rule reached differently, and neither of them makes a jig task execute unconditionally. | [A/D] |
 | FR-4.5 | Tasks execute serially. | [A] |
 | FR-4.6 | No task consumes another task's output. Work needing several steps is one script producing one exit code and one output. | [A] |
 | FR-4.7 | Because no task depends on another, the merged result does not vary with the order tasks ran in. | [D] |
@@ -208,6 +209,7 @@ composition does not.
 |---|---|---|
 | FR-8.1 | A run has exactly one result. The merge reads every `work/*/output.yaml` and folds them into one `result.yaml`, mechanically, and repeatably over a finished directory. | [A/D] |
 | FR-8.2 | The merge rewrites `evidence` from a list of paths into a mapping keyed by task, each entry carrying that task's args and the filepath of its own result. | [A] |
+| FR-8.2a | The merge takes each key from the work directory name, which FR-3.3 prefixes with the task, and the args from that execution's manifest, which FR-9.5c already records. Neither is read from the envelope, so an adapter never has to know what task it was run for and FR-6.2's contract stays as narrow as it is. | [A/D] |
 | FR-8.3 | The merged result passes only when every constituent passes. There is no constituent whose failure does not count: a check nobody wants enforced is a check not in the jig. | [A/D] |
 | FR-8.3a | A merge finding no constituent fails, with a reason saying no task produced a result. FR-8.3 on its own passes that run, because every constituent passing holds when there are none, and a green result is read as checked and fine, which over zero checks it is not. | [A] |
 | FR-8.4 | The merged result carries the reasons, statistics and evidence references its constituents produced, so what failed and why is readable from the merged file alone. | [A/D] |
