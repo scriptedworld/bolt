@@ -200,7 +200,7 @@ not help with.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-6.1 | An adapter is a separate process. It turns one task execution's captured output into a result envelope, and nothing else in bolt decides whether that execution passed. The single exception is FR-4.12b: an execution bolt terminated cannot pass, whatever its adapter made of what it gathered. | [A] |
+| FR-6.1 | An adapter is a separate process. It turns one task execution's captured output into a result envelope, and nothing else in bolt decides whether that execution passed. The exceptions are three, each named where it arises: FR-4.12b, an execution bolt terminated, which cannot pass whatever its adapter made of what it gathered; FR-6.11, an adapter that reached no authoritative result at all; and FR-6.14, a task that did not produce the evidence it declared, leaving nothing to adapt. | [A/D] |
 | FR-6.2 | The default adapter invocation names the captured files: `--stdout`, `--stderr`, `--evidence` and `--exitcode`. A task may write its adapter invocation explicitly in place of the default. | [A] |
 | FR-6.2a | An adapter is handed the same three locations every task gets, the project root, the run's base and the execution's work directory. | [A] |
 | FR-6.2c | A task declares its evidence files, and those are what `--evidence` names. Discovery would hand an adapter whatever a tool happened to leave behind, a lock file or a temporary or an intermediate, and let something irrelevant ruin a run. An artifact nobody declared still sits in the work directory as evidence on disk; it is simply not passed to the adapter. | [A] |
