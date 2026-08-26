@@ -249,6 +249,13 @@ on which file won and the command line alone does not say.
 locations" where FR-4.1c exposes five. FR-9.5d already made it a rule rather
 than a list, so nothing rested on the count, and it now says five.
 
+**Building it corrected FR-4.17b.** The row had bolt resolving a relative value
+against the base. Bolt cannot: a definition is a scalar and nothing tells
+`../REQUIREMENTS.md` from `100`, so there is no set of values to apply FR-2.4
+to. The outcome the row wanted holds anyway, because FR-4.1a stands the command
+at the base and the value is substituted as written. The row now says which of
+the two is doing the work.
+
 **What is still open.** A schema for the file, which is wrench's: it ships
 `jig`, `envelope` and `manifest` today and would need a fourth for FR-4.20 to be
 checkable. The jig schema also grows a `definitions` block, by FR-3.15.
