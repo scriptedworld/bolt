@@ -59,12 +59,13 @@ flags, and the merge reading task and args off disk.
 | Ordinal on a single execution | FR-9.9 | Always carried. |
 | Exit statuses | FR-10.5, FR-10.6 | 0 ran, 1 could not run, 128+n on a signal. |
 | Partial result on failure | FR-10.7 | Written whenever bolt is alive to write it. |
-| Where a definitions file sits | FR-4.16a | `bolt.definitions.yaml` at the base, named like a jig. |
-| How it is found | FR-4.16b | At the base only. No walking up, because an inherited file is a layer. |
+| How a definitions file is named | FR-4.16a | `--definitions <name>`, read from the config directory as `bolt.<name>.definitions.yaml`. |
+| How many to an invocation | FR-4.16b | One. Several per project, each scoped by its name. |
+| A definitions file's shape | FR-4.16c | One level of names, scalar values. |
 | A placeholder nothing defines | FR-4.18, FR-4.18a | Refuses the run up front, checked when `requires` is. |
 | A value carrying substitutions | FR-4.17a | Literal. Reading the file settles every value in it. |
-| A definition shadowing a location | FR-4.19 | A jig error. |
-| What a child inherits | FR-5.17 | Its own base's file, and none of its parent's. |
+| A definition shadowing a location | FR-4.19 | Reserved. Refuses the run. |
+| What a child inherits | FR-5.13j, FR-5.17 | Its parent's definitions file, until a field says otherwise. |
 
 Two questions left for wrench, which now states them itself: which codecs and
 readers ship, and whether the schemas are files an editor can be pointed at.
@@ -189,44 +190,60 @@ answers rather than from it.
 
 ## Composition and overlay
 
-**Settled 2026-08-26 as FR-4.16 to FR-4.20, FR-5.17 and FR-9.5g.** What follows
-is why, and questions 30, 31 and 33 below are struck by it.
+**Settled 2026-08-26 as FR-3.14 to FR-3.15, FR-4.16 to FR-4.20, FR-5.13j,
+FR-5.17 and FR-9.5g.** What follows is why, and questions 30, 31 and 33 below
+are struck by it.
 
-**A jig carries placeholders and a definitions file supplies the values.** A
-subdirectory then runs the *same* shared jig with its own values, instead of
-the jig being copied, overlaid, or merged by task id.
+**Substitution resolves against one mapping, built in three layers.** Bolt seeds
+it with the locations and path variables, a jig's own `definitions` block gives
+each placeholder a default, and one definitions file named on the invocation
+merges over both. Every key in the result is a template variable.
 
-    bolt.common-quality.yaml       ... --requirements {requirements} ...
-    <base>/bolt.definitions.yaml   requirements: ../REQUIREMENTS.md
+    bolt.common-quality.yaml            definitions:
+                                          requirements: REQUIREMENTS.md
+                                        ... --requirements {requirements} ...
+
+    bolt.python-override.definitions.yaml
+                                        requirements: ../REQUIREMENTS.md
 
 **What it is instead of.** The retired bolt merged definitions by task id and
 took the last writer, which is what `bolt -c common -c go` meant and what
-toolbox's shared jigs are still written for. Questions 30 to 33 are all that
+toolbox's shared jigs are still written for. Questions 30 to 33 are that
 mechanism's edges: what a parent may override, at what granularity, whether it
-may disable a task, and what wins when two layers set the same key. **A
-parameterised jig has none of those edges**, because nothing merges: there is
-one jig and a set of values, and a value either has a definition or it does not.
+may disable a task, and what wins when two layers set the same key.
 
-**What it answers immediately.** `common-quality` runs traceability against
-`REQUIREMENTS.md` relative to the run root. wrench keeps one requirements
-document at its root and wants that jig run at `go/` and at `python/`, where no
-such file sits. With a definitions file per base, each says where its
-requirements are, and one document serves both without the checker changing.
-`clank/tasks/wrench/gate/10-a-composite-jig.planning` is the case in full.
+**What merges here is a mapping of scalars, not a jig.** So 30 and 31 have
+nothing to answer: no task is reached into, and none can be switched off. 33 is
+answered rather than dissolved, by FR-4.17 and FR-4.16b: the file wins over the
+jig's defaults, and there is one file, so there is no ordering. **32 survives**,
+and is the only one of the four that does.
 
-**What it left open, and the default each took.** The file is
-`bolt.definitions.yaml` at the base (FR-4.16a). It is read there and nowhere
-else, with no walking up, because an inherited file is a layer (FR-4.16b). A
-placeholder no definition supplies refuses the run before anything executes,
-checked when `requires` is (FR-4.18, FR-4.18a). A value is a literal and carries
-no substitutions of its own (FR-4.17a).
+**What it answers immediately.** Six Python subprojects share one set of
+adjustments instead of carrying six copies. The project names a definitions
+file, the six jig tasks name none and inherit it by FR-5.13a, and a seventh
+that genuinely differs names its own. A project keeps several such files, one
+per toolchain, scoped by their names: `bolt.python-override.definitions.yaml`
+beside `bolt.go-override.definitions.yaml`.
+
+It also settles wrench's case. `common-quality` runs traceability against
+`{requirements}`, and wrench's one document at the root serves runs based at
+`go/` and at `python/` because FR-4.17b resolves a relative value against the
+run's base. `clank/tasks/wrench/gate/10-a-composite-jig.planning` is that case
+in full.
+
+**A conditional task is refused, and the reason is reproducibility.** FR-3.14:
+state cannot be relied on to be the same between runs, so a task set that varied
+with it would make two results incomparable without either of them saying so.
+FR-3.14a puts a task wanted in some directories and not others into a jig of its
+own, listed by the jigs that want it, where the selection is readable rather
+than decided mid-run.
 
 **What it cost.** FR-4.2 reads how a task runs off its command line and FR-9.5c
 records every value bolt exposed. FR-4.17c settles the first: a literal value
 cannot introduce a path variable, so FR-4.2 still reads the command as written.
-FR-9.5g settles the second, putting a defined value in the manifest and
-distinguishable from what bolt supplied, so a reader of a jig carrying
-placeholders finds what each one stood for at this base.
+FR-9.5g settles the second, putting the whole mapping in the manifest with the
+layer each key came from, because the same key means different things depending
+on which file won and the command line alone does not say.
 
 **Reading FR-9.5c to write FR-9.5g found it stale.** It enumerated "the three
 locations" where FR-4.1c exposes five. FR-9.5d already made it a rule rather
@@ -234,27 +251,31 @@ than a list, so nothing rested on the count, and it now says five.
 
 **What is still open.** A schema for the file, which is wrench's: it ships
 `jig`, `envelope` and `manifest` today and would need a fourth for FR-4.20 to be
-checkable.
+checkable. The jig schema also grows a `definitions` block, by FR-3.15.
 
 
 29. When a jig invokes another, what does the child inherit: environment,
     timeouts, the required default?
 30. ~~Can a parent override a field of a child's task, and at what granularity:
-    the whole task, or one field?~~ **No, by FR-4.16c. Nothing merges, so there
-    is no override to grant a granularity to.**
+    the whole task, or one field?~~ **Nothing reaches into a task.** What merges
+    is a mapping of scalars, and a jig task changes a child by declaring fields
+    under FR-5.13a.
 31. ~~Can a parent disable a task a shared jig declares, and is the omission
-    visible in the result?~~ **No, by FR-4.16c.** Stated as a cost rather than
-    a gap closed: a base that should not run one of a shared jig's tasks needs
-    a different jig. Reopen this if that turns out to bite, because a
-    definition the task is conditional on is the shape it would take.
+    visible in the result?~~ **No, by FR-3.14, and reproducibility is the
+    reason**: a task set varying with anything read at run time makes two runs
+    incomparable without either saying so. FR-3.14a is the answer instead, a
+    separate jig listed by the directories that want it.
 32. Is there a user-level or machine-level layer above the repository's jig?
     §67 describes exactly that for pre-commit, a repository policy plus an
-    independent personal one. **Open. The proposal above does not touch it**:
-    parameterising one jig says nothing about a second, personal one, and this
-    is the one of 30 to 33 that survives.
+    independent personal one. **Open, and the only one of 30 to 33 that
+    survives.** Parameterising one jig says nothing about a second, personal
+    one, and FR-4.16b's single definitions file is deliberately not the place to
+    put one.
 33. ~~What is the precedence when the same key is set at more than one layer,
-    and are collections merged or replaced?~~ **There are no layers, by
-    FR-4.16c.**
+    and are collections merged or replaced?~~ **The file wins over the jig's
+    defaults, by FR-4.17, and there is no ordering to settle because FR-4.16b
+    allows one file.** Nothing is collected: FR-4.16c makes every value a
+    scalar.
 
 ## Boundaries with the rest of the ecosystem
 
