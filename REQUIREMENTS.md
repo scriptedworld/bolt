@@ -160,6 +160,18 @@ not help with.
 | FR-4.13 | A run exceeding its limit fails, with a reason saying the limit was passed. | [A] |
 | FR-4.14 | A run that times out still writes its result, carrying what completed before the limit. Bolt is alive and in control when the limit passes, so the rule is the one FR-5.8 already sets for a refusal: only a bolt that dies leaves nothing behind. | [A/D] |
 | FR-4.15 | A task command runs as a subprocess. The captured streams and the exit status FR-9.2 records come from the process boundary rather than from bookkeeping bolt would otherwise keep, and FR-4.5's serial execution removes what would have argued for running anything in process. | [D] |
+| FR-4.16 | A jig may carry placeholders a definitions file at the base supplies the values for. One shared jig then runs at several bases, each with its own values, without being copied, overlaid or merged by task id. | [D] |
+| FR-4.16a | The file is `bolt.definitions.yaml` and it sits at the base of the run that reads it. It belongs to the base rather than to the jig, because what it holds is what makes one base differ from another, and it is named like a jig so both are recognisable in a directory holding everything else a project keeps. | [D] |
+| FR-4.16b | It is read from the base and from nowhere else. Bolt does not walk up looking for one, because an inherited file is a layer and this mechanism has none. A base with no definitions file supplies no values. | [D] |
+| FR-4.16c | Nothing merges, which is what this buys. No jig is overlaid on another, no parent reaches into a child's task, and no key is set at two levels for a precedence rule to settle. A value either has a definition at the base or it does not. | [D] |
+| FR-4.17 | A definition is a name and a value, and a placeholder substitutes as a location variable does. `{requirements}` in a command line or in a jig task's field becomes what the base defined, and FR-4.3 quotes it as it quotes a path. | [D] |
+| FR-4.17a | A value is a literal. A definitions file carries no substitutions of its own, so reading one settles every value it holds and nothing resolves in terms of anything else. | [D] |
+| FR-4.17b | A value written as a relative path resolves against the base under FR-2.9, which is the directory the file sits in. `requirements: ../REQUIREMENTS.md` at `go/` reaches the document one level up, so one contract serves two packs running the same jig. | [D] |
+| FR-4.17c | A definition cannot introduce `{each_path}` or `{all_paths}`, because a value is a literal. FR-4.2 therefore still reads how a task runs off the command as written: substitution changes what a command says, never how many times it runs. | [D] |
+| FR-4.18 | A placeholder no definition supplies refuses the run before anything executes, in the shape FR-2.5a states, with a reason naming the placeholder and the base. Substituting empty is the reading that fails silently, leaving a command line short an argument and a tool reporting something else. | [D] |
+| FR-4.18a | It is checked when `requires` is, under FR-3.10b, so a jig dropped at a base that does not define what it needs refuses in the first second rather than partway through a gate. | [D] |
+| FR-4.19 | A definitions file may not define a name bolt exposes as a location variable, and one that does refuses the run. `{base_dir}` means what bolt exposes, and a base redefining it would make one name mean two things depending on where it was read. | [D] |
+| FR-4.20 | A definitions file is schema-validated under FR-1.5 like everything else bolt reads as data. One that will not parse or will not validate refuses the run, and is not taken for an absent file. | [D] |
 
 ## 5. Nested jigs
 
@@ -195,6 +207,7 @@ not help with.
 | FR-5.15 | A jig task with no input paths under its base does not run, by the same rule that stops a path-consuming task with nothing to consume. A nested project nobody touched contributes nothing. | [A] |
 | FR-5.15a | A subdirectory that is not there is treated as one holding nothing, so the jig task does not run and the run carries on. FR-3.7 makes a shared jig naming subprojects a repository may not have ordinary rather than exceptional, and refusing the run would make one unusable everywhere it did not fit exactly. | [D] |
 | FR-5.16 | A jig task runs once against its base. It has no command for FR-4.2 to read a mode off, so there is nothing to make it run per path. | [D] |
+| FR-5.17 | A nested run reads the definitions file at its own base and inherits none from its parent. FR-5.13a's inheritance covers the fields a jig task declares, not the values a base defines, which is what lets one shared jig run at two bases and mean something different at each. | [D] |
 
 ## 6. Adapters
 
@@ -288,10 +301,11 @@ A run's whole output is one directory:
 | FR-9.5 | An execution's manifest records which paths `matching` selected and which `excluding` removed, for a task that consumes paths. What that task saw, and what it was kept from seeing, sits on disk beside what it did. | [A] |
 | FR-9.5a | A manifest is written before its command runs, so an execution that was killed, or that never got started, still records what was going to be attempted. The case that most needs a record is the one that would otherwise have none. | [A] |
 | FR-9.5b | It therefore holds only what is known beforehand. Anything a run learns by finishing is not in the manifest, because the manifest was closed before there was anything to learn. | [A/D] |
-| FR-9.5c | Every value bolt exposed as a template variable for that execution is in the manifest: the three locations, and whichever path variable applied. A reader sees what the task was given and not only what its command became, which matters where one path appears several times in a line or where a variable was available and went unused. | [A] |
+| FR-9.5c | Every value bolt exposed as a template variable for that execution is in the manifest: the five locations FR-4.1c names, and whichever path variable applied. A reader sees what the task was given and not only what its command became, which matters where one path appears several times in a line or where a variable was available and went unused. | [A] |
 | FR-9.5d | That is a rule rather than a list, so a variable added later is recorded because it is a variable, not because somebody remembered to add it. | [A/D] |
 | FR-9.5e | The environment is not among what it holds. A dump of it carries whatever the shell was holding, into a file that exists to be handed around as evidence, and recording it safely means filtering it, which is not a first-version problem worth having. | [A] |
 | FR-9.5f | So an execution is not fully reconstructable from its evidence. What a tool read from its environment is not written down, and behaviour that turned on `PATH`, a locale or a tool's own configuration variable cannot be explained from the run directory. | [A/D] |
+| FR-9.5g | A value that came from a definitions file is in the manifest beside the values bolt exposed, and distinguishable from them. FR-9.5c covers what bolt supplied; a reader of a jig carrying placeholders also needs what each one stood for at this base, and that a file rather than bolt is where it came from. | [D] |
 | FR-9.6 | A task naming no path variable was handed no list, so its manifest claims none. Recording one would say the command saw files it never received. | [A] |
 | FR-9.7 | What such a task examined is the tool's own business, and bolt does not know it. A run's evidence covers what bolt handed over, never what a tool went and found for itself. | [A/D] |
 | FR-9.8 | A per-path execution's manifest records the whole matched list, not only the path that execution was handed. FR-9.5 exists to preserve what the task was offered and what it was kept from seeing, and one path alone loses that. Repetition is the cost of every execution's evidence standing alone. | [D] |

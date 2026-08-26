@@ -59,6 +59,12 @@ flags, and the merge reading task and args off disk.
 | Ordinal on a single execution | FR-9.9 | Always carried. |
 | Exit statuses | FR-10.5, FR-10.6 | 0 ran, 1 could not run, 128+n on a signal. |
 | Partial result on failure | FR-10.7 | Written whenever bolt is alive to write it. |
+| Where a definitions file sits | FR-4.16a | `bolt.definitions.yaml` at the base, named like a jig. |
+| How it is found | FR-4.16b | At the base only. No walking up, because an inherited file is a layer. |
+| A placeholder nothing defines | FR-4.18, FR-4.18a | Refuses the run up front, checked when `requires` is. |
+| A value carrying substitutions | FR-4.17a | Literal. Reading the file settles every value in it. |
+| A definition shadowing a location | FR-4.19 | A jig error. |
+| What a child inherits | FR-5.17 | Its own base's file, and none of its parent's. |
 
 Two questions left for wrench, which now states them itself: which codecs and
 readers ship, and whether the schemas are files an editor can be pointed at.
@@ -183,9 +189,8 @@ answers rather than from it.
 
 ## Composition and overlay
 
-**A proposal, 2026-08-26, which may replace most of what follows.** Not a
-settled row, recorded here so the questions below are read against it rather
-than answered separately.
+**Settled 2026-08-26 as FR-4.16 to FR-4.20, FR-5.17 and FR-9.5g.** What follows
+is why, and questions 30, 31 and 33 below are struck by it.
 
 **A jig carries placeholders and a definitions file supplies the values.** A
 subdirectory then runs the *same* shared jig with its own values, instead of
@@ -209,30 +214,47 @@ such file sits. With a definitions file per base, each says where its
 requirements are, and one document serves both without the checker changing.
 `clank/tasks/wrench/gate/10-a-composite-jig.planning` is the case in full.
 
-**What it leaves open.** Where the file sits and what it is called. Whether it
-is found by walking up from the base or named on the jig task. What happens to
-a placeholder no definition supplies, which is either a jig error before
-anything runs, like FR-3.10b's `requires`, or an empty substitution, which is
-the reading that fails silently. Whether a definitions file may itself carry
-substitutions, which is where this stops being simple.
+**What it left open, and the default each took.** The file is
+`bolt.definitions.yaml` at the base (FR-4.16a). It is read there and nowhere
+else, with no walking up, because an inherited file is a layer (FR-4.16b). A
+placeholder no definition supplies refuses the run before anything executes,
+checked when `requires` is (FR-4.18, FR-4.18a). A value is a literal and carries
+no substitutions of its own (FR-4.17a).
 
-**It is not free.** FR-4.2 reads how a task runs off its command line, and
-FR-9.5c records every value bolt exposed as a template variable. Both would have
-to account for values that come from a file rather than from bolt, and the
-manifest is the place a reader finds out what a placeholder stood for.
+**What it cost.** FR-4.2 reads how a task runs off its command line and FR-9.5c
+records every value bolt exposed. FR-4.17c settles the first: a literal value
+cannot introduce a path variable, so FR-4.2 still reads the command as written.
+FR-9.5g settles the second, putting a defined value in the manifest and
+distinguishable from what bolt supplied, so a reader of a jig carrying
+placeholders finds what each one stood for at this base.
+
+**Reading FR-9.5c to write FR-9.5g found it stale.** It enumerated "the three
+locations" where FR-4.1c exposes five. FR-9.5d already made it a rule rather
+than a list, so nothing rested on the count, and it now says five.
+
+**What is still open.** A schema for the file, which is wrench's: it ships
+`jig`, `envelope` and `manifest` today and would need a fourth for FR-4.20 to be
+checkable.
 
 
 29. When a jig invokes another, what does the child inherit: environment,
     timeouts, the required default?
-30. Can a parent override a field of a child's task, and at what granularity:
-    the whole task, or one field?
-31. Can a parent disable a task a shared jig declares, and is the omission
-    visible in the result?
+30. ~~Can a parent override a field of a child's task, and at what granularity:
+    the whole task, or one field?~~ **No, by FR-4.16c. Nothing merges, so there
+    is no override to grant a granularity to.**
+31. ~~Can a parent disable a task a shared jig declares, and is the omission
+    visible in the result?~~ **No, by FR-4.16c.** Stated as a cost rather than
+    a gap closed: a base that should not run one of a shared jig's tasks needs
+    a different jig. Reopen this if that turns out to bite, because a
+    definition the task is conditional on is the shape it would take.
 32. Is there a user-level or machine-level layer above the repository's jig?
     §67 describes exactly that for pre-commit, a repository policy plus an
-    independent personal one.
-33. What is the precedence when the same key is set at more than one layer, and
-    are collections merged or replaced?
+    independent personal one. **Open. The proposal above does not touch it**:
+    parameterising one jig says nothing about a second, personal one, and this
+    is the one of 30 to 33 that survives.
+33. ~~What is the precedence when the same key is set at more than one layer,
+    and are collections merged or replaced?~~ **There are no layers, by
+    FR-4.16c.**
 
 ## Boundaries with the rest of the ecosystem
 
