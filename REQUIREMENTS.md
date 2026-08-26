@@ -14,6 +14,11 @@ bolt or of a run, not how anything is built.
 document or in an answer. `[D]` is derived from one. `[A/D]` is both. `[?]` is
 open, recorded so it is not lost and carrying no test yet.
 
+Thirty-five rows were added on 2026-08-26, closing every question that blocked
+a build. Four came from an answer and the rest from a default taken rather than
+asked. All of them are listed in `NEXT_STEPS.md` under "Defaults taken", so a
+wrong one is found by reading that table rather than by meeting it in the code.
+
 No test cites any row here, because no implementation exists. Every settled row
 is uncovered under toolbox's traceability gate, and marking them `[?]` to turn
 that green would misreport what is settled.
@@ -73,14 +78,23 @@ composition does not.
 | ID | Requirement | |
 |---|---|---|
 | FR-2.1 | A jig is run on a directory. That is the whole of what an invocation says: which jig, and where. | [A] |
+| FR-2.1a | One jig, and one directory. Running several over one tree is a jig whose tasks are nested jigs, which FR-5.x already specifies and which gives each its own work directory and depth accounting. A second composition mechanism beside that one would buy nothing. | [D] |
 | FR-2.2 | Bolt walks that directory to find the files its tasks act on. It has no changed-since-a-ref. | [A] |
 | FR-2.2a | The walk honours `.gitignore`. An ignored file is not part of the project and is not checked, which keeps `.git`, `node_modules`, a virtualenv and build output out of every run without a second list to maintain. | [A] |
 | FR-2.2b | Honouring `.gitignore` means reading those files as text. Bolt does not invoke git, read anything under `.git/`, or require a repository, so it does not reach `.git/info/exclude` or a global excludes file either. A tree with no `.gitignore` in it simply excludes nothing. | [A/D] |
 | FR-2.2c | A run never walks another run's output. Bolt's own run directories are excluded whatever `.gitignore` says, because a tree accumulating them would otherwise feed each run the last one's evidence. | [D] |
+| FR-2.2d | The walk returns paths in sorted order, so the matched list is the same list on every run over the same tree. FR-9.4's identical work directory names rest on this and on nothing else. | [D] |
+| FR-2.2e | The walk does not follow symlinks. Following one leaves the base and breaks the containment FR-2.3 states, and `link-jigs` leaves tracked symlinks pointing into toolbox, so a project using shared jigs has them sitting in the tree being walked. | [D] |
+| FR-2.2f | There is no way to reach a file `.gitignore` excludes. `matching` narrows what the walk found and the walk has already dropped ignored files. Generated code somebody wants checked is the case this refuses, and it stays refused until something needs it. | [D] |
 | FR-2.3 | The directory is the run's base, and everything a run touches comes from inside it. Containment is how the input is formed, not a check applied to it afterwards. | [A/D] |
 | FR-2.4 | Paths are resolved to absolute before anything runs. | [A] |
 | FR-2.5 | A run refuses to start if the directory it was given is not there. | [A/D] |
+| FR-2.5a | That refusal takes the shape every refusal takes: a `result.yaml` carrying `success: false` and a reason naming the directory, then a non-zero exit. A caller parses one thing whatever went wrong. | [D] |
 | FR-2.6 | `--output-dir` names the directory a run writes into. Given none, a run creates `.bolt-<iso8601>`. | [A] |
+| FR-2.6a | `--output-dir` is created if it is not there, parents included. A graph node's `.ephemera/` may not exist yet, and making the caller create it first buys nothing. | [D] |
+| FR-2.6b | A run refuses an output directory that already holds a run. Writing into one interleaves two runs' evidence, and FR-2.2c's exclusion cannot recognise a directory it did not name. Removing it is the caller's decision. | [D] |
+| FR-2.6c | `.bolt-<iso8601>` is created at the run's base. Bolt reads no git, so there is no repository root to prefer, and the base is the one directory every invocation names. | [D] |
+| FR-2.6d | The timestamp is filesystem-safe: hyphens where the strict form has colons, and the local offset spelled the same way. A directory name is a path on every platform, and the strict form's colons are legal here and hostile to a Windows checkout. | [D] |
 | FR-2.7 | Bolt reads no git. A run over a tree that is not a repository behaves exactly as one over a tree that is. | [D] |
 | FR-2.8 | A config directory argument says where `bolt.<name>.yaml` files are found, so where jigs live is told to bolt rather than inferred from the directory being run on. | [A] |
 | FR-2.9 | A relative path is resolved against the base directory of the invocation it is written in. One rule covers filter patterns, a jig task's subdirectory, a `config-dir` field and anything else written as a path, so nobody has to remember which kind of path follows which convention. | [A] |
@@ -93,6 +107,7 @@ composition does not.
 | FR-3.1 | A jig is the unit of configuration and composition. What bolt executes for a project is read from that project's jig. | [A] |
 | FR-3.2 | A task declares a name, an optional description, `matching` and `excluding` lists, its adapter, its evidence files, `short-circuit-failure`, and a command written as a shell line. There is no runmode field. | [A] |
 | FR-3.3 | A task's name prefixes its work directories, so a task's evidence is identifiable on disk without opening anything. | [A/D] |
+| FR-3.3a | Task names are unique within a jig and a duplicate is a jig error. FR-3.3 makes the name the work directory prefix, so two tasks sharing one would put their executions in the same place. | [D] |
 | FR-3.4 | `matching` is a condition on a task: a list of patterns or literal paths saying which files inside the run's directory that task acts on, where `**` matches zero or more directory levels. Every Python file through the formatter is one task with one pattern. A task never sees a path its condition rejects. | [A] |
 | FR-3.4a | `excluding` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
 | FR-3.4b | `matching` and `excluding` belong to a task that consumes paths. On a command naming neither path variable they are a jig error, caught in validation rather than quietly ignored. Whether a whole-project command should run at all is a question about where the jig is pointed, and FR-5.15 already answers it. | [A] |
@@ -105,6 +120,9 @@ composition does not.
 | FR-3.9 | A jig file is `bolt.<name>.yaml`, so jig files are identifiable in a directory holding everything else a project keeps, and a jig is spoken of by its `<name>` rather than by a filename. | [A] |
 | FR-3.10 | A jig declares `requires`, every executable it invokes: the tools its commands run, the adapters its tasks name, and any checker it calls. Nothing a jig reaches for is absent from that list, so the list is the jig's whole dependency inventory rather than a note about unusual tools. | [A] |
 | FR-3.10a | An adapter named by a task therefore appears in `requires` too, which is a consistency a checker can hold: an adapter no entry covers is found before a run instead of when the task reaches it. | [A/D] |
+| FR-3.10b | `requires` is checked before any task executes and the run refuses, naming what is missing. An incomplete toolchain is known before half a gate has run rather than partway through it. | [D] |
+| FR-3.10c | FR-4.10 still stands for a command that cannot start for any other reason. Checking up front is a guarantee about `requires`, not about every way a process fails to launch. | [D] |
+| FR-3.10d | A project's own jig has no image built from it, so `requires` naming a tool the base image lacks is caught by FR-3.10b at the start of the run. Installing it is not bolt's to do. | [D] |
 | FR-3.11 | Those declarations are readable by things other than bolt. An anvil image is built from a jig, with its install logic driven by that jig's `requires`, so what an image carries is generated from the list rather than mirroring it. There is one source and nothing to reconcile, and nothing depends on bolt gathering anything up. | [A] |
 | FR-3.12 | Bolt validates the jig it is handed and does not go looking for others. Every reachable jig being well-formed is a checker's job, run over the config directory as a task like any other, so a broken jig fails a gate instead of surfacing halfway through one. | [A] |
 | FR-3.13 | That leaves no bootstrap hole. The jig bolt is given is validated as it loads, so a broken one fails at once, and the checker covers the jigs bolt was never asked to read. | [A/D] |
@@ -116,7 +134,10 @@ composition does not.
 | FR-4.1 | Three locations are separately specifiable and separately available to every task: the project root, the base this run operates from, and the execution's own work directory. The outermost run is assumed to sit at the project root and a nested one is not, so a jig based on a subtree can still reach a config file at the root without giving up its base. | [A] |
 | FR-4.1a | A command runs at the base directory. A tool has to stand where the jig's frame of reference is, or `./...` and a bare relative path mean something other than what the jig meant, and FR-3.5 already puts the patterns there. FR-5.12's override is the exception, running a jig that needs the repository root at the repository root. | [A] |
 | FR-4.1b | The base is where a command stands rather than the only place it can reach. The project root, the config directory and the work directory are all named to it, so needing one is not a reason to stand somewhere else. | [A/D] |
+| FR-4.1c | Five locations are exposed as template variables: `{project_root}`, `{base_dir}`, `{work_dir}`, `{config_dir}` and `{output_dir}`. All five rather than the three a task acts within, so FR-9.5d's rule holds with no carve-out to remember. | [D] |
+| FR-4.1d | Template variables are underscored and command-line flags are hyphenated, as a rule rather than as an accident. `{config_dir}` and `--config-dir` name one thing in the two shapes their contexts use. | [D] |
 | FR-4.2 | How a task runs is read off its command, not declared beside it. `{each_path}` means one execution per matched path. `{all_paths}` means one execution with the whole selection substituted. Neither means one execution and no paths. A command naming both is a jig error. | [A] |
+| FR-4.2a | There is no way to ask for one execution per path where the command does not name a path variable. FR-4.2 reads how a task runs off its command, so a command naming neither variable has said it runs once. Nothing needs the other thing yet. | [D] |
 | FR-4.3 | Every path bolt substitutes is individually quoted, so a path carrying a space, a quote or a semicolon can neither split the command line nor inject into it. | [A] |
 | FR-4.4 | A command task whose command names `{each_path}` or `{all_paths}` does not execute when its filtered selection is empty, and produces no output. A command task naming neither always executes. | [A] |
 | FR-4.4a | That is a rule about command tasks. A jig task has no command to name a path variable, by FR-5.13h, so FR-5.15 carries its rule instead: it does not run when its base holds no input paths. The same rule reached differently, and neither of them makes a jig task execute unconditionally. | [A/D] |
@@ -137,6 +158,7 @@ composition does not.
 | FR-4.12d | A timed-out execution therefore has a valid envelope, which distinguishes it from one whose adapter died of its own accord and left none. Under FR-7.6 a timeout is an authoritative failure and a crash is no result at all. | [A/D] |
 | FR-4.13 | A run exceeding its limit fails, with a reason saying the limit was passed. | [A] |
 | FR-4.14 | A run that times out still writes its result, carrying what completed before the limit. Bolt is alive and in control when the limit passes, so the rule is the one FR-5.8 already sets for a refusal: only a bolt that dies leaves nothing behind. | [A/D] |
+| FR-4.15 | A task command runs as a subprocess. The captured streams and the exit status FR-9.2 records come from the process boundary rather than from bookkeeping bolt would otherwise keep, and FR-4.5's serial execution removes what would have argued for running anything in process. | [D] |
 
 ## 5. Nested jigs
 
@@ -168,6 +190,8 @@ composition does not.
 | FR-5.13i | Every one of these is schema-checkable, which a command line would not have been. FR-1.5 validates a jig, and the part with the most power over a nested run is not the part exempt from it. | [A/D] |
 | FR-5.14 | A jig that genuinely needs the repository root says so, and that overrides a subdirectory base. | [A] |
 | FR-5.15 | A jig task with no input paths under its base does not run, by the same rule that stops a path-consuming task with nothing to consume. A nested project nobody touched contributes nothing. | [A] |
+| FR-5.15a | A subdirectory that is not there is treated as one holding nothing, so the jig task does not run and the run carries on. FR-3.7 makes a shared jig naming subprojects a repository may not have ordinary rather than exceptional, and refusing the run would make one unusable everywhere it did not fit exactly. | [D] |
+| FR-5.16 | A jig task runs once against its base. It has no command for FR-4.2 to read a mode off, so there is nothing to make it run per path. | [D] |
 
 ## 6. Adapters
 
@@ -184,6 +208,12 @@ composition does not.
 | FR-6.6 | Fixing an adapter and re-folding a finished run costs no re-execution, because every input an adapter reads is already on disk. | [D] |
 | FR-6.7 | Every adapter, and the merge, carries tests asserting that what it produces validates against the envelope schema. FR-1.8's check on the way out is a backstop; the guarantee is that a producer which would emit something invalid fails its own suite first. | [A] |
 | FR-6.8 | Those tests are boilerplate rather than written afresh per adapter, so conformance arrives with writing an adapter instead of being something each author has to remember. | [A] |
+| FR-6.9 | A task naming no adapter gets the generic exit-code adapter, reporting success on a zero exit and failure otherwise. Every command has an exit status, so it is the one adapter that needs to know nothing about the tool it is reading. | [D] |
+| FR-6.10 | An adapter is resolved by name from the config directory, where FR-2.8 already finds jigs. A jig and the adapters it names then travel together, so `link-jigs` places both or neither. | [D] |
+| FR-6.11 | An adapter that exits non-zero, writes no `output.yaml`, or writes one that will not parse has produced no authoritative result under FR-7.6. Bolt writes the envelope itself carrying `success: false`, and the reason says which of the three happened, because they have different causes. | [D] |
+| FR-6.12 | Canonical form on `output.yaml` is the adapter's responsibility. An adapter using wrench gets it from `save_formatted_file` without doing anything, and bolt validates the envelope against its schema on the way in, at the merge. | [D] |
+| FR-6.13 | Bolt does not check canonical form by reparsing and comparing. Comments do not survive a round trip, so that check fails every jig documenting itself under FR-3.4c, and byte comparison belongs in wrench's fixture suite where the emitter is what is under test. | [D] |
+| FR-6.14 | A declared evidence file that was not produced fails its task, with a reason naming the path. A task declaring evidence it did not write did not do what it said, and FR-6.2c's refusal to discover means nothing else notices. | [D] |
 
 ## 7. Result envelopes
 
@@ -202,6 +232,9 @@ composition does not.
 | FR-7.5c | Captured streams are the exception, because they are not written as a unit. FR-4.12a needs a killed command's partial output to survive, and output still arriving cannot be written atomically without discarding exactly what that row keeps. | [A/D] |
 | FR-7.6 | Absent and invalid are different conditions. No `output.yaml` means no authoritative result has been reached. One that is present and fails validation is a failure. One that validates is authoritative. | [A] |
 | FR-7.7 | Producing a valid envelope means a well-formed YAML file carrying `success` as a boolean, and `reasons` as a list of objects when `success` is false. Nothing further is required of any producer, inside bolt or outside it. | [A] |
+| FR-7.8 | A reason object carries `message`, a string, always. One consumer can then render every reason it meets, while the rest of the object stays open to whatever a producer wants to add. | [D] |
+| FR-7.9 | A reason object also carries `kind`, naming what sort of thing it is. A consumer tells a missing tool from a tool that found problems without reading English, which is what FR-4.10 needs when it carries a missing binary in a reason rather than in a status. | [D] |
+| FR-7.10 | A task that could not execute is therefore distinguishable in the merged result from one that executed and failed. The kind says which, and FR-8.4 carries reasons up. | [D] |
 
 ## 8. The merge
 
@@ -216,6 +249,8 @@ composition does not.
 | FR-8.5 | Constituent envelopes survive the merge. Both levels stay on disk. | [D] |
 | FR-8.6 | Only the outermost invocation relativises. Preparing the final result, a bolt that finds no depth set in its environment rewrites the output and evidence references going into `result.yaml` as relative to the project directory; a nested run leaves them absolute. No root has to be propagated for this, because the only bolt needing one is the bolt doing the conversion. | [A/D] |
 | FR-8.7 | Rewriting reaches the structured path references and stops there. Text a tool emitted, carried up inside a reason, stays as the tool wrote it and may still name an absolute path. | [A/D] |
+| FR-8.8 | `args` in the merged mapping is the argv as executed, after substitution. FR-9.5c records exactly that and FR-8.2a reads it from there, so the merged file says what ran rather than what was written. | [D] |
+| FR-8.9 | `result.yaml` records the base the run was pointed at. It is the first thing a reader asks of a result, and FR-9.5c's per-execution manifests answer it only for somebody already inside the run directory. | [D] |
 
 ## 9. The output directory
 
@@ -255,6 +290,8 @@ A run's whole output is one directory:
 | FR-9.5f | So an execution is not fully reconstructable from its evidence. What a tool read from its environment is not written down, and behaviour that turned on `PATH`, a locale or a tool's own configuration variable cannot be explained from the run directory. | [A/D] |
 | FR-9.6 | A task naming no path variable was handed no list, so its manifest claims none. Recording one would say the command saw files it never received. | [A] |
 | FR-9.7 | What such a task examined is the tool's own business, and bolt does not know it. A run's evidence covers what bolt handed over, never what a tool went and found for itself. | [A/D] |
+| FR-9.8 | A per-path execution's manifest records the whole matched list, not only the path that execution was handed. FR-9.5 exists to preserve what the task was offered and what it was kept from seeing, and one path alone loses that. Repetition is the cost of every execution's evidence standing alone. | [D] |
+| FR-9.9 | Every execution carries an ordinal, including a task that executes exactly once. One naming rule, so a work directory name parses without knowing how many executions there were. | [D] |
 
 ## 10. Exit status
 
@@ -264,6 +301,9 @@ A run's whole output is one directory:
 | FR-10.2 | A run in which every task executed and some tools reported failures exits 0 and writes `success: false`. That pairing is correct. | [A/D] |
 | FR-10.3 | The authoritative quality verdict is the envelope. A caller reading bolt's exit status to learn whether the tools passed has read the wrong thing. | [A] |
 | FR-10.4 | Bolt exits non-zero when it could not carry out the requested ETL. | [A] |
+| FR-10.5 | Bolt exits 0 when the run completed, whatever the tools concluded, and 1 when it could not carry the run out: a jig that will not parse, an unknown adapter, an unwritable output directory, a depth ceiling passed, a directory that is not there. FR-10.3 keeps the quality verdict in the envelope. | [D] |
+| FR-10.6 | A bolt killed by a signal exits 128 plus the signal number, which is the shell's convention and the one case where bolt does not choose its own status. | [D] |
+| FR-10.7 | Bolt writes a `result.yaml` whenever it is alive and in control when it stops, a refusal and a timeout included. Only a bolt that died leaves none, so a caller finding no result knows the process was killed rather than that the run never started. | [D] |
 
 ## 11. Where a run happens
 
@@ -289,12 +329,8 @@ The questions that would settle them are in `NEXT_STEPS.md`.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-13.1 | An adapter writes its envelope to a defined place, named in the contract that invokes it. | [?] |
-| FR-13.2 | A task that could not execute is distinguishable in `result.yaml` from one that executed and failed. | [?] |
 | FR-13.4 | Whether a constituent is required is declared, with a stated default. | [?] |
-| FR-13.5 | A task that exceeds a time budget reaches a defined outcome. | [?] |
 | FR-13.6 | Run directories are removed on a stated rule, so a dogfooding repository does not accumulate them without bound. | [?] |
 | FR-13.7 | Evidence can be tied to the exact tree state it was produced from, as §65 requires, by something. Bolt reads no git, so either it acquires that dependency or the requirement belongs to the caller. | [?] |
 | FR-13.8 | The number of bolt runs a user may have live at once is bounded, if that guard is wanted at all. | [?] |
-| FR-13.9 | The jig is written in a defined format, validated against a schema. | [?] |
 | FR-13.10 | The envelope schema is owned and published somewhere every producer and consumer in the ecosystem can validate against. | [?] |
