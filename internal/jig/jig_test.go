@@ -171,3 +171,64 @@ func TestHowATaskRunsIsReadOffItsCommand(t *testing.T) {
 		})
 	}
 }
+
+// COVERS: FR-3.15 | positive
+func TestAJigsDefinitionsBlockIsOptionalAndSoIsAnyEntry(t *testing.T) {
+	// A jig with no placeholders writes none. One deliberately leaving a value
+	// to its adopter names the placeholder in a command and defines nothing,
+	// which is what FR-4.18 then refuses when nothing else supplies it.
+	bare, err := jig.Load(written(t, "tasks:\n  - name: a\n    command: \"true\"\n"), "check")
+	if err != nil {
+		t.Fatalf("a jig with no definitions block was refused: %v", err)
+	}
+	if len(bare.Definitions) != 0 {
+		t.Errorf("a jig with no block loaded definitions: %v", bare.Definitions)
+	}
+
+	partial, err := jig.Load(written(t, `
+definitions:
+  line_length: 100
+  strict: true
+  empty: ""
+tasks:
+  - name: a
+    command: "check {line_length} {strict} {empty} {supplied_elsewhere}"
+`), "check")
+	if err != nil {
+		t.Fatalf("loading: %v", err)
+	}
+
+	// A number and a boolean reach a command line as the text they were written
+	// as, and an empty value is a value.
+	for name, want := range map[string]string{"line_length": "100", "strict": "true", "empty": ""} {
+		got, defined := partial.Definitions[name]
+		if !defined {
+			t.Errorf("%s is not defined", name)
+			continue
+		}
+		if got != want {
+			t.Errorf("%s loaded as %q, want %q", name, got, want)
+		}
+	}
+	if _, defined := partial.Definitions["supplied_elsewhere"]; defined {
+		t.Error("a placeholder the jig did not define was given a value anyway")
+	}
+}
+
+// COVERS: FR-3.15 | edge
+func TestAPlaceholderIsReadOffACommandAndABraceExpansionIsNot(t *testing.T) {
+	// The name shape is the one a definitions file's keys are held to, so what
+	// a command can name and what a file can define are one set. It is narrow
+	// enough that a shell's own braces are not mistaken for a placeholder.
+	got := jig.Placeholders("cp {base_dir}/{name}.txt out.{a,b} {} {Upper} {name}")
+
+	want := []string{"base_dir", "name"}
+	if len(got) != len(want) {
+		t.Fatalf("read %v, want %v", got, want)
+	}
+	for i, name := range want {
+		if got[i] != name {
+			t.Errorf("placeholder %d is %q, want %q", i, got[i], name)
+		}
+	}
+}

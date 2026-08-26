@@ -38,6 +38,18 @@ requires:
   - govulncheck
   - python3
 
+# The default for every placeholder below. A definitions file named with
+# --definitions merges over this, so a base wanting a different value writes
+# that one line and inherits the rest. Nothing here is required to be defined:
+# a placeholder no layer supplies refuses the run before anything executes.
+#
+# `requirements` is the placeholder common-quality will carry once it is
+# ported. wrench is the case it exists for: one document at the root serving
+# runs based at go/ and at python/, where each base names a definitions file
+# saying where its requirements are.
+definitions:
+  requirements: REQUIREMENTS.md
+
 tasks:
   # gofmt lists unformatted files on stdout and exits 0 either way, so its exit
   # status answers "did gofmt run" and never "is this formatted". Until the
@@ -73,7 +85,7 @@ tasks:
   # cites.
   - name: traceability
     description: every test cites what it discharges, and every settled requirement has one
-    command: python3 {config_dir}/bin/test-traceability.py --requirements REQUIREMENTS.md .
+    command: python3 {config_dir}/bin/test-traceability.py --requirements {requirements} .
 
   # The profile is addressed into the work directory rather than dropped in the
   # tree. A tool that can be told where to write is told.

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/scriptedworld/wrench"
@@ -24,6 +25,10 @@ type Jig struct {
 	Path string
 	// Requires is every executable the jig invokes.
 	Requires []string
+	// Definitions gives the jig's own placeholders their defaults. Optional,
+	// and so is any entry: a jig leaving a value to its adopter names the
+	// placeholder in a command and defines nothing.
+	Definitions map[string]string
 	// Tasks execute in declaration order.
 	Tasks []Task
 }
@@ -71,9 +76,10 @@ func Load(configDir, name string) (*Jig, error) {
 	}
 
 	loaded := &Jig{
-		Name:     name,
-		Path:     path,
-		Requires: strings_(document["requires"]),
+		Name:        name,
+		Path:        path,
+		Requires:    strings_(document["requires"]),
+		Definitions: Scalars(document["definitions"]),
 	}
 
 	rawTasks, _ := document["tasks"].([]any)
@@ -176,6 +182,40 @@ func (j *Jig) SortedRequires() []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// Scalars reads a definitions mapping out of a validated document.
+//
+// The schema has already held every value to a scalar, so a number or a boolean
+// reaches a command line as the text it was written as. It lives here because a
+// jig carries a block of the same shape as the file, and one reader serves both.
+func Scalars(value any) map[string]string {
+	document, ok := value.(map[string]any)
+	if !ok {
+		return nil
+	}
+	out := make(map[string]string, len(document))
+	for key, item := range document {
+		out[key] = scalar(item)
+	}
+	return out
+}
+
+func scalar(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return typed
+	case bool:
+		return strconv.FormatBool(typed)
+	case int:
+		return strconv.Itoa(typed)
+	case int64:
+		return strconv.FormatInt(typed, 10)
+	case float64:
+		return strconv.FormatFloat(typed, 'f', -1, 64)
+	default:
+		return fmt.Sprint(typed)
+	}
 }
 
 func text(value any) string {

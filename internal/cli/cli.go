@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/scriptedworld/bolt/internal/definitions"
 	"github.com/scriptedworld/bolt/internal/jig"
 	"github.com/scriptedworld/bolt/internal/merge"
 	"github.com/scriptedworld/bolt/internal/run"
@@ -35,6 +36,10 @@ commands stand in it.
 
     --config-dir   where bolt.<name>.yaml is found (default: the directory)
     --output-dir   where evidence is written (default: .bolt-<iso8601> at the base)
+    --definitions  a <name> read from the config directory as
+                   bolt.<name>.definitions.yaml, supplying values for the jig's
+                   placeholders. It merges over the jig's own definitions block,
+                   which merges over the locations bolt exposes.
 
 Exits 0 when the run completed, whatever the tools concluded, and 1 when bolt
 could not carry it out. The verdict is success in result.yaml.
@@ -48,6 +53,7 @@ func Main(args []string, stdout, stderr io.Writer) int {
 
 	configDir := flags.String("config-dir", "", "where bolt.<name>.yaml is found")
 	outputDir := flags.String("output-dir", "", "where evidence is written")
+	definitionsName := flags.String("definitions", "", "a <name> read as bolt.<name>.definitions.yaml")
 
 	if err := flags.Parse(args); err != nil {
 		return Refused
@@ -64,20 +70,22 @@ func Main(args []string, stdout, stderr io.Writer) int {
 	}
 
 	return execute(request{
-		jigName:   rest[0],
-		baseDir:   rest[1],
-		configDir: *configDir,
-		outputDir: *outputDir,
-		now:       time.Now(),
+		jigName:     rest[0],
+		baseDir:     rest[1],
+		configDir:   *configDir,
+		outputDir:   *outputDir,
+		definitions: *definitionsName,
+		now:         time.Now(),
 	}, stdout, stderr)
 }
 
 type request struct {
-	jigName   string
-	baseDir   string
-	configDir string
-	outputDir string
-	now       time.Time
+	jigName     string
+	baseDir     string
+	configDir   string
+	definitions string
+	outputDir   string
+	now         time.Time
 }
 
 func execute(req request, stdout, stderr io.Writer) int {
@@ -119,13 +127,22 @@ func execute(req request, stdout, stderr io.Writer) int {
 		return Refused
 	}
 
+	// Read where the jig was, and before the run, so a file that will not parse
+	// is a refusal with nothing created rather than a run that got partway.
+	defined, err := definitions.Load(req.configDir, req.definitions)
+	if err != nil {
+		fmt.Fprintf(stderr, "bolt: %v\n", err)
+		return Refused
+	}
+
 	outcome, err := run.Execute(run.Options{
-		Jig:       loaded,
-		BaseDir:   base,
-		ConfigDir: req.configDir,
-		OutputDir: output,
-		Now:       req.now,
-		Progress:  stdout,
+		Jig:         loaded,
+		BaseDir:     base,
+		ConfigDir:   req.configDir,
+		OutputDir:   output,
+		Definitions: defined,
+		Now:         req.now,
+		Progress:    stdout,
 	})
 	if err != nil {
 		fmt.Fprintf(stderr, "bolt: %v\n", err)

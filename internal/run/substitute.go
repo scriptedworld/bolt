@@ -3,6 +3,7 @@ package run
 import (
 	"strings"
 
+	"github.com/scriptedworld/bolt/internal/definitions"
 	"github.com/scriptedworld/bolt/internal/jig"
 )
 
@@ -16,29 +17,39 @@ type Locations struct {
 	OutputDir   string
 }
 
-// values maps each variable to what it stands for, which is also what the
-// manifest records. A variable added later is recorded because it is a
-// variable, not because somebody remembered to add it.
+// values maps each location's bare name to what it stands for, which is bolt's
+// layer of the mapping substitution resolves against. A variable added later is
+// carried because it is a variable, not because somebody remembered to add it.
 func (l Locations) values() map[string]string {
 	return map[string]string{
-		jig.ProjectRoot: l.ProjectRoot,
-		jig.BaseDir:     l.BaseDir,
-		jig.WorkDir:     l.WorkDir,
-		jig.ConfigDir:   l.ConfigDir,
-		jig.OutputDir:   l.OutputDir,
+		bare(jig.ProjectRoot): l.ProjectRoot,
+		bare(jig.BaseDir):     l.BaseDir,
+		bare(jig.WorkDir):     l.WorkDir,
+		bare(jig.ConfigDir):   l.ConfigDir,
+		bare(jig.OutputDir):   l.OutputDir,
 	}
 }
 
-// substitute puts the locations and the paths into a command line.
+// bare strips the braces a variable is written with, because a mapping is keyed
+// by the name and a command writes it as {name}.
+func bare(variable string) string {
+	return variable[1 : len(variable)-1]
+}
+
+// substitute puts the resolved mapping and the paths into a command line.
 //
-// Every path is quoted individually, so one carrying a space, a quote or a
+// Every value is quoted individually, so one carrying a space, a quote or a
 // semicolon can neither split the command line nor inject into it. Quoting the
 // whole substitution instead would let a selection of two files become one
 // argument.
-func substitute(command string, locations Locations, each string, all []string) string {
-	replacements := make([]string, 0, 14)
-	for variable, value := range locations.values() {
-		replacements = append(replacements, variable, shellQuote(value))
+//
+// A defined value is quoted like a location, which is what makes it one
+// argument. A definition meaning several arguments is not expressible, and that
+// is the same trade FR-4.16c already made by holding a value to a scalar.
+func substitute(command string, mapping definitions.Mapping, each string, all []string) string {
+	replacements := make([]string, 0, 2*len(mapping)+4)
+	for name, value := range mapping {
+		replacements = append(replacements, "{"+name+"}", shellQuote(value.Value))
 	}
 
 	if strings.Contains(command, jig.EachPath) {

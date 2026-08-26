@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/scriptedworld/bolt/internal/adapter"
+	"github.com/scriptedworld/bolt/internal/definitions"
 	"github.com/scriptedworld/bolt/internal/jig"
 	"github.com/scriptedworld/wrench"
 )
@@ -14,7 +15,7 @@ import (
 // The adapter reaches the verdict. Bolt reaches it in three cases and no
 // others: a task that did not produce the evidence it declared, an adapter that
 // reached no authoritative result, and one whose envelope does not validate.
-func reachVerdict(workDir string, task jig.Task, status int, executable string, where Locations, each string, selection []string) error {
+func reachVerdict(workDir string, task jig.Task, status int, executable string, where Locations, mapping definitions.Mapping, each string, selection []string) error {
 	locations := adapter.Locations{
 		ProjectRoot: where.ProjectRoot,
 		BaseDir:     where.BaseDir,
@@ -33,7 +34,7 @@ func reachVerdict(workDir string, task jig.Task, status int, executable string, 
 		))
 	}
 
-	result, err := invokeAdapter(task, executable, locations, where, each, selection)
+	result, err := invokeAdapter(task, executable, locations, mapping, each, selection)
 	if err != nil {
 		return err
 	}
@@ -58,11 +59,11 @@ func reachVerdict(workDir string, task jig.Task, status int, executable string, 
 // default otherwise. An explicit invocation gets the same substitutions a
 // command gets, and is still expected to leave the envelope where the default
 // would.
-func invokeAdapter(task jig.Task, executable string, locations adapter.Locations, where Locations, each string, selection []string) (adapter.Result, error) {
+func invokeAdapter(task jig.Task, executable string, locations adapter.Locations, mapping definitions.Mapping, each string, selection []string) (adapter.Result, error) {
 	if task.AdapterCommand == "" {
 		return adapter.Run(executable, adapter.DefaultArgs(locations, task.Evidence), locations)
 	}
-	return adapter.RunShell(substitute(task.AdapterCommand, where, each, selection), locations)
+	return adapter.RunShell(substitute(task.AdapterCommand, mapping, each, selection), locations)
 }
 
 // writeExitCodeEnvelope is the generic adapter a task gets when it names none.

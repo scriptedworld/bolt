@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/scriptedworld/bolt/internal/adapter"
+	"github.com/scriptedworld/bolt/internal/definitions"
 	"github.com/scriptedworld/bolt/internal/jig"
 	"github.com/scriptedworld/bolt/internal/paths"
 	"github.com/scriptedworld/wrench"
@@ -23,6 +24,10 @@ type Options struct {
 	BaseDir   string
 	ConfigDir string
 	OutputDir string
+	// Definitions is the file layer, already read from the config directory.
+	// The jig's own block is on the jig, and bolt's own values are per
+	// execution, so this is the only layer a caller supplies.
+	Definitions map[string]string
 	// Now stamps the default output directory. Passed in so a test does not
 	// have to reach for a clock.
 	Now time.Time
@@ -78,6 +83,13 @@ func Execute(options Options) (*Outcome, error) {
 	found, err := paths.Walk(base, withinBase)
 	if err != nil {
 		return nil, fmt.Errorf("walking %s: %w", base, err)
+	}
+
+	// Checked before the first task executes, where `requires` is checked. A
+	// jig dropped at a base that does not define what it needs refuses in the
+	// first second rather than partway through a gate.
+	if err := definitions.Check(options.Jig, options.Definitions); err != nil {
+		return nil, err
 	}
 
 	// Resolved before the first task executes. An unknown adapter is a run
@@ -149,13 +161,21 @@ func runOnce(task jig.Task, options Options, base, configDir, outputDir string, 
 		ConfigDir:   configDir,
 		OutputDir:   outputDir,
 	}
-	command := substitute(task.Command, locations, each, selection)
+
+	// Built per execution because the work directory is one of bolt's values
+	// and it differs every time. The jig and file layers are settled, and
+	// Execute has already refused a run they could not satisfy.
+	mapping, err := definitions.Resolve(locations.values(), options.Jig.Definitions, options.Definitions)
+	if err != nil {
+		return err
+	}
+	command := substitute(task.Command, mapping, each, selection)
 
 	// The manifest is written before the command runs, so an execution that
 	// was killed, or never started, still records what was going to be
 	// attempted. The case that most needs a record is the one that would
 	// otherwise have none.
-	if err := writeManifest(workDir, task, locations, command, ordinal, each, selection); err != nil {
+	if err := writeManifest(workDir, task, mapping, command, ordinal, each, selection); err != nil {
 		return err
 	}
 
@@ -168,7 +188,7 @@ func runOnce(task jig.Task, options Options, base, configDir, outputDir string, 
 		return err
 	}
 
-	return reachVerdict(workDir, task, status, executable, locations, each, selection)
+	return reachVerdict(workDir, task, status, executable, locations, mapping, each, selection)
 }
 
 // runCommand executes the line as a subprocess standing at the base, capturing
@@ -211,16 +231,17 @@ func runCommand(command, base, workDir string) (int, error) {
 	return status, nil
 }
 
-func writeManifest(workDir string, task jig.Task, locations Locations, command string, ordinal int, each string, selection []string) error {
-	variables := map[string]any{}
-	for variable, value := range locations.values() {
-		variables[trimBraces(variable)] = value
-	}
+// writeManifest records what the execution was going to be given: every key the
+// three layers hold, the value that won, and the layer it came from. The same
+// key means different things depending on which layer won, and the command line
+// alone does not say.
+func writeManifest(workDir string, task jig.Task, mapping definitions.Mapping, command string, ordinal int, each string, selection []string) error {
+	variables := mapping.Record()
 	if task.PerPath() {
-		variables[trimBraces(jig.EachPath)] = each
+		variables[bare(jig.EachPath)] = boltValue(each)
 	}
 	if task.ConsumesPaths() && !task.PerPath() {
-		variables[trimBraces(jig.AllPaths)] = asAny(selection)
+		variables[bare(jig.AllPaths)] = boltValue(asAny(selection))
 	}
 
 	manifest := map[string]any{
@@ -239,8 +260,10 @@ func writeManifest(workDir string, task jig.Task, locations Locations, command s
 	return wrench.SaveFormattedFile(manifest, path, wrench.ManifestSchema, wrench.YAML, wrench.LocalFile)
 }
 
-func trimBraces(variable string) string {
-	return variable[1 : len(variable)-1]
+// boltValue records a path variable the way the mapping records everything
+// else, so a reader of a manifest meets one shape rather than two.
+func boltValue(value any) map[string]any {
+	return map[string]any{"value": value, "from": string(definitions.FromBolt)}
 }
 
 func asAny(items []string) []any {
