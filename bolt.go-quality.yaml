@@ -1,10 +1,29 @@
 # bolt.go-quality.yaml, bolt's own gate, run by bolt.
 #
-# This is the project's own overlay, not the shared definition. What is here
-# either names bolt specifically or has no adapter yet and is written so its
-# exit code is the answer. The shared Go definition lives in toolbox and is
-# being ported to this format; as each task there gains its adapter, the
-# equivalent here goes away.
+# This is the project's own jig, standing in for two shared definitions that
+# have not been ported yet. What is here either names bolt specifically or has
+# no adapter yet and is written so its exit code is the answer.
+#
+# WHICH SHARED DEFINITION EACH TASK BELONGS TO, so the port knows what to
+# delete from here rather than guessing:
+#
+#     common-quality    traceability
+#                       and, once ported, suppressions and complexity, which
+#                       are absent here only because neither has been written
+#                       in a form this can run
+#
+#     go-std-quality    format, tidy, build, vet, tests, vuln
+#                       and, once ported, lint and coverage, which need
+#                       adapters
+#
+# traceability is a common task and not a Go one: it holds a document against
+# the source, which has nothing to do with what the source was written in. The
+# filename says go-quality because this is one project jig, not because
+# traceability belongs to Go.
+#
+# THE SHARED PAIR CANNOT SIMPLY BE OVERLAID. They are written for a bolt that
+# merged definitions by task id, and this one composes by nested jig tasks
+# instead. See clank/tasks/toolbox/port-the-jigs.
 #
 # Ordered cheapest first, so a failure surfaces before the slow checks run.
 #
