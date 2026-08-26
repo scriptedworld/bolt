@@ -1,0 +1,67 @@
+# bolt.go-quality.yaml, bolt's own gate, run by bolt.
+#
+# This is the project's own overlay, not the shared definition. What is here
+# either names bolt specifically or has no adapter yet and is written so its
+# exit code is the answer. The shared Go definition lives in toolbox and is
+# being ported to this format; as each task there gains its adapter, the
+# equivalent here goes away.
+#
+# Ordered cheapest first, so a failure surfaces before the slow checks run.
+#
+# A path that travels with this file resolves against {config_dir}. A path
+# belonging to the project being checked stays relative to the base, where the
+# command already stands.
+
+requires:
+  - sh
+  - go
+  - gofmt
+  - govulncheck
+  - python3
+
+tasks:
+  # gofmt lists unformatted files on stdout and exits 0 either way, so its exit
+  # status answers "did gofmt run" and never "is this formatted". Until the
+  # adapter is ported, `test -z` turns the listing into a status. The listing
+  # itself is still on stdout in the work directory, so nothing is lost.
+  - name: format
+    description: every file is gofmt-clean
+    command: 'test -z "$(gofmt -l .)"'
+
+  # -diff exits non-zero when go.mod or go.sum would change, without changing
+  # them. A tidy that mutates the tree during a check is a check with a side
+  # effect.
+  - name: tidy
+    description: go.mod and go.sum are already tidy
+    command: go mod tidy -diff
+
+  - name: build
+    description: every package compiles
+    command: go build ./...
+
+  - name: vet
+    description: the compiler-adjacent checks that need no configuration
+    command: go vet ./...
+
+  # A requirements document nobody is held to becomes decoration. Both
+  # directions fail: a test citing nothing, and a settled requirement no test
+  # cites.
+  - name: traceability
+    description: every test cites what it discharges, and every settled requirement has one
+    command: python3 {config_dir}/bin/test-traceability.py --requirements REQUIREMENTS.md .
+
+  # The profile is addressed into the work directory rather than dropped in the
+  # tree. A tool that can be told where to write is told.
+  - name: tests
+    description: race, shuffle and a coverage profile
+    command: >-
+      go test -race -shuffle=on -covermode=atomic
+      -coverpkg=./... -coverprofile={work_dir}/coverage.out ./...
+    evidence:
+      - coverage.out
+
+  # Reachability-based: only reports vulnerabilities actually called, rather
+  # than every advisory touching a module in go.sum.
+  - name: vuln
+    description: vulnerabilities in code that is actually reached
+    command: govulncheck ./...

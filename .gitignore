@@ -5,3 +5,7 @@ START_HERE.md
 # -F. Gitignored so that naming it on the command line can never put it into
 # the commit it describes.
 .ephemera/
+
+# Run directories. A tree accumulating them would otherwise feed each run the
+# last one's evidence, and only THIS run's output is excluded structurally.
+.bolt-*
