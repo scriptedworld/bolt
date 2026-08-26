@@ -183,6 +183,45 @@ answers rather than from it.
 
 ## Composition and overlay
 
+**A proposal, 2026-08-26, which may replace most of what follows.** Not a
+settled row, recorded here so the questions below are read against it rather
+than answered separately.
+
+**A jig carries placeholders and a definitions file supplies the values.** A
+subdirectory then runs the *same* shared jig with its own values, instead of
+the jig being copied, overlaid, or merged by task id.
+
+    bolt.common-quality.yaml       ... --requirements {requirements} ...
+    <base>/bolt.definitions.yaml   requirements: ../REQUIREMENTS.md
+
+**What it is instead of.** The retired bolt merged definitions by task id and
+took the last writer, which is what `bolt -c common -c go` meant and what
+toolbox's shared jigs are still written for. Questions 30 to 33 are all that
+mechanism's edges: what a parent may override, at what granularity, whether it
+may disable a task, and what wins when two layers set the same key. **A
+parameterised jig has none of those edges**, because nothing merges: there is
+one jig and a set of values, and a value either has a definition or it does not.
+
+**What it answers immediately.** `common-quality` runs traceability against
+`REQUIREMENTS.md` relative to the run root. wrench keeps one requirements
+document at its root and wants that jig run at `go/` and at `python/`, where no
+such file sits. With a definitions file per base, each says where its
+requirements are, and one document serves both without the checker changing.
+`clank/tasks/wrench/gate/10-a-composite-jig.planning` is the case in full.
+
+**What it leaves open.** Where the file sits and what it is called. Whether it
+is found by walking up from the base or named on the jig task. What happens to
+a placeholder no definition supplies, which is either a jig error before
+anything runs, like FR-3.10b's `requires`, or an empty substitution, which is
+the reading that fails silently. Whether a definitions file may itself carry
+substitutions, which is where this stops being simple.
+
+**It is not free.** FR-4.2 reads how a task runs off its command line, and
+FR-9.5c records every value bolt exposed as a template variable. Both would have
+to account for values that come from a file rather than from bolt, and the
+manifest is the place a reader finds out what a placeholder stood for.
+
+
 29. When a jig invokes another, what does the child inherit: environment,
     timeouts, the required default?
 30. Can a parent override a field of a child's task, and at what granularity:
