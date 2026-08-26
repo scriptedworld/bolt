@@ -336,3 +336,31 @@ The questions that would settle them are in `NEXT_STEPS.md`.
 | FR-13.7 | Evidence can be tied to the exact tree state it was produced from, as §65 requires, by something. Bolt reads no git, so either it acquires that dependency or the requirement belongs to the caller. | [?] |
 | FR-13.8 | The number of bolt runs a user may have live at once is bounded, if that guard is wanted at all. | [?] |
 | FR-13.10 | The envelope schema is owned and published somewhere every producer and consumer in the ecosystem can validate against. | [?] |
+
+## Retired
+
+A requirement can be retired or superseded. **Its ID is never reused**, because
+reuse silently rewrites what every existing reference to that ID meant and
+nothing about the new row looks wrong. A reader meeting one of these in an old
+commit, a note or another project's document finds where it went here.
+
+Numbering therefore has gaps, and a gap is the record working rather than an
+oversight.
+
+| ID | Retired | Superseded by |
+|---|---|---|
+| FR-1.11 | 2026-08-26 | `wrench/REQUIREMENTS.md` FR-1.1. It stated what wrench is, which bolt cannot discharge. |
+| FR-1.14 | 2026-08-26 | `wrench` FR-2.1. The two calls are wrench's contract; FR-1.12 keeps bolt's use of it. |
+| FR-1.15 | 2026-08-26 | `wrench` FR-2.5, the codec and IO split. |
+| FR-1.15a | 2026-08-26 | `wrench` FR-2.5a, the IO boundary outside the call. |
+| FR-1.16 | 2026-08-26 | `wrench` FR-3.1, one schema per kind of file. |
+| FR-1.17 | 2026-08-26 | `wrench` FR-3.3, JSON Schema over the decoded structure. |
+| FR-1.18 | 2026-08-26 | `wrench` FR-4.3, canonical form belonging to the save call. |
+| FR-1.19 | 2026-08-26 | `wrench` FR-2.3, a compelled schema and not the right one. |
+| FR-6.5 | 2026-08-26 | Filed at `clank/inbox/toolbox/adapters-carry-their-conformance-tests/`. Adapters reading structured formats is toolbox's, not bolt's. |
+| FR-6.8 | 2026-08-26 | The same entry. FR-6.7 kept the merge's half, which is bolt's own producer. |
+| FR-13.1 | 2026-08-26 | FR-6.2b. An adapter writes `output.yaml` into the work directory it was given and the name never varies. |
+| FR-13.2 | 2026-08-26 | FR-7.9 and FR-7.10. A reason carries `kind`, so a task that could not execute is distinguishable from one that executed and failed. |
+| FR-13.3 | 2026-08-24 | FR-8.3a. A merge finding no constituent fails, so a green result cannot mean nothing was checked. |
+| FR-13.5 | 2026-08-26 | FR-4.12 and its sub-rows, which give a timed-out task a defined outcome at length. |
+| FR-13.9 | 2026-08-26 | FR-3.4d, FR-1.5 and FR-3.12: a jig is YAML, every file is schema-validated, and bolt validates the jig it is handed. |
