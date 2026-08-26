@@ -45,6 +45,14 @@ task's output. That chain still happens inside one script, and bolt sees one
 task, so the capability survives and the architecture's picture of bolt-level
 composition does not.
 
+That simplification has a cost worth stating, because a reader will otherwise
+rediscover it. An intermediate step inside a script produces no envelope, no
+manifest and no work directory, so §19's worked example loses its evidence
+exactly where it was interesting: the analyzer's own input and verdict are no
+longer on disk. A pipeline wanting every stage evidenced writes each stage as
+its own task and passes files through the tree, which FR-4.6 permits and does
+not help with.
+
 ---
 
 ## 1. Runs, and the files bolt reads and writes
@@ -74,7 +82,7 @@ composition does not.
 | FR-2.2 | Bolt walks that directory to find the files its tasks act on. It has no changed-since-a-ref. | [A] |
 | FR-2.2a | The walk honours `.gitignore`. An ignored file is not part of the project and is not checked, which keeps `.git`, `node_modules`, a virtualenv and build output out of every run without a second list to maintain. | [A] |
 | FR-2.2b | Honouring `.gitignore` means reading those files as text. Bolt does not invoke git, read anything under `.git/`, or require a repository, so it does not reach `.git/info/exclude` or a global excludes file either. A tree with no `.gitignore` in it simply excludes nothing. | [A/D] |
-| FR-2.2c | A run never walks another run's output. Bolt's own run directories are excluded whatever `.gitignore` says, because a tree accumulating them would otherwise feed each run the last one's evidence. | [D] |
+| FR-2.2c | A run never walks its own output directory, whatever it was named and whatever `.gitignore` says, which is knowable because the run created it. Another run's output directory is not recognisable by name, so FR-2.6b refuses one that already holds a run rather than pretending the walk can spot it. | [D] |
 | FR-2.2d | The walk returns paths in sorted order, so the matched list is the same list on every run over the same tree. FR-9.4's identical work directory names rest on this and on nothing else. | [D] |
 | FR-2.2e | The walk does not follow symlinks. Following one leaves the base and breaks the containment FR-2.3 states, and `link-jigs` leaves tracked symlinks pointing into toolbox, so a project using shared jigs has them sitting in the tree being walked. | [D] |
 | FR-2.2f | There is no way to reach a file `.gitignore` excludes. `matching` narrows what the walk found and the walk has already dropped ignored files. Generated code somebody wants checked is the case this refuses, and it stays refused until something needs it. | [D] |
@@ -134,6 +142,7 @@ composition does not.
 | FR-4.4 | A command task whose command names `{each_path}` or `{all_paths}` does not execute when its filtered selection is empty, and produces no output. A command task naming neither always executes. | [A] |
 | FR-4.4a | That is a rule about command tasks. A jig task has no command to name a path variable, by FR-5.13h, so FR-5.15 carries its rule instead: it does not run when its base holds no input paths. The same rule reached differently, and neither of them makes a jig task execute unconditionally. | [A/D] |
 | FR-4.5 | Tasks execute serially. | [A] |
+| FR-4.5a | Serially because one execution at a time is the simplest thing that works, not because anything requires it. FR-4.6 and FR-4.7 already give the independence parallelism would need, and FR-9.2a takes the ordinals from the matched list rather than from execution order, so nothing in the evidence layout depends on it either. | [D] |
 | FR-4.6 | No task consumes another task's output. Work needing several steps is one script producing one exit code and one output. | [A] |
 | FR-4.7 | Because no task depends on another, the merged result does not vary with the order tasks ran in. | [D] |
 | FR-4.8 | A failing task does not stop the run. The tasks after it still execute, because a run that stops early throws away the evidence they would have produced and leaves a reader unable to tell what else was wrong. | [A] |
@@ -165,6 +174,7 @@ composition does not.
 | FR-5.5 | A jig task carries no condition. The child walks its own subdirectory and its own tasks decide what they act on. Selecting files is the nested jig's business, never its caller's. | [A] |
 | FR-5.6 | Bolt carries its nesting depth in the environment of every process it spawns, and increments it on finding the variable already set. The depth therefore survives reparenting, backgrounding and a task command that invokes bolt directly rather than through a jig task. | [A/D] |
 | FR-5.7 | The ceiling defaults to 4 and is read from the environment only at the outermost invocation, so a jig cannot raise the limit it is running under. | [A/D] |
+| FR-5.7a | That is a guard against accident and runaway, not against a jig trying to defeat it. FR-5.6 contemplates a task command invoking bolt directly, and such a command can unset the variable and be believed outermost. Closing that needs the ancestry cross-check, which is a question rather than a row. | [A/D] |
 | FR-5.8 | A run refused for depth writes its own `result.yaml` with `success: false` and a reason naming the limit, then exits non-zero. Its parent's link resolves, and the merge folds an ordinary failure. | [A] |
 | FR-5.9 | Paths are absolute at every depth, so a nested run's evidence folds into its parent with nothing rewritten. A path means the same thing to a child and to its parent. | [A/D] |
 | FR-5.10 | A jig task names a jig and, optionally, a subdirectory of the current base to run it in. Naming one says something specific: a project of that jig's kind lives there, a Go module with its own `go.mod`, a Python package with its own `pyproject.toml`. The declaration is that applying this jig at this level is worth something, and that directory becomes the child's base. | [A] |
@@ -268,6 +278,7 @@ A run's whole output is one directory:
 | FR-9.2a | The ordinal is the execution index within the task. Each task numbers its own executions from one, independently of every other task, so a directory name says which task and which of its executions without needing the run's order. For a per-path task the index is the position in the matched list, which FR-9.5's manifest records, so an execution traces back to the path it was handed. | [A] |
 | FR-9.2b | The ordinal is zero-padded to the width that task's execution count needs, so a listing sorts correctly with no arbitrary cap and no wasted digits. The count is known before the first execution, because the matched list is settled before any of it runs. | [A] |
 | FR-9.2c | Bolt puts no artifact there. A command stands at the base under FR-4.1a and writes into the work directory because FR-4.1 named it one, so an artifact arrives by being addressed. One written elsewhere is not in the run's evidence, and going to look for it is the discovery FR-6.2c refuses. | [D] |
+| FR-9.2d | A tool with no output-path flag therefore writes into the tree being checked, not into the work directory, and nothing in the run removes it. Addressing the work directory is the jig author's job, and a tool that cannot be told where to write is one a jig wraps in a script that can. | [D] |
 | FR-9.3 | One execution's evidence is complete inside one directory. A reader needs nothing outside it to see what ran and what happened. | [D] |
 | FR-9.4 | Serial execution makes the ordinals deterministic, so two runs over the same tree produce identical work directory names and the two trees line up file for file. | [D] |
 | FR-9.4a | Whether their contents match is a separate matter. Envelopes carry absolute paths, so a run directory named after its own timestamp turns up inside them and two such runs differ wherever a path is recorded. Point both runs at a stable output directory and they do not. | [D] |
