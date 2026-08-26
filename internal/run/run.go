@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/scriptedworld/bolt/internal/adapter"
 	"github.com/scriptedworld/bolt/internal/jig"
 	"github.com/scriptedworld/bolt/internal/paths"
 	"github.com/scriptedworld/wrench"
@@ -79,9 +80,21 @@ func Execute(options Options) (*Outcome, error) {
 		return nil, fmt.Errorf("walking %s: %w", base, err)
 	}
 
+	// Resolved before the first task executes. An unknown adapter is a run
+	// bolt cannot carry out, and learning that after half a gate has run is
+	// learning it too late.
+	adapters := map[string]string{}
+	for _, task := range options.Jig.Tasks {
+		executable, err := adapter.Resolve(configDir, task.Adapter)
+		if err != nil {
+			return nil, fmt.Errorf("task %q: %w", task.Name, err)
+		}
+		adapters[task.Name] = executable
+	}
+
 	outcome := &Outcome{OutputDir: absoluteOutput}
 	for _, task := range options.Jig.Tasks {
-		ran, err := runTask(task, options, base, configDir, absoluteOutput, found)
+		ran, err := runTask(task, options, base, configDir, absoluteOutput, found, adapters[task.Name])
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +108,7 @@ func Execute(options Options) (*Outcome, error) {
 	return outcome, nil
 }
 
-func runTask(task jig.Task, options Options, base, configDir, outputDir string, found []string) (int, error) {
+func runTask(task jig.Task, options Options, base, configDir, outputDir string, found []string, executable string) (int, error) {
 	selection := found
 	if task.ConsumesPaths() {
 		var err error
@@ -116,14 +129,14 @@ func runTask(task jig.Task, options Options, base, configDir, outputDir string, 
 	}
 
 	for ordinal, path := range each {
-		if err := runOnce(task, options, base, configDir, outputDir, ordinal, len(each), path, selection); err != nil {
+		if err := runOnce(task, options, base, configDir, outputDir, ordinal, len(each), path, selection, executable); err != nil {
 			return 0, err
 		}
 	}
 	return len(each), nil
 }
 
-func runOnce(task jig.Task, options Options, base, configDir, outputDir string, ordinal, total int, each string, selection []string) error {
+func runOnce(task jig.Task, options Options, base, configDir, outputDir string, ordinal, total int, each string, selection []string, executable string) error {
 	workDir := filepath.Join(outputDir, WorkSubdir, executionDir(task.Name, ordinal, total))
 	if err := os.MkdirAll(workDir, 0o755); err != nil {
 		return err
@@ -155,7 +168,7 @@ func runOnce(task jig.Task, options Options, base, configDir, outputDir string, 
 		return err
 	}
 
-	return writeEnvelope(workDir, task, status)
+	return reachVerdict(workDir, task, status, executable, locations, each, selection)
 }
 
 // runCommand executes the line as a subprocess standing at the base, capturing
@@ -224,24 +237,6 @@ func writeManifest(workDir string, task jig.Task, locations Locations, command s
 
 	path := filepath.Join(workDir, ManifestFile)
 	return wrench.SaveFormattedFile(manifest, path, wrench.ManifestSchema, wrench.YAML, wrench.LocalFile)
-}
-
-// writeEnvelope runs the generic exit-code adapter, which reports success on a
-// zero exit and failure otherwise. Every command has an exit status, so it is
-// the one adapter that needs to know nothing about the tool it is reading.
-func writeEnvelope(workDir string, task jig.Task, status int) error {
-	envelope := map[string]any{"success": status == 0}
-	if status != 0 {
-		envelope["reasons"] = []any{
-			map[string]any{
-				"kind":    "nonzero-exit",
-				"message": fmt.Sprintf("%s exited %d", task.Name, status),
-			},
-		}
-	}
-
-	path := filepath.Join(workDir, EnvelopeFile)
-	return wrench.SaveFormattedFile(envelope, path, wrench.EnvelopeSchema, wrench.YAML, wrench.LocalFile)
 }
 
 func trimBraces(variable string) string {

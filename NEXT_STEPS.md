@@ -105,108 +105,106 @@ FR-7.9 and FR-7.10, FR-13.5 by FR-4.12, FR-13.9 by FR-3.4d, FR-1.5 and FR-3.12.
 
 ## Adapters
 
-11. With an explicit adapter invocation, are the same substitutions available,
-    and is the envelope still expected in the same place?
-12. May an adapter read the repository tree, or only the files it was handed?
+11. May an adapter read the repository tree, or only the files it was handed?
 
 ## Time
 
 Nothing in the architecture mentions time, and what is here now comes from
 answers rather than from it.
 
-13. Where is each limit declared? A task's belongs on the task; a run's could
+12. Where is each limit declared? A task's belongs on the task; a run's could
     sit on the jig, on the command line, or both, and if both then which wins.
-14. How is a timed-out child terminated, which signal and with what grace, and
+13. How is a timed-out child terminated, which signal and with what grace, and
     are its descendants killed with it? A command that spawns its own children
     leaves them running when only the child is signalled, and they go on
     writing into a work directory bolt has finished with, and into the streams
     an adapter is about to read under FR-4.12a.
-15. What records the executions a task never reached? A per-path task cut off
+14. What records the executions a task never reached? A per-path task cut off
     at path fifty leaves fifty work directories and nothing saying the other
     three hundred and fifty were never attempted. The run fails, correctly, and
     a reader still cannot see how much went unchecked.
-16. Does a run that times out fold in the constituents that completed, or does
+15. Does a run that times out fold in the constituents that completed, or does
     its result carry only the timeout? FR-4.14 keeps the evidence; whether the
     merge runs over what is there is the part that is not settled.
 
 ## The output directory
 
-17. Is a task skipped for an empty selection recorded in `result.yaml`?
+16. Is a task skipped for an empty selection recorded in `result.yaml`?
     FR-8.3a closes the case where every task skips, since a merge finding no
     constituent fails. Open is the partial case: four tasks green and a fifth
     skipped reads the same as four tasks and no fifth.
-18. Does a manifest record what the walk found, or only what the task matched?
+17. Does a manifest record what the walk found, or only what the task matched?
     FR-9.8 settles that it holds the whole matched list rather than one path.
     What it does not settle is whether the walk's own findings are in there
     too, which is what separates a task offered a hundred files and wanting
     none from one run against an empty tree.
-19. `manifest` already means the read and write authorization scope in §53 to
+18. `manifest` already means the read and write authorization scope in §53 to
     §55, and both kinds land in task evidence trees. Rename bolt's?
-20. Who deletes run directories, and when? The lifetime is settled by FR-9.1a:
+19. Who deletes run directories, and when? The lifetime is settled by FR-9.1a:
     wanted while the result is being reviewed, not afterwards. Open is whether
     bolt prunes its own, whether whoever named `--output-dir` owns removing it,
     and what a graph node's `.ephemera/` does about it.
 
 ## Input paths
 
-21. Does a run over a large tree exceed `ARG_MAX` when `{all_paths}` expands?
+20. Does a run over a large tree exceed `ARG_MAX` when `{all_paths}` expands?
     Whole-project runs make this the ordinary case rather than an edge one.
     Does bolt chunk into several executions, or is it the jig author's problem?
-22. §67's pre-commit overlay wants a gate over what changed, and a
+21. §67's pre-commit overlay wants a gate over what changed, and a
     directory-only invocation cannot express that. Does the overlay run the
     whole project on every commit, or does something have to give?
 
 ## Nested jigs
 
-23. Is there a shorthand for naming one jig at many bases? Nine Go subprojects
+22. Is there a shorthand for naming one jig at many bases? Nine Go subprojects
     is nine jig tasks each needing its own name, and a list form would say it
     once. Against that, a written-out task per instance is what makes the
     project jig readable as an inventory of what is in the tree.
-24. Does FR-5.12's whole-jig override survive separate location variables? A
+23. Does FR-5.12's whole-jig override survive separate location variables? A
     jig that "needs the repository root" usually needs it for one path, a
     shared config or a header template, and `{project_root}` covers that per
     use without surrendering the base. What it does not cover is a tool that
     must be standing at the root. It also cuts against FR-5.10: the point of a
     base is that a nested project has its own root.
-25. Is a cycle detected by name, or only by depth exhaustion? A jig stack in
+24. Is a cycle detected by name, or only by depth exhaustion? A jig stack in
     the environment would name the cycle; a counter can only report a number.
-26. Can a jig be referenced by version, or is it always whatever is on disk?
+25. Can a jig be referenced by version, or is it always whatever is on disk?
 
 ## Bounds and guards
 
-27. Is the ancestry cross-check worth building? It closes `unset BOLT_DEPTH`,
+26. Is the ancestry cross-check worth building? It closes `unset BOLT_DEPTH`,
     which the counter alone cannot, at the cost of Linux-specific code and
     process-spawning tests, and only matters against a jig actively trying to
     get around the guard.
-28. Is the per-user cap on live runs wanted? If so, what is the default, and is
+27. Is the per-user cap on live runs wanted? If so, what is the default, and is
     the default off?
-29. When parallel execution arrives, is the bound a per-run budget that
+28. When parallel execution arrives, is the bound a per-run budget that
     descends with nesting rather than a shared counter?
 
 ## Composition and overlay
 
-30. When a jig invokes another, what does the child inherit: environment,
+29. When a jig invokes another, what does the child inherit: environment,
     timeouts, the required default?
-31. Can a parent override a field of a child's task, and at what granularity:
+30. Can a parent override a field of a child's task, and at what granularity:
     the whole task, or one field?
-32. Can a parent disable a task a shared jig declares, and is the omission
+31. Can a parent disable a task a shared jig declares, and is the omission
     visible in the result?
-33. Is there a user-level or machine-level layer above the repository's jig?
+32. Is there a user-level or machine-level layer above the repository's jig?
     §67 describes exactly that for pre-commit, a repository policy plus an
     independent personal one.
-34. What is the precedence when the same key is set at more than one layer, and
+33. What is the precedence when the same key is set at more than one layer, and
     are collections merged or replaced?
 
 ## Boundaries with the rest of the ecosystem
 
-35. Does the per-file coverage policy of §20 live in an adapter, in a toolbox
+34. Does the per-file coverage policy of §20 live in an adapter, in a toolbox
     analyzer an adapter then reads, or in bolt? Which repository owns it
     decides whether it is a bolt requirement at all.
-36. Is `result.yaml` what a ratchet node depends on directly, or does a node
+35. Is `result.yaml` what a ratchet node depends on directly, or does a node
     wrap it in something of its own?
-37. Does bolt stamp the tree state §65 wants, or does that move to the caller?
+36. Does bolt stamp the tree state §65 wants, or does that move to the caller?
     Bolt reads no git for anything else.
-38. Does bolt have an interface other than a command line? An importable
+37. Does bolt have an interface other than a command line? An importable
     library used by another Go component would change what the requirements
     cover.
 

@@ -40,6 +40,9 @@ type Task struct {
 	// Adapter names the adapter that reads what the command produced. Empty
 	// means the generic exit-code adapter.
 	Adapter string
+	// AdapterCommand is an explicit invocation written in place of the default
+	// one. The same substitutions are available as in a command.
+	AdapterCommand string
 	// Evidence is what the task declares it produces, never discovered.
 	Evidence []string
 	// ShortCircuit stops the run when this task fails.
@@ -96,14 +99,15 @@ func readTask(item any) (Task, error) {
 
 	short, _ := mapping["short-circuit-failure"].(bool)
 	return Task{
-		Name:         text(mapping["name"]),
-		Description:  text(mapping["description"]),
-		Command:      text(mapping["command"]),
-		Matching:     strings_(mapping["matching"]),
-		Excluding:    strings_(mapping["excluding"]),
-		Adapter:      text(mapping["adapter"]),
-		Evidence:     strings_(mapping["evidence"]),
-		ShortCircuit: short,
+		Name:           text(mapping["name"]),
+		Description:    text(mapping["description"]),
+		Command:        text(mapping["command"]),
+		Matching:       strings_(mapping["matching"]),
+		Excluding:      strings_(mapping["excluding"]),
+		Adapter:        text(mapping["adapter"]),
+		AdapterCommand: text(mapping["adapter-command"]),
+		Evidence:       strings_(mapping["evidence"]),
+		ShortCircuit:   short,
 	}, nil
 }
 
@@ -132,6 +136,9 @@ func (t Task) check() error {
 	}
 	if !each && !all && (len(t.Matching) > 0 || len(t.Excluding) > 0) {
 		return fmt.Errorf("declares matching or excluding but names neither %s nor %s, so the selection would be built and discarded", EachPath, AllPaths)
+	}
+	if t.AdapterCommand != "" && t.Adapter == "" {
+		return fmt.Errorf("writes an adapter-command but names no adapter, so there is nothing to invoke")
 	}
 	return nil
 }
