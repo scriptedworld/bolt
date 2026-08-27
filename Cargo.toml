@@ -7,6 +7,11 @@ license = "MIT"
 description = "Runs a jig over a directory and records what happened."
 
 [dependencies]
+globset = "0.4"
+ignore = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+wrench = { version = "0.1.0", path = "../wrench/rust" }
 
 [lints.rust]
 # Dead code is a warning by default and the gate turns warnings into failures,

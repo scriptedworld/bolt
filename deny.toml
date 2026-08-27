@@ -4,17 +4,39 @@
 # allow list allows nothing. That is the tool working rather than a nuisance:
 # a licence policy nobody wrote is a licence policy nobody agreed.
 
+# The targets bolt is built for. Without this cargo-deny reads every target's
+# dependencies, including ones that never reach a binary here.
+#
+# It is not a way of hiding an inconvenient licence. `r-efi` is LGPL-2.1-or-later
+# and reaches this tree only through a wasi and uefi path: measured 2026-08-27,
+# `cargo tree --target x86_64-unknown-linux-gnu` contains it zero times. A
+# licence that does not ship is not a licence bolt is under, and scoping says
+# that where an allow entry would have claimed the opposite.
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "x86_64-unknown-linux-musl" },
+    { triple = "aarch64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-musl" },
+]
+
 [licenses]
 # NFR-12.3 says bolt is MIT. The rest are what a permissively licensed Rust
 # dependency tree carries in practice, and every one of them permits
 # redistribution in a binary without imposing terms on what links it.
 allow = [
     "MIT",
+    # MIT without the attribution clause, so strictly more permissive than the
+    # line above. Reaches bolt through jsonschema, which is wrench's.
+    "MIT-0",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
     "BSD-2-Clause",
     "BSD-3-Clause",
     "ISC",
+    # A public domain dedication. BurntSushi's crates are dual Unlicense OR MIT
+    # and the walk and the glob matching are both his, so either line covers
+    # them; both are listed because cargo-deny reports the pair.
+    "Unlicense",
     "Unicode-3.0",
     "Zlib",
 ]
