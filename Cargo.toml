@@ -13,6 +13,12 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 wrench = { version = "0.1.0", path = "../wrench/rust" }
 
+[dev-dependencies]
+# Fixture trees. Every test builds a directory to walk, and a run writes into
+# the tree it was pointed at, so a test that reused one would read the last
+# one's evidence.
+tempfile = "3"
+
 [lints.rust]
 # Dead code is a warning by default and the gate turns warnings into failures,
 # so Rust needs no counterpart to Python's vulture task.
