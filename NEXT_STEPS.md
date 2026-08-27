@@ -235,6 +235,20 @@ rests on, and it does not change with the language.
 10. FR-1.5 validates a jig. Does an unrecognised key fail it or warn? Failing
     makes a jig written for a newer bolt unusable by an older one; warning lets
     a typo pass as an ignored field.
+38. Do tasks execute in the order the jig declares them? **No row says so.**
+    FR-4.5 says only that they execute serially, FR-4.5a says that is the
+    simplest thing rather than something required, and FR-4.7 says the merged
+    result does not vary with the order tasks ran in.
+
+    It is load-bearing elsewhere. FR-4.9's `short-circuit-failure` says the
+    tasks *after* the failing one do not execute, and "after" needs a defined
+    order. A jig author putting `format` before `build` expects that order too,
+    and the console summary prints it.
+
+    Found at stage 4 of `walking-skeleton/10`, 2026-08-27, because the test plan
+    had mapped declaration order onto FR-4.5. The test now asserts what FR-4.5
+    says, which is that no two executions overlap. If the answer is yes, this
+    wants its own row and `runner/20` should cite it rather than FR-4.5.
 
 ## Adapters
 
