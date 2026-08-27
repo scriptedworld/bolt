@@ -25,6 +25,10 @@ type Jig struct {
 	Path string
 	// Requires is every executable the jig invokes.
 	Requires []string
+	// NeedsRepositoryRoot says the jig has to stand at the repository root, and
+	// overrides a subdirectory base. A property of the tool the jig runs rather
+	// than of any one caller placing it.
+	NeedsRepositoryRoot bool
 	// Definitions gives the jig's own placeholders their defaults. Optional,
 	// and so is any entry: a jig leaving a value to its adopter names the
 	// placeholder in a command and defines nothing.
@@ -107,10 +111,11 @@ func Load(configDir, name string) (*Jig, error) {
 	}
 
 	loaded := &Jig{
-		Name:        name,
-		Path:        path,
-		Requires:    strings_(document["requires"]),
-		Definitions: Scalars(document["definitions"]),
+		Name:                name,
+		Path:                path,
+		Requires:            strings_(document["requires"]),
+		Definitions:         Scalars(document["definitions"]),
+		NeedsRepositoryRoot: boolean(document["needs-repository-root"]),
 	}
 
 	rawTasks, _ := document["tasks"].([]any)
@@ -277,6 +282,11 @@ func scalar(value any) string {
 	default:
 		return fmt.Sprint(typed)
 	}
+}
+
+func boolean(value any) bool {
+	b, _ := value.(bool)
+	return b
 }
 
 func text(value any) string {

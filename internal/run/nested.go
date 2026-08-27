@@ -134,6 +134,17 @@ func childOptions(task jig.Task, options Options, base, configDir, outputDir, ch
 		return Options{}, err
 	}
 
+	// A jig that genuinely needs the repository root says so, and that beats
+	// the base its caller named. It is a property of the tool the jig runs, so
+	// only the jig can know it, which is why this is read after loading rather
+	// than decided by the task.
+	//
+	// It overrides the base and nothing else: the config directory, the output
+	// directory and {project_root} are all what they already were.
+	if loaded.NeedsRepositoryRoot {
+		childBase = options.projectRoot(base)
+	}
+
 	return Options{
 		Jig:         loaded,
 		BaseDir:     childBase,

@@ -29,6 +29,21 @@ func stat(path string) (fs.FileInfo, error) {
 	return os.Stat(path)
 }
 
+// runBoltAt runs a named jig directly on a base, which is the command-line
+// invocation a nested run has to be identical to.
+func runBoltAt(t *testing.T, configDir, base, jigName string) string {
+	t.Helper()
+	output := filepath.Join(t.TempDir(), "direct")
+
+	var stdout, stderr bytes.Buffer
+	if status := cli.Main([]string{
+		"--output-dir", output, "--config-dir", configDir, jigName, base,
+	}, &stdout, &stderr); status != 0 {
+		t.Fatalf("the direct run was refused: %s", stderr.String())
+	}
+	return output
+}
+
 // variables reads one execution's manifest and returns what it recorded, which
 // is where the layer a value came from is written down.
 func variables(t *testing.T, output, execution string) map[string]any {
