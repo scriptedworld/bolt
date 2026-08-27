@@ -1,0 +1,25 @@
+[package]
+name = "bolt"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97"
+license = "MIT"
+description = "Runs a jig over a directory and records what happened."
+
+[dependencies]
+
+[lints.rust]
+# Dead code is a warning by default and the gate turns warnings into failures,
+# so Rust needs no counterpart to Python's vulture task.
+missing_docs = "warn"
+
+[lints.clippy]
+# The gate runs clippy with -D warnings, so a lint set here is a lint enforced.
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+
+[profile.release]
+# One file that runs where it is put. NFR-12.4 wants no C toolchain in the
+# picture, which Rust does not give for free the way CGO_ENABLED=0 does, and
+# NEXT_STEPS records that as a decision rather than a detail.
+strip = true

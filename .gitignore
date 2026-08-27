@@ -15,3 +15,5 @@ START_HERE.md
 # written yet. The file is ignored so a binary left here from before the split
 # is not committed by accident.
 /bin/bolt
+target/
+Cargo.lock

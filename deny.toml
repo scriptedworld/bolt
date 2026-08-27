@@ -1,0 +1,44 @@
+# cargo-deny's policy, read by the `licences` task in bolt.rust-quality.yaml.
+#
+# Without this the check fails on bolt's own MIT licence, because an empty
+# allow list allows nothing. That is the tool working rather than a nuisance:
+# a licence policy nobody wrote is a licence policy nobody agreed.
+
+[licenses]
+# NFR-12.3 says bolt is MIT. The rest are what a permissively licensed Rust
+# dependency tree carries in practice, and every one of them permits
+# redistribution in a binary without imposing terms on what links it.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+]
+# A dependency whose licence is unstated is refused rather than assumed. The
+# assumption is the failure mode: a crate with no licence field is not
+# permissively licensed, it is unlicensed.
+unused-allowed-license = "allow"
+
+[bans]
+# Two versions of one crate is usually a lockfile that has not been reconciled,
+# and it doubles what a vulnerability check has to reason about. A warning
+# rather than a failure, because a transitive duplicate is often not the
+# adopter's to fix.
+multiple-versions = "warn"
+wildcards = "deny"
+
+[advisories]
+# The `vuln` task runs `cargo audit`, which is the tool that owns this question.
+# Leaving advisories on here as well is deliberate: the two read the same
+# database and disagreeing is worth knowing about.
+yanked = "deny"
+
+[sources]
+# Anything not from crates.io is named explicitly or it does not build. A git
+# dependency nobody declared is a supply chain nobody reviewed.
+unknown-registry = "deny"
+unknown-git = "deny"
