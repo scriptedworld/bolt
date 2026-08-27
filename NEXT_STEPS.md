@@ -249,6 +249,26 @@ rests on, and it does not change with the language.
     had mapped declaration order onto FR-4.5. The test now asserts what FR-4.5
     says, which is that no two executions overlap. If the answer is yes, this
     wants its own row and `runner/20` should cite it rather than FR-4.5.
+39. Is a dotfile a project file? **No row says.** FACT 2026-08-27: at `ignore`'s
+    defaults a tree holding `.editorconfig` and `.github/workflows/ci.yml` walks
+    as `["plain.txt"]`, because `hidden` defaults to true. So a jig linting CI
+    workflow files reports a clean run over zero files, and FR-8.3a does not
+    catch it, because the other tasks produced constituents.
+
+    Both answers are defensible and neither is written. `hidden(false)` walks
+    `.git/` too unless something else excludes it, and FR-2.2b says bolt reads
+    nothing under `.git/` rather than that the walk skips it. Probe at
+    `.ephemera/walk-probe`.
+40. Does FR-2.2e mean bolt does not *traverse* a symlink, or that it does not
+    *return* one? FACT 2026-08-27: with `follow_links` false, a base holding a
+    file symlink pointing outside walks as
+    `["dirlink", "filelink.txt", "inside.txt"]`. Nothing is traversed, so the
+    row is satisfied, and a task handed `filelink.txt` reads through it to
+    outside the base, which FR-2.3's containment is not.
+
+    The row's own rationale is about `link-jigs` leaving tracked symlinks
+    pointing into toolbox, and those are file symlinks, so the case the row was
+    written for is the case it does not settle.
 
 ## Adapters
 

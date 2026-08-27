@@ -19,9 +19,15 @@ a build. Four came from an answer and the rest from a default taken rather than
 asked. All of them are listed in `NEXT_STEPS.md` under "Defaults taken", so a
 wrong one is found by reading that table rather than by meeting it in the code.
 
-No test cites any row here, because no implementation exists. Every settled row
-is uncovered under toolbox's traceability gate, and marking them `[?]` to turn
-that green would misreport what is settled.
+Every settled row reads as uncovered under toolbox's traceability gate, and
+marking them `[?]` to turn that green would misreport what is settled.
+
+FACT 2026-08-27: that is no longer only because no implementation exists.
+`tests/skeleton.rs` cites 27 rows in `COVERS:` markers and the gate still
+reports 0 of 235, because the checker knows Go and Python and no glob it holds
+matches a Rust test. Filed at
+`clank/inbox/toolbox/traceability-cannot-see-a-rust-test/` with a repro. Until
+it lands, the coverage number here measures nothing.
 
 ## Where this departs from the architecture
 
