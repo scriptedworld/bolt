@@ -482,6 +482,60 @@ renumbering it would move what those citations point at.
 
 ---
 
+# The binary on PATH is the Go bolt, deliberately
+
+Not a question. **This is a bridge and it is meant to be there.** Recorded here
+rather than in `START_HERE.md`, which is gitignored and rewritten every session,
+because at least three other sessions gate on this binary and a fact they depend
+on cannot live in a file designed to disappear. The wrench session asked whether
+it was deliberate or drift on 2026-08-27, which is what showed the record was
+ephemeral.
+
+`~/bin/bolt` resolves to `bolt/bin/bolt`, gitignored at `.gitignore:17`. It is
+the **Go** implementation. Nothing in this tree builds it: `cmd/` and `go.mod`
+left with the split, and the Rust bolt has no working CLI yet.
+
+**Every consumer's gate runs through it.** wrench, toolbox and bolt itself. It
+keeps working while the Rust rebuild happens, and the alternative was every gate
+in the ecosystem going dark for the length of the rebuild.
+
+## It is not reproducible today, and that is fixable
+
+FACT 2026-08-27: the live binary reports
+`v0.0.0-20260827184032-ddf14b15eb75+dirty`. The `+dirty` means it was built from
+uncommitted changes at 11:51, before the split, so no committed source
+reproduces it.
+
+FACT 2026-08-27: `bolt.go` at `7604557` is clean and rebuilds it without the
+suffix, at `v0.0.0-20260827201109-7604557974a5`, with a **byte-identical help
+surface** including `--definitions`, and it runs the gate.
+
+    cd ~/.projects/bolt.go && CGO_ENABLED=0 go build -o bin/bolt ./cmd/bolt
+    diff <(~/bin/bolt --help) <(~/.projects/bolt.go/bin/bolt --help)
+
+So the reproducibility gap closes whenever somebody rebuilds from `bolt.go`.
+
+## The durable fix belongs to dotfiles
+
+Repointing `~/bin/bolt` at `bolt.go/bin/bolt`. Filed at
+`clank/inbox/dotfiles/three-components-are-in-no-manifest/` along with `bolt`'s
+manifest summary still ending in "Go". silo is chasing it.
+
+**Leave the orphan in place until that lands.** Deleting it breaks `bolt` for
+everyone and gains nothing while the link still points here.
+
+## What a consumer should expect
+
+The Rust bolt reaches the Go one's surface task by task, not at once.
+`--definitions` is `clank/tasks/bolt/definitions/10-the-three-layer-mapping`,
+`.ready` and behind `walking-skeleton/10`, which is at stage 4 with nothing
+implemented. **A consumer designing against `--definitions` today is designing
+against the Go binary**, and that is fine as long as it is deliberate.
+
+Nothing about the Rust rebuild removes the Go binary from PATH. The swap is
+dotfiles repointing the link, and it moves between two Go binaries, not from Go
+to Rust.
+
 # Files here that belong to another repository
 
 Not a question. Recorded here because bolt has no `docs/` tree yet, and a
