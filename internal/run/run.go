@@ -59,6 +59,8 @@ type Outcome struct {
 	OutputDir  string
 	Executions int
 	Skipped    []string
+	// Stopped is the tasks a short-circuiting failure kept from executing.
+	Stopped []string
 }
 
 // Execute runs every task in declaration order and writes the evidence.
@@ -109,9 +111,12 @@ func Execute(options Options) (*Outcome, error) {
 		return nil, fmt.Errorf("walking %s: %w", base, err)
 	}
 
-	// Checked before the first task executes, where `requires` is checked. A
-	// jig dropped at a base that does not define what it needs refuses in the
-	// first second rather than partway through a gate.
+	// Both checked before the first task executes, so an incomplete toolchain
+	// or an undefined placeholder refuses in the first second rather than
+	// partway through a gate.
+	if err := checkRequires(options.Jig); err != nil {
+		return nil, err
+	}
 	if err := definitions.Check(options.Jig, options.Definitions); err != nil {
 		return nil, err
 	}
@@ -130,7 +135,7 @@ func Execute(options Options) (*Outcome, error) {
 
 	outcome := &Outcome{OutputDir: absoluteOutput}
 	for _, task := range options.Jig.Tasks {
-		ran, err := runTask(task, options, base, configDir, absoluteOutput, found, adapters[task.Name])
+		ran, passed, err := runTask(task, options, base, configDir, absoluteOutput, found, adapters[task.Name])
 		if err != nil {
 			return nil, err
 		}
@@ -139,12 +144,37 @@ func Execute(options Options) (*Outcome, error) {
 			continue
 		}
 		outcome.Executions += ran
+
+		// A failing task does not stop the run, by FR-4.8. Stopping is what a
+		// jig asks for rather than what it gets, and asking for it is this
+		// field. The tasks after it do not execute and are not skipped for an
+		// empty selection either, so they are recorded as stopped.
+		if task.ShortCircuit && !passed {
+			outcome.Stopped = remaining(options.Jig.Tasks, task.Name)
+			break
+		}
 	}
 
 	return outcome, nil
 }
 
-func runTask(task jig.Task, options Options, base, configDir, outputDir string, found []string, executable string) (int, error) {
+// remaining is the tasks after the one that stopped the run, so a reader sees
+// what was not attempted rather than inferring it from what is absent.
+func remaining(tasks []jig.Task, after string) []string {
+	var out []string
+	seen := false
+	for _, task := range tasks {
+		if seen {
+			out = append(out, task.Name)
+		}
+		if task.Name == after {
+			seen = true
+		}
+	}
+	return out
+}
+
+func runTask(task jig.Task, options Options, base, configDir, outputDir string, found []string, executable string) (int, bool, error) {
 	if task.IsJig() {
 		return runNestedJig(task, options, base, configDir, outputDir)
 	}
@@ -154,12 +184,12 @@ func runTask(task jig.Task, options Options, base, configDir, outputDir string, 
 		var err error
 		selection, err = paths.Select(found, task.Matching, task.Excluding)
 		if err != nil {
-			return 0, fmt.Errorf("task %q: %w", task.Name, err)
+			return 0, false, fmt.Errorf("task %q: %w", task.Name, err)
 		}
 		// A command naming a path variable with nothing to consume does not
 		// execute, and produces no output.
 		if len(selection) == 0 {
-			return 0, nil
+			return 0, true, nil
 		}
 	}
 
@@ -168,18 +198,21 @@ func runTask(task jig.Task, options Options, base, configDir, outputDir string, 
 		each = selection
 	}
 
+	passed := true
 	for ordinal, path := range each {
-		if err := runOnce(task, options, base, configDir, outputDir, ordinal, len(each), path, selection, executable); err != nil {
-			return 0, err
+		verdict, err := runOnce(task, options, base, configDir, outputDir, ordinal, len(each), path, selection, executable)
+		if err != nil {
+			return 0, false, err
 		}
+		passed = passed && verdict
 	}
-	return len(each), nil
+	return len(each), passed, nil
 }
 
-func runOnce(task jig.Task, options Options, base, configDir, outputDir string, ordinal, total int, each string, selection []string, executable string) error {
+func runOnce(task jig.Task, options Options, base, configDir, outputDir string, ordinal, total int, each string, selection []string, executable string) (bool, error) {
 	workDir := filepath.Join(outputDir, WorkSubdir, executionDir(task.Name, ordinal, total))
 	if err := os.MkdirAll(workDir, 0o755); err != nil {
-		return err
+		return false, err
 	}
 
 	locations := Locations{
@@ -195,7 +228,7 @@ func runOnce(task jig.Task, options Options, base, configDir, outputDir string, 
 	// Execute has already refused a run they could not satisfy.
 	mapping, err := definitions.Resolve(locations.values(), options.Jig.Definitions, options.Definitions)
 	if err != nil {
-		return err
+		return false, err
 	}
 	command := substitute(task.Command, mapping, each, selection)
 
@@ -204,7 +237,7 @@ func runOnce(task jig.Task, options Options, base, configDir, outputDir string, 
 	// attempted. The case that most needs a record is the one that would
 	// otherwise have none.
 	if err := writeManifest(workDir, task, mapping, command, ordinal, each, selection); err != nil {
-		return err
+		return false, err
 	}
 
 	if options.Progress != nil {
@@ -213,10 +246,16 @@ func runOnce(task jig.Task, options Options, base, configDir, outputDir string, 
 
 	status, err := runCommand(command, options.standDir(base), workDir, options)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	return reachVerdict(workDir, task, status, executable, locations, mapping, each, selection)
+	if err := reachVerdict(workDir, task, status, executable, locations, mapping, each, selection); err != nil {
+		return false, err
+	}
+	// Read back what was written rather than tracking it alongside. The
+	// envelope is the authoritative verdict, and a second copy of it in
+	// bookkeeping is a second thing that can disagree.
+	return executionPassed(workDir)
 }
 
 // runCommand executes the line as a subprocess standing at the base, capturing

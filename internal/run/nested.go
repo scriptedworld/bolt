@@ -21,10 +21,10 @@ const ChildDirName = "run"
 // A nested run is not a mode. Inside its subdirectory it is identical to the
 // same jig run on that directory from the command line, so this prepares the
 // invocation and calls Execute, which is the one code path both callers reach.
-func runNestedJig(task jig.Task, options Options, base, configDir, outputDir string) (int, error) {
+func runNestedJig(task jig.Task, options Options, base, configDir, outputDir string) (int, bool, error) {
 	childBase, err := childBase(task, options, base, configDir, outputDir)
 	if err != nil {
-		return 0, err
+		return 0, false, err
 	}
 
 	// A subdirectory that is not there is treated as one holding nothing, and a
@@ -32,26 +32,26 @@ func runNestedJig(task jig.Task, options Options, base, configDir, outputDir str
 	// subprojects a repository may not have is ordinary rather than
 	// exceptional, so refusing would make it unusable wherever it did not fit.
 	if info, statErr := os.Stat(childBase); statErr != nil || !info.IsDir() {
-		return 0, nil
+		return 0, true, nil
 	}
 	found, err := paths.Walk(childBase, nil)
 	if err != nil {
-		return 0, fmt.Errorf("task %q: walking %s: %w", task.Name, childBase, err)
+		return 0, false, fmt.Errorf("task %q: walking %s: %w", task.Name, childBase, err)
 	}
 	if len(found) == 0 {
-		return 0, nil
+		return 0, true, nil
 	}
 
 	// A jig task runs once against its base, so the ordinal is always the
 	// first and the width is one.
 	workDir := filepath.Join(outputDir, WorkSubdir, executionDir(task.Name, 0, 1))
 	if err := os.MkdirAll(workDir, 0o755); err != nil {
-		return 0, err
+		return 0, false, err
 	}
 
 	child, err := childOptions(task, options, base, configDir, outputDir, childBase, workDir)
 	if err != nil {
-		return 0, fmt.Errorf("task %q: %w", task.Name, err)
+		return 0, false, fmt.Errorf("task %q: %w", task.Name, err)
 	}
 
 	if options.Progress != nil {
@@ -59,15 +59,21 @@ func runNestedJig(task jig.Task, options Options, base, configDir, outputDir str
 	}
 
 	if err := writeJigManifest(workDir, task, child, base); err != nil {
-		return 0, err
+		return 0, false, err
 	}
 
 	// The child follows its own process: its own requires, its own tasks, its
 	// own filtering. Nothing rolls up and no parent reads a child's content.
 	if err := runChild(child); err != nil {
-		return 0, err
+		return 0, false, err
 	}
-	return 1, linkChildResult(workDir, child.OutputDir)
+	if err := linkChildResult(workDir, child.OutputDir); err != nil {
+		return 0, false, err
+	}
+	// The child's own result is this task's verdict, read through the link so
+	// there is one authority and not a copy of it.
+	passed, err := executionPassed(workDir)
+	return 1, passed, err
 }
 
 // childBase resolves the subdirectory `in` names against the current base.

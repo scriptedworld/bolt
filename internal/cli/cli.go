@@ -195,5 +195,10 @@ func report(stdout io.Writer, outcome *run.Outcome, passed bool) {
 	if len(outcome.Skipped) > 0 {
 		fmt.Fprintf(stdout, ", %d task(s) skipped for an empty selection: %v", len(outcome.Skipped), outcome.Skipped)
 	}
+	// What a short-circuiting failure kept from running, so a reader sees what
+	// was not attempted rather than inferring it from what is absent.
+	if len(outcome.Stopped) > 0 {
+		fmt.Fprintf(stdout, ", %d task(s) not reached: %v", len(outcome.Stopped), outcome.Stopped)
+	}
 	fmt.Fprintf(stdout, "\n%s\n", filepath.Join(outcome.OutputDir, run.ResultFile))
 }
