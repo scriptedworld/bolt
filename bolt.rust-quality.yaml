@@ -35,12 +35,20 @@
 #                installed, and `requires` refuses a run naming a tool that is
 #                not there, so it is named here in a comment and nowhere else.
 #
-# COMPLEXITY SHELLS LIZARD AND WILL NOT ALWAYS. lizard parses Rust, measured
-# 2026-08-27: it reported one function at CCN 2 from a probe file. helga
-# replaces it when helga exists, and what helga becomes is silo's to direct.
-# NEXT_STEPS.md records the swap as owed and states what this gate needs from
-# whatever runs the task, which is a tool that parses the language and
-# thresholds bolt can state.
+# COMPLEXITY IS THE PROVISIONAL TASK, and both halves of it are provisional:
+# what produces the numbers, and whether this task belongs in a common jig at
+# all. The metrics are the requirement; one cross-language analyser is the
+# nice-to-have shape rather than the commitment.
+#
+# lizard stands in today, measured 2026-08-27 to parse Rust. Language-native
+# tools are an accepted alternative, and for Rust they need no new tool: clippy
+# already has cognitive_complexity, too_many_arguments, too_many_lines and
+# excessive_nesting, all present in the installed version. Enabling those four
+# in Cargo.toml would let this task and lizard leave together, since the lint
+# task already refuses warnings.
+#
+# Not done, because the common-jig shape is still the one being tried and moving
+# early would prejudge it. NEXT_STEPS.md carries the reasoning.
 #
 # Ordered cheapest first, so a failure surfaces before the slow checks run.
 #

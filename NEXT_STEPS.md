@@ -115,24 +115,38 @@ Not questions. Each is a task in the jig that runs one tool now and is expected
 to run another later, listed so the swap is tracked rather than living in a
 comment nobody greps.
 
-**`complexity` shells lizard and helga replaces it.** Answered 2026-08-27: helga
-does not exist, so early implementation uses lizard and the swap goes on this
-list. helga is the common static analysis platform, per
+**The metrics are the requirement. The tool and the task's home are both
+open.** Answered 2026-08-27, and it is a weaker commitment than the current jig
+implies.
+
+What is wanted is complexity, function length and parameter count. A single
+cross-language analyser is the **nice-to-have** shape: helga if it exists, per
 `silo/docs/DECISIONS/components-are-named-from-the-great-clock.md` at `633cb31`,
-and what it becomes is silo's to direct rather than recorded here. Do not
-confuse it with bigal, which the same decision renamed in the other direction.
+and what helga becomes is silo's rather than recorded here. lizard stands in
+meanwhile, and FACT 2026-08-27: it parses Rust, measured against a probe file.
 
-What bolt's gate needs from whatever runs that task, stated as bolt's
-requirement and not as anyone else's design:
+**Getting the same metrics from language-native tools is an accepted outcome,
+not a fallback to apologise for.** If one analyser turns out to have too many
+tricky bits across every language, `complexity` leaves the common jig entirely
+and each language jig carries its own.
 
-- **A tool that parses the language being gated.** FACT 2026-08-27: lizard
-  parses Rust, measured against a probe file, which is why the task works today.
-- **Thresholds bolt can state**, which are toolbox's common jig's: complexity
-  15, 60 lines, 5 parameters.
-- Worth knowing when the swap happens: **cyclomatic and cognitive complexity are
-  different measures and neither substitutes for the other.** toolbox's Python
-  jig says so and pairs lizard with complexipy, so a single number may not be
-  what this task ends up wanting.
+For Rust that is already available and needs no new tool. FACT 2026-08-27, every
+lint present in the installed clippy:
+
+    clippy::cognitive_complexity   the measure complexipy gives Python
+    clippy::too_many_arguments     the parameter count
+    clippy::too_many_lines         the function length
+    clippy::excessive_nesting      what cognitive complexity is mostly about
+
+So the Rust gate could drop `complexity` and `lizard` from `requires` tomorrow
+by enabling four lints in `Cargo.toml`, where the `lint` task already refuses
+warnings. It has not, because the common-jig shape is still the one being tried
+and moving early would prejudge it.
+
+**Cyclomatic and cognitive complexity are different measures and neither
+substitutes for the other.** toolbox's Python jig says so and pairs lizard with
+complexipy. It is the reason a single number may not be what this task wants,
+whichever tool produces it.
 
 **`suppressions` is not in the jig at all.** toolbox's common jig has it and
 nothing here runs it, so hard rule 4's register is unenforced in this tree. It
