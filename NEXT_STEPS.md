@@ -109,6 +109,43 @@ implementation deliberately is not.
 Everything else is ordinary translation: errors to `Result`, `filepath` to
 `std::path`, and logic that is the same logic.
 
+## The gate's own replacements, owed rather than open
+
+Not questions. Each is a task in the jig that runs one tool now and is expected
+to run another later, listed so the swap is tracked rather than living in a
+comment nobody greps.
+
+**`complexity` shells lizard and helga replaces it.** Answered 2026-08-27: helga
+does not exist, so early implementation uses lizard and the swap goes on this
+list. helga is the common static analysis platform, per
+`silo/docs/DECISIONS/components-are-named-from-the-great-clock.md` at `633cb31`,
+and what it becomes is silo's to direct rather than recorded here. Do not
+confuse it with bigal, which the same decision renamed in the other direction.
+
+What bolt's gate needs from whatever runs that task, stated as bolt's
+requirement and not as anyone else's design:
+
+- **A tool that parses the language being gated.** FACT 2026-08-27: lizard
+  parses Rust, measured against a probe file, which is why the task works today.
+- **Thresholds bolt can state**, which are toolbox's common jig's: complexity
+  15, 60 lines, 5 parameters.
+- Worth knowing when the swap happens: **cyclomatic and cognitive complexity are
+  different measures and neither substitutes for the other.** toolbox's Python
+  jig says so and pairs lizard with complexipy, so a single number may not be
+  what this task ends up wanting.
+
+**`suppressions` is not in the jig at all.** toolbox's common jig has it and
+nothing here runs it, so hard rule 4's register is unenforced in this tree. It
+arrives with the shared common jig or before.
+
+**Unused dependencies have no task.** `cargo-udeps` would be it, and FACT
+2026-08-27: it is not installed. `requires` refuses a run naming a tool that is
+not there, so naming it would break the gate rather than extend it.
+
+**Docstring coverage is a lint, not a number.** `missing_docs` in `Cargo.toml`
+fails the build; interrogate reports a percentage. If the number is wanted, that
+is a tool this jig does not have.
+
 **The Go-as-provenance argument is not a reason to keep it.** It reached this
 session second-hand: that nothing here was ever written in Go, so a Go bolt
 cannot plausibly derive from the archived one, making the language itself a

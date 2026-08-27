@@ -35,22 +35,12 @@
 #                installed, and `requires` refuses a run naming a tool that is
 #                not there, so it is named here in a comment and nowhere else.
 #
-# COMPLEXITY IS THE ONE WITH A FUTURE. It shells lizard today, which parses Rust
-# (measured 2026-08-27: it reported one function at CCN 2 from a probe file).
-# helga replaces it: Rust and tree-sitter static analysis, the common scan
-# platform, per silo/docs/DECISIONS/components-are-named-from-the-great-clock.md
-# at 633cb31. Unbuilt.
-#
-# Two things helga inherits, written here because they are written nowhere else:
-#
-#   `complexity` sits in the COMMON jig rather than a per-language one, and that
-#   only works today because lizard happens to parse many languages. helga has
-#   to make that claim good rather than inherit it by accident.
-#
-#   CYCLOMATIC and COGNITIVE complexity are different measures and neither
-#   substitutes for the other. toolbox's Python jig says so explicitly and pairs
-#   lizard with complexipy. A common platform plausibly wants both per language
-#   rather than the one number lizard gives.
+# COMPLEXITY SHELLS LIZARD AND WILL NOT ALWAYS. lizard parses Rust, measured
+# 2026-08-27: it reported one function at CCN 2 from a probe file. helga
+# replaces it when helga exists, and what helga becomes is silo's to direct.
+# NEXT_STEPS.md records the swap as owed and states what this gate needs from
+# whatever runs the task, which is a tool that parses the language and
+# thresholds bolt can state.
 #
 # Ordered cheapest first, so a failure surfaces before the slow checks run.
 #
