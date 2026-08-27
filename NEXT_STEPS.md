@@ -167,14 +167,21 @@ answers rather than from it.
     is nine jig tasks each needing its own name, and a list form would say it
     once. Against that, a written-out task per instance is what makes the
     project jig readable as an inventory of what is in the tree.
-23. Does FR-5.12's whole-jig override survive separate location variables? A
-    jig that "needs the repository root" usually needs it for one path, a
-    shared config or a header template, and `{project_root}` covers that per
-    use without surrendering the base. What it does not cover is a tool that
-    must be standing at the root. It also cuts against FR-5.10: the point of a
-    base is that a nested project has its own root.
+23. ~~Does FR-5.12's whole-jig override survive separate location variables?~~
+    **Answered by this question's own reasoning, as FR-5.14 to FR-5.14d.** It
+    was right that `{project_root}` covers the per-path case and that only a
+    tool which must *stand* at the root is left over, so that is all
+    `needs-repository-root` does: the working directory moves and the base does
+    not. Nothing surrenders its base, so the cut against FR-5.10 does not
+    arise.
+
+    **Built the other way first, which is why FR-5.14c carries a measurement.**
+    Overriding the base let a child read outside the grant its caller wrote,
+    and this question was sitting beside the row saying so.
 24. Is a cycle detected by name, or only by depth exhaustion? A jig stack in
     the environment would name the cycle; a counter can only report a number.
+    **Only depth today**, by FR-5.7. `bolt.recursive.yaml` naming itself is
+    stopped at 4 with a reason naming the limit and not the cycle.
 25. Can a jig be referenced by version, or is it always whatever is on disk?
 
 ## Bounds and guards
@@ -271,7 +278,13 @@ renumbering it would move what those citations point at.
 
 
 29. When a jig invokes another, what does the child inherit: environment,
-    timeouts, the required default?
+    timeouts, the required default? **Two of the three are settled.** The
+    environment carries the depth and the ceiling and nothing else bolt puts
+    there, by FR-5.6 and FR-5.7; the rest of it is question 8 and still open.
+    Config directory, output directory and definitions inherit unless a field
+    says otherwise, by FR-5.13a to FR-5.13c and FR-5.13j. **Timeouts are
+    unbuilt**, so nothing has been decided about them, and the required default
+    is FR-13.4.
 30. ~~Can a parent override a field of a child's task, and at what granularity:
     the whole task, or one field?~~ **Nothing reaches into a task.** What merges
     is a mapping of scalars, and a jig task changes a child by declaring fields
