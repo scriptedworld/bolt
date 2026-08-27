@@ -255,7 +255,10 @@ tasks:
 needs-repository-root: true
 tasks:
   - name: where
-    command: "pwd > {work_dir}/where; echo {project_root} > {work_dir}/root"
+    command: "pwd > {work_dir}/where; echo {base_dir} > {work_dir}/base"
+  - name: sees
+    command: "echo {all_paths} > {work_dir}/saw"
+    matching: ["**/*.src"]
 `,
 	})
 
@@ -264,18 +267,45 @@ tasks:
 		t.Fatalf("the run failed: %v %s", got.result["reasons"], got.stderr)
 	}
 
-	where := strings.TrimSpace(findFile(t, filepath.Join(got.output, "work", "nested-0"), "where"))
-	if where != root {
-		t.Errorf("the child stood at %q, want the repository root %q", where, root)
+	child := filepath.Join(got.output, "work", "nested-0")
+	if where := strings.TrimSpace(findFile(t, child, "where")); where != root {
+		t.Errorf("the command stood at %q, want the repository root %q", where, root)
 	}
+	if base := strings.TrimSpace(findFile(t, child, "base")); base != filepath.Join(root, "go") {
+		t.Errorf("{base_dir} is %q, want the base the caller granted", base)
+	}
+}
 
-	// It overrides the base and nothing else. {project_root} was already the
-	// root, and the child's output still sits in its task's work directory.
-	if seen := strings.TrimSpace(findFile(t, filepath.Join(got.output, "work", "nested-0"), "root")); seen != root {
-		t.Errorf("{project_root} moved to %q, and it was already the root", seen)
+// COVERS: FR-5.14b, FR-5.14c | regression
+func TestStandingAtTheRootDoesNotWidenWhatTheChildCanRead(t *testing.T) {
+	// Built the other way first, and measured: a parent naming `in: go` ran a
+	// child that read a file outside the grant, with nothing in the parent's
+	// jig recording it. FR-5.13 makes narrowing the base and narrowing the
+	// containment check one act, so a mechanism undoing one undoes both.
+	root := monorepo(t, `
+tasks:
+  - name: nested
+    jig: rooted
+    in: go
+`, map[string]string{
+		"bolt.rooted.yaml": `
+needs-repository-root: true
+tasks:
+  - name: sees
+    command: "echo {all_paths} > {work_dir}/saw"
+    matching: ["**/*.src"]
+`,
+		"outside/private.src": "",
+	})
+
+	got := runNested(t, root)
+	saw := findFile(t, filepath.Join(got.output, "work", "nested-0"), "saw")
+
+	if strings.Contains(saw, "private.src") {
+		t.Errorf("the child read outside the base its caller granted: %q", saw)
 	}
-	if _, err := stat(filepath.Join(got.output, "work", "nested-0", "run", "result.yaml")); err != nil {
-		t.Errorf("the child's output left its task's work directory: %v", err)
+	if !strings.Contains(saw, "one.src") {
+		t.Errorf("the child did not see its own base: %q", saw)
 	}
 }
 

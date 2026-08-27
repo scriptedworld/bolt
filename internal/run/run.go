@@ -32,6 +32,10 @@ type Options struct {
 	// the outermost, which is assumed to sit at the base; a nested one carries
 	// its parent's, because narrowing the base leaves the root what it was.
 	ProjectRoot string
+	// StandDir is where this run's commands stand, when that is not the base.
+	// Only FR-5.14 sets it, and it reaches the working directory and nothing
+	// else: the walk, the containment and the patterns stay with the base.
+	StandDir string
 	// Ceiling is the nesting limit in force, resolved by the outermost.
 	Ceiling int
 	// Depth is how many invocations deep this one is, zero at the outermost.
@@ -207,7 +211,7 @@ func runOnce(task jig.Task, options Options, base, configDir, outputDir string, 
 		fmt.Fprintf(options.Progress, "%s\n", filepath.Base(workDir))
 	}
 
-	status, err := runCommand(command, base, workDir, options)
+	status, err := runCommand(command, options.standDir(base), workDir, options)
 	if err != nil {
 		return err
 	}
@@ -302,6 +306,15 @@ func saveManifest(workDir string, manifest map[string]any) error {
 // projectRoot is where the project starts. The outermost run is assumed to sit
 // there and a nested one is not, so a jig based on a subtree still reaches a
 // config file at the root without giving up its base.
+// standDir is where a command stands, which is the base unless a jig declared
+// it has to stand at the repository root.
+func (o Options) standDir(base string) string {
+	if o.StandDir != "" {
+		return o.StandDir
+	}
+	return base
+}
+
 func (o Options) projectRoot(base string) string {
 	if o.ProjectRoot != "" {
 		return o.ProjectRoot

@@ -134,20 +134,24 @@ func childOptions(task jig.Task, options Options, base, configDir, outputDir, ch
 		return Options{}, err
 	}
 
-	// A jig that genuinely needs the repository root says so, and that beats
-	// the base its caller named. It is a property of the tool the jig runs, so
-	// only the jig can know it, which is why this is read after loading rather
-	// than decided by the task.
+	// A jig that genuinely needs the repository root says so, and its commands
+	// stand there. It is a property of the tool the jig runs, so only the jig
+	// can know it, which is why this is read after loading rather than decided
+	// by the task.
 	//
-	// It overrides the base and nothing else: the config directory, the output
-	// directory and {project_root} are all what they already were.
+	// It reaches where a command stands and nothing else. Overriding the base
+	// would let a child widen past the grant its caller wrote, with nothing in
+	// the parent's jig recording it, and FR-5.13 makes narrowing the base and
+	// narrowing the containment check one act.
+	standIn := ""
 	if loaded.NeedsRepositoryRoot {
-		childBase = options.projectRoot(base)
+		standIn = options.projectRoot(base)
 	}
 
 	return Options{
 		Jig:         loaded,
 		BaseDir:     childBase,
+		StandDir:    standIn,
 		ConfigDir:   childConfig,
 		OutputDir:   filepath.Join(workDir, name),
 		Definitions: defined,
