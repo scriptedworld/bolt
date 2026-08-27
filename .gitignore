@@ -10,8 +10,8 @@ START_HERE.md
 # last one's evidence, and only THIS run's output is excluded structurally.
 .bolt-*
 
-# The built binary. `~/bin/bolt` is a symlink to `bolt/bin/bolt`, so building
-# here is what puts bolt on PATH, and the artifact itself is not committed.
-#
-#     CGO_ENABLED=0 go build -o bin/bolt ./cmd/bolt
+# The built binary. Nothing in this tree builds one any more: the Go
+# implementation moved to the bolt.go repository, and the Rust one is not
+# written yet. The file is ignored so a binary left here from before the split
+# is not committed by accident.
 /bin/bolt

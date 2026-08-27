@@ -78,8 +78,36 @@ FR-7.9 and FR-7.10, FR-13.5 by FR-4.12, FR-13.9 by FR-3.4d, FR-1.5 and FR-3.12.
 
 # The language
 
-**Bolt is expected to be rewritten in Rust.** Answered 2026-08-27. qwark and
-grim stay Go, to show I can work in Go too.
+**Bolt is being rewritten in Rust.** Answered 2026-08-27. qwark and grim stay
+Go, to show I can work in Go too.
+
+**The Go implementation is a repository of its own, `bolt.go`.** It carries the
+whole history to that point, so the derivation record travels with the code that
+was derived. It is the runner in use until the Rust tree reaches parity, and
+nothing in this tree builds a binary any more.
+
+## What a rewrite has to solve that a port does not
+
+Measured or read 2026-08-27, before anything was moved.
+
+**wrench has no Rust pack**, and this is the largest item. A Rust bolt needs a
+third implementation of the canonical-form emitter, byte-identical to the Go and
+Python ones and held to the same fixture set, which `wrench/START_HERE.md` calls
+the only thing keeping the existing two level. That work is wrench's.
+
+**NFR-12.4 gets harder.** `CGO_ENABLED=0` gives Go a static binary for nothing.
+Rust links glibc dynamically by default and a genuinely static build wants the
+musl target, which wants a musl toolchain: the exact "no C toolchain" constraint
+the row states. Either the row bends or the image grows a toolchain, and that is
+a decision rather than a detail.
+
+**Timeouts and process groups need crates.** Go has `exec.CommandContext` and
+`SysProcAttr.Setpgid` in its standard library; Rust's has no wait-with-timeout.
+`runner/40` is the task that meets this, and its tests are written and its
+implementation deliberately is not.
+
+Everything else is ordinary translation: errors to `Result`, `filepath` to
+`std::path`, and logic that is the same logic.
 
 **The Go-as-provenance argument is not a reason to keep it.** It reached this
 session second-hand: that nothing here was ever written in Go, so a Go bolt
