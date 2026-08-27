@@ -76,6 +76,35 @@ FR-7.9 and FR-7.10, FR-13.5 by FR-4.12, FR-13.9 by FR-3.4d, FR-1.5 and FR-3.12.
 
 ---
 
+# The language
+
+**Bolt is expected to be rewritten in Rust.** Answered 2026-08-27. qwark and
+grim stay Go, to show I can work in Go too.
+
+**The Go-as-provenance argument is not a reason to keep it.** It reached this
+session second-hand: that nothing here was ever written in Go, so a Go bolt
+cannot plausibly derive from the archived one, making the language itself a
+clean-room proof. It is not what the choice rests on, and nothing should be
+built on it.
+
+**The provenance is carried by the derivation, not by the language.** The first
+paragraph of `REQUIREMENTS.md` records that these requirements were reached from
+`silo/docs/ARCHITECTURE.md` and from answers, with no earlier bolt
+implementation, requirements document, design note or test read. That is what
+makes the chain clean, and a Rust bolt translated from this one inherits it,
+because this one's own provenance is documented rather than inferred from what
+it is written in.
+
+**So what a rewrite carries over is this document, `REQUIREMENTS.md`, and the
+test suite**, all of which are language-neutral. The Go code is the reference
+implementation those were proved against, and continuing it is what makes the
+suite worth translating.
+
+The archived tree stays sealed either way. That is the constraint the derivation
+rests on, and it does not change with the language.
+
+---
+
 # Recorded and deferred
 
 ## The envelope
