@@ -109,6 +109,24 @@ implementation deliberately is not.
 Everything else is ordinary translation: errors to `Result`, `filepath` to
 `std::path`, and logic that is the same logic.
 
+## REQUIREMENTS.md becomes a directory, and not yet
+
+**Ruled 2026-08-27**, every project, one file per requirement under
+`docs/REQUIREMENTS/<category>/`. Single-file is retired with the format rather
+than kept alongside. `silo/docs/DECISIONS/requirements-are-a-directory.md` at
+`055f0c2`.
+
+**Bolt is the measurement the ruling rests on.** FACT 2026-08-27: 245 rows in 397
+lines, the largest of eight and more than twice the next.
+
+**Do not split the file yet.** The checker cannot read a directory: it guards
+with `.exists()`, which a directory satisfies, then `read_text()` raises
+`IsADirectoryError`. bolt's gate runs `traceability` against this file, so
+splitting first turns a task that fails honestly into one that crashes. Filed
+for toolbox at `clank/inbox/toolbox/traceability-must-read-a-directory/`.
+
+The order is checker, then migrate. Nothing here is owed until it lands.
+
 ## The gate's own replacements, owed rather than open
 
 Not questions. Each is a task in the jig that runs one tool now and is expected
