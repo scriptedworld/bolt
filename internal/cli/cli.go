@@ -7,13 +7,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/scriptedworld/bolt/internal/definitions"
 	"github.com/scriptedworld/bolt/internal/jig"
 	"github.com/scriptedworld/bolt/internal/merge"
 	"github.com/scriptedworld/bolt/internal/run"
-	"github.com/scriptedworld/wrench"
 )
 
 // Exit statuses. Bolt's status answers one question: could bolt carry out the
@@ -99,15 +99,6 @@ func execute(req request, stdout, stderr io.Writer) int {
 		return Refused
 	}
 
-	// A run refuses to start if the directory it was given is not there.
-	// Checked before anything is created, because preparing the output
-	// directory would otherwise bring the base into being as a side effect and
-	// the run would go on to check an empty tree.
-	if info, statErr := os.Stat(base); statErr != nil || !info.IsDir() {
-		fmt.Fprintf(stderr, "bolt: %s is not a directory to run over\n", base)
-		return Refused
-	}
-
 	output := req.outputDir
 	if output == "" {
 		output = filepath.Join(base, run.DefaultOutputName(req.now))
@@ -118,21 +109,24 @@ func execute(req request, stdout, stderr io.Writer) int {
 		return Refused
 	}
 
+	// A run refuses to start if the directory it was given is not there.
+	// Checked before anything is created, because preparing the output
+	// directory would otherwise bring the base into being as a side effect and
+	// the run would go on to check an empty tree.
+	if info, statErr := os.Stat(base); statErr != nil || !info.IsDir() {
+		return refuseInto(output, base, fmt.Errorf("%s is not a directory to run over", base), stderr)
+	}
+
 	loaded, err := jig.Load(req.configDir, req.jigName)
 	if err != nil {
-		// The output directory does not exist yet, so there is nowhere a
-		// refusal could be written that a caller would think to look. Saying
-		// so on stderr is the whole of it.
-		fmt.Fprintf(stderr, "bolt: %v\n", err)
-		return Refused
+		return refuseInto(output, base, err, stderr)
 	}
 
 	// Read where the jig was, and before the run, so a file that will not parse
 	// is a refusal with nothing created rather than a run that got partway.
 	defined, err := definitions.Load(req.configDir, req.definitions)
 	if err != nil {
-		fmt.Fprintf(stderr, "bolt: %v\n", err)
-		return Refused
+		return refuseInto(output, base, err, stderr)
 	}
 
 	outcome, err := run.Execute(run.Options{
@@ -146,39 +140,49 @@ func execute(req request, stdout, stderr io.Writer) int {
 		Progress:    stdout,
 	})
 	if err != nil {
-		fmt.Fprintf(stderr, "bolt: %v\n", err)
 		return refuseInto(output, base, err, stderr)
 	}
 
 	passed, err := merge.Fold(outcome.OutputDir, base, true)
 	if err != nil {
-		fmt.Fprintf(stderr, "bolt: %v\n", err)
-		return Refused
+		return refuseInto(output, base, err, stderr)
 	}
 
 	report(stdout, outcome, passed)
 	return Ran
 }
 
-// refuseInto writes the refusal where a caller will find it, when the output
-// directory exists to hold one. Only a bolt that dies leaves nothing behind.
+// refuseInto writes the refusal where a caller will find it and says so on
+// stderr. Every refusal takes one shape, so a caller parses one thing whatever
+// went wrong, and only a bolt that dies leaves nothing behind.
 func refuseInto(output, base string, cause error, stderr io.Writer) int {
-	result := map[string]any{
-		"success": false,
-		"reasons": []any{
-			map[string]any{
-				"kind":    "bolt-refused",
-				"message": cause.Error(),
-			},
-		},
-		"metadata": map[string]any{"base": base},
+	fmt.Fprintf(stderr, "bolt: %v\n", cause)
+
+	// The one case with nowhere to write. Creating the output directory would
+	// create the base along with it, and the base not being there is what is
+	// being refused, so writing the result would undo the refusal. A caller
+	// that named --output-dir outside the base gets one either way.
+	if within(output, base) {
+		if _, err := os.Stat(base); err != nil {
+			fmt.Fprintf(stderr, "bolt: no result written: %s would have created %s\n", output, base)
+			return Refused
+		}
 	}
 
-	path := filepath.Join(output, run.ResultFile)
-	if err := wrench.SaveFormattedFile(result, path, wrench.EnvelopeSchema, wrench.YAML, wrench.LocalFile); err != nil {
+	if err := run.Refuse(output, base, cause); err != nil {
 		fmt.Fprintf(stderr, "bolt: could not write the refusal: %v\n", err)
 	}
 	return Refused
+}
+
+// within says whether a path sits inside a directory, which decides whether
+// creating it would bring that directory into being.
+func within(path, dir string) bool {
+	relative, err := filepath.Rel(dir, path)
+	if err != nil {
+		return false
+	}
+	return relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator))
 }
 
 func report(stdout io.Writer, outcome *run.Outcome, passed bool) {

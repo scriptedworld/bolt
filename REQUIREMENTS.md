@@ -332,6 +332,8 @@ A run's whole output is one directory:
 | FR-10.4 | Bolt exits non-zero when it could not carry out the requested ETL. | [A] |
 | FR-10.5 | Bolt exits 0 when the run completed, whatever the tools concluded, and 1 when it could not carry the run out: a jig that will not parse, an unknown adapter, an unwritable output directory, a depth ceiling passed, a directory that is not there. FR-10.3 keeps the quality verdict in the envelope. | [D] |
 | FR-10.6 | A bolt killed by a signal exits 128 plus the signal number, which is the shell's convention and the one case where bolt does not choose its own status. | [D] |
+| FR-10.7a | One refusal cannot take that shape, and it is FR-2.5's. Where the output directory sits inside a base that is not there, writing the result would create the base, which is what is being refused, so bolt says on stderr that it wrote none and why. Naming `--output-dir` outside the base gets a result as every other refusal does. | [D] |
+| FR-10.7b | So a caller that wants a parseable refusal for every case names an output directory outside the tree being checked. A graph node already does, by FR-2.6a's `.ephemera/`, which is why this is an edge rather than the ordinary case. | [D] |
 | FR-10.7 | Bolt writes a `result.yaml` whenever it is alive and in control when it stops, a refusal and a timeout included. Only a bolt that died leaves none, so a caller finding no result knows the process was killed rather than that the run never started. | [D] |
 
 ## 11. Where a run happens
