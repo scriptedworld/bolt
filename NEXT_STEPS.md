@@ -293,7 +293,8 @@ answers rather than from it.
     is nine jig tasks each needing its own name, and a list form would say it
     once. Against that, a written-out task per instance is what makes the
     project jig readable as an inventory of what is in the tree.
-23. ~~Does FR-5.12's whole-jig override survive separate location variables?~~
+23. ~~Does the whole-jig override survive separate location variables?~~ (It
+    cited FR-5.12, which is one jig at many bases. The override is FR-5.14.)
     **Answered by this question's own reasoning, as FR-5.14 to FR-5.14d.** It
     was right that `{project_root}` covers the per-path case and that only a
     tool which must *stand* at the root is left over, so that is all
