@@ -147,6 +147,35 @@ for toolbox at `clank/inbox/toolbox/traceability-must-read-a-directory/`.
 
 The order is checker, then migrate. Nothing here is owed until it lands.
 
+## bolt's own `lint` task was passing without denying warnings
+
+**Corrected 2026-08-28**, and it retracts a figure this session reported twice.
+
+`bolt.rust-quality.yaml` runs `cargo clippy --all-targets -- -D {deny}`, where
+`{deny}` comes from the jig's `definitions` block. Bolt does not read that block
+yet, so before FR-4.18 was implemented the placeholder went to the shell
+verbatim. Measured, from that run's own evidence:
+
+    command   cargo clippy --all-targets -- -D {deny}
+    exitcode  0
+    stderr    warning: `bolt` (bin "bolt") generated 1 warning
+    envelope  success: true
+
+clippy accepted `{deny}` as an unrecognised lint name, so **`-D warnings` never
+applied** and the task passed while enforcing nothing. Every "seven of eight
+tasks pass" in this session's record was six and a vacuous one.
+
+**The envelope was not wrong.** The exit was 0 and the exit-code adapter says so
+correctly. Nothing in the evidence layer can know a tool was handed a flag it
+did not understand, which is the argument for an adapter that reads what the
+tool said rather than only what it returned, and it is FR-6.9's own limit stated
+in its own row.
+
+Bolt now refuses the jig outright: `task lint names {deny}, which nothing
+defines`. So **NFR-12.1 waits on `definitions/10`**, and the Rust bolt cannot
+gate itself until that lands. That is a smaller claim than the one it replaces
+and it is the true one.
+
 ## The gate's own replacements, owed rather than open
 
 Not questions. Each is a task in the jig that runs one tool now and is expected
