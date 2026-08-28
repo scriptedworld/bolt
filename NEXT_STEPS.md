@@ -330,6 +330,47 @@ rests on, and it does not change with the language.
     is which tasks failed, not how many executions there were.
 
     The defect itself is `bolt.go`'s, at `internal/cli/cli.go` in `report`.
+43. What happens when bolt's embedded schema is older than wrench's? **Nothing
+    tells anyone.** FACT 2026-08-27: wrench embeds its schemas at build time,
+    `//go:embed schemas/*.schema.json` in the Go pack and a `build.rs`
+    generating `include_str!` in the Rust one, so bolt carries a copy fixed at
+    the moment it was compiled. The Rust rebuild inherits this.
+
+    So **the schema this estate enforces is whatever its consumers last built
+    with, not what wrench ships.** Measured by the wrench session: `allow-empty`
+    was committed at 21:45 and reached enforcement at 22:08 only because bolt
+    happened to be rebuilt after. Swapped half an hour earlier, the field would
+    have been in wrench's contract and unenforceable everywhere, with nothing
+    saying so from either end.
+
+    This is not a defect. A static binary wants its schemas embedded, and
+    FR-1.12 makes bolt a consumer of wrench's contract rather than its owner.
+    What is missing is any way to notice the gap: **a new constraint is
+    unenforced everywhere the moment it lands**, and the window between wrench
+    committing one and a consumer rebuilding is invisible from both sides.
+
+    Candidates, none chosen. Bolt reports the schema version it carries so a
+    reader can compare. Wrench stamps a version its consumers can assert
+    against. Or it stays a known property and the swap discipline covers it,
+    which is what happened today by luck rather than by design.
+
+    The estate ran one shared binary today, so there was one stale schema rather
+    than eight. That is the current mitigation and nothing states it.
+
+## A caller that finds its output directory by timestamp is wrong
+
+Not a question. Recorded from skid's withdrawn finding, because the same mistake
+will be available to whoever writes the Rust CLI's consumers.
+
+Bolt refusing with usage and writing **no** output directory is correct, and it
+is also what misleads. A caller that redirects both streams away and then reads
+`ls -dt .bolt-*/ | head -1` gets the *previous* run's directory and grades it as
+this run's. Nothing about that looks wrong.
+
+`--output-dir` is the answer: a caller that names where evidence goes never has
+to discover it. FR-10.7b already says a caller wanting a parseable refusal in
+every case names one outside the tree, and this is the same advice reached from
+the other direction.
 
 ## Adapters
 
