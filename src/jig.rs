@@ -83,8 +83,41 @@ pub struct Task {
     pub command: Option<String>,
 
     /// The jig this task runs, for a jig task rather than a command task.
+    ///
+    /// FR-5.1. Naming it is what makes this a jig task, which is what
+    /// [`Task::is_jig`] reads.
     #[serde(default)]
     pub jig: Option<String>,
+
+    /// A subdirectory of the current base to run the named jig in, by FR-5.10.
+    ///
+    /// FR-5.10a names the field, and FR-5.13 makes naming one narrow the base
+    /// and the containment check together. FR-5.13d is why there is no field
+    /// beside it for the directory the child runs on: it comes from here and
+    /// from nowhere else, which is what makes containment checkable by reading
+    /// the parent's jig.
+    #[serde(default, rename = "in")]
+    pub in_directory: Option<String>,
+
+    /// Where the child looks for jigs, by FR-5.13b. Left out, it inherits.
+    #[serde(default, rename = "config-dir")]
+    pub config_dir: Option<String>,
+
+    /// The child's output directory, by FR-5.13c.
+    ///
+    /// It names the directory rather than placing it: whatever it is set to,
+    /// the result is a subdirectory of this task's own work directory.
+    #[serde(default, rename = "output-dir")]
+    pub output_dir: Option<String>,
+
+    /// The child's definitions file, by FR-5.13j, as `--definitions` names one.
+    ///
+    /// Left out, it inherits, which is what FR-5.17 rests on: six subprojects
+    /// naming nothing all run against the parent's, so one adjustment lives in
+    /// one place. A name rather than a mapping, unlike [`Jig::definitions`],
+    /// because it is the same thing the command line names.
+    #[serde(default, rename = "definitions")]
+    pub definitions_file: Option<String>,
 
     /// Patterns or literal paths saying which files this task acts on.
     ///
@@ -157,6 +190,38 @@ pub struct Task {
     /// FR-6.2c's refusal to discover means nothing else notices.
     #[serde(default)]
     pub evidence: Vec<String>,
+}
+
+impl Task {
+    /// Whether this is a jig task rather than a command task, by FR-5.1.
+    ///
+    /// Read off `jig` being named rather than off a kind field, the same way
+    /// FR-4.2 reads a command task's shape off its command. The schema's
+    /// `oneOf` already refuses a task naming both.
+    #[must_use]
+    pub fn is_jig(&self) -> bool {
+        self.jig.is_some()
+    }
+
+    /// Every value a jig task declares, with the field each came from.
+    ///
+    /// FR-5.13a makes these fields rather than a command line, and FR-5.13i is
+    /// why that matters: every one is then checkable before anything runs. This
+    /// is what the check walks, so adding a field without adding it here is the
+    /// mistake to avoid.
+    #[must_use]
+    pub fn declared(&self) -> Vec<(&'static str, &str)> {
+        [
+            ("jig", self.jig.as_deref()),
+            ("in", self.in_directory.as_deref()),
+            ("config-dir", self.config_dir.as_deref()),
+            ("output-dir", self.output_dir.as_deref()),
+            ("definitions", self.definitions_file.as_deref()),
+        ]
+        .into_iter()
+        .filter_map(|(field, value)| value.map(|value| (field, value)))
+        .collect()
+    }
 }
 
 /// Read the jig named `name` from `config_dir` and validate it.

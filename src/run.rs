@@ -212,6 +212,7 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
         base,
         definitions: None,
         output_dir: None,
+        config_dir: None,
     })
 }
 
@@ -229,6 +230,13 @@ pub struct Invocation<'a> {
     pub definitions: Option<&'a str>,
     /// Where evidence goes, by FR-2.6. `None` is `.bolt-<iso8601>` at the base.
     pub output_dir: Option<&'a Path>,
+    /// Where jigs are found, by FR-2.8. `None` is the base.
+    ///
+    /// FR-2.8 has where jigs live told to bolt rather than inferred from the
+    /// directory being run on, so one shared jig directory can serve a tree it
+    /// does not sit in. The default stays the base, which is what makes naming
+    /// it unnecessary for a project keeping its own jigs.
+    pub config_dir: Option<&'a Path>,
 }
 
 /// Carry out an invocation.
@@ -244,6 +252,7 @@ pub fn invoke(invocation: &Invocation) -> Result<Outcome, Error> {
         base,
         definitions,
         output_dir,
+        config_dir,
     } = invocation;
 
     // One stamp for the whole invocation. Taking it twice would let a second
@@ -287,7 +296,10 @@ pub fn invoke(invocation: &Invocation) -> Result<Outcome, Error> {
     // result for whatever goes wrong. The refusal is written into the directory
     // this run owns, which the two checks above have already established is not
     // somebody else's.
-    carry_out(jig, base, &output_dir, *definitions)
+    // FR-2.8 defaults to the base, absolute like every path a caller writes.
+    let config_dir = config_dir.map_or_else(|| base.clone(), absolute);
+
+    carry_out(jig, base, &output_dir, *definitions, &config_dir)
         .inspect_err(|refusal| write_refusal(&output_dir, refusal))
 }
 
@@ -478,13 +490,14 @@ fn carry_out(
     base: &Path,
     output_dir: &Path,
     definitions: Option<&str>,
+    config_dir: &Path,
 ) -> Result<Outcome, Error> {
     let output_dir = output_dir.to_path_buf();
-    let jig = jig::read(base, jig)?;
+    let jig = jig::read(config_dir, jig)?;
 
-    // FR-2.8 puts the config directory at the base for this task; naming it
-    // separately is `runner/10`'s.
-    let definitions = Definitions::build(jig.definitions.as_ref(), base, definitions)?;
+    // FR-4.16a reads a definitions file from the config directory, where FR-3.9
+    // puts the jig, so `--config-dir` moves a jig and its adjustments together.
+    let definitions = Definitions::build(jig.definitions.as_ref(), config_dir, definitions)?;
 
     // Everything a jig can be refused for, checked before any task executes.
     // FR-3.10b makes that the shape: an incomplete jig is known before half a
@@ -512,7 +525,7 @@ fn carry_out(
     let locations = Locations {
         project_root: base.to_path_buf(),
         base_dir: base.to_path_buf(),
-        config_dir: base.to_path_buf(),
+        config_dir: config_dir.to_path_buf(),
         output_dir: output_dir.clone(),
     };
     let scope = Scope {
@@ -738,6 +751,9 @@ fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<Plan
             return Err(Error::UnsafeTaskName { task: named() });
         }
 
+        if task.is_jig() {
+            check_fields(task)?;
+        }
         let Some(command) = task.command.as_deref() else {
             return Err(Error::NestedJigNotBuilt { task: named() });
         };
@@ -767,6 +783,36 @@ fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<Plan
     }
 
     Ok(commands)
+}
+
+/// FR-5.13h's check over every field a jig task declares.
+///
+/// The path variables are what a jig task may not name. It has no command
+/// consuming paths, so there is no selection for `{each_path}` to be one of and
+/// nothing for `{all_paths}` to expand to; a jig that names one is asking for
+/// something bolt cannot do rather than making a typo.
+///
+/// **Called before the unbuilt-feature refusal**, so a jig task whose fields are
+/// wrong is told what is wrong with its fields. Being told nested jigs are
+/// unbuilt teaches nothing about the jig in front of you, and that message
+/// changes under a reader once `50b` lands while this one does not.
+///
+/// The location variables are left alone here. FR-5.13f has them substituted in
+/// a field as they are in a command, which is `50b`'s to build, and FR-4.18's
+/// refusal for a name nothing defines already covers the rest.
+fn check_fields(task: &Task) -> Result<(), Error> {
+    for (field, value) in task.declared() {
+        for variable in placeholders(value) {
+            if selection::PATH_VARIABLES.contains(&variable) {
+                return Err(Error::PathVariableInField {
+                    task: task.name.clone(),
+                    field,
+                    variable: variable.to_owned(),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Every `{name}` a command line spells, in the order they appear.

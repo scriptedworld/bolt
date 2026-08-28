@@ -238,8 +238,16 @@ fn a_jig_without_a_version_is_read() {
     assert_eq!(outcome.executions, 1, "the task did not execute");
 }
 
-// COVERS: FR-5.13h, FR-10.5 | negative
+// COVERS: FR-10.5 | negative
 /// A task naming a jig is refused by name, because nested jigs are not built.
+///
+/// **This cited FR-5.13h and discharged none of it.** That row is about path
+/// variables having nothing to resolve against in a jig task's field, and this
+/// test names no field and no variable. The citation made the row read as
+/// covered from the day it was written, which is the failure a traceability
+/// gate cannot catch: it checks that a cited row exists, not that the test
+/// touches it. `a_path_variable_in_a_jig_tasks_field_is_a_jig_error` covers it
+/// now.
 ///
 /// The refusal has to say which feature is missing rather than which field is.
 /// Before this, the message was serde's `missing field command`, which reads as
@@ -2641,6 +2649,7 @@ fn run_with(jig: &str, base: &Path, definitions: &str) -> Result<bolt::Outcome, 
         base,
         definitions: Some(definitions),
         output_dir: None,
+        config_dir: None,
     })
 }
 
@@ -2674,6 +2683,7 @@ fn run_into(jig: &str, base: &Path, output_dir: &Path) -> Result<bolt::Outcome, 
         base,
         definitions: None,
         output_dir: Some(output_dir),
+        config_dir: None,
     })
 }
 
@@ -3128,9 +3138,14 @@ fn a_tasks_limit_covers_all_its_executions_together() {
         "budget",
         concat!(
             "  - name: slow\n",
-            "    time-limit: \"0.25s\"\n",
+            // Four executions of 0.3s against a budget of 0.7s. Each finishes
+            // inside the limit on its own, which is what makes the two readings
+            // separable, and four of them cannot. Started at 0.1s against 0.25s
+            // and was flaky under a loaded suite, because a tenth of a second is
+            // the same order as process startup when eighty tests are running.
+            "    time-limit: \"0.7s\"\n",
             "    matching: [\"**/*.txt\"]\n",
-            "    command: \"sh -c 'sleep 0.1; echo {each_path}'\"\n",
+            "    command: \"sh -c 'sleep 0.3; echo {each_path}'\"\n",
         ),
     );
 
@@ -3257,7 +3272,13 @@ fn a_killed_command_keeps_its_output_and_its_adapter_still_runs() {
         "hangs",
         concat!(
             "  - name: reporting\n",
-            "    time-limit: \"0.05s\"\n",
+            // Half a second, not the fifty milliseconds this started with. The
+            // command has to reach its `echo` before the limit fires, and under
+            // a suite running eighty tests at once fifty was not enough process
+            // startup: measured flaky, roughly one run in five, reporting an
+            // empty capture. The sleep is a hundredfold the limit either way,
+            // so nothing about what is being tested changed.
+            "    time-limit: \"0.5s\"\n",
             "    adapter: noting-adapter\n",
             "    command: \"sh -c 'echo forty-problems; sleep 5'\"\n",
         ),
@@ -3342,7 +3363,7 @@ fn the_runs_limit_catching_an_adapter_leaves_bolt_to_write_the_envelope() {
     write_limited_jig(
         root.path(),
         "slow-adapter",
-        "0.15s",
+        "0.5s",
         concat!(
             "  - name: quick\n",
             "    adapter: hanging-adapter\n",
@@ -3365,7 +3386,7 @@ fn the_runs_limit_catching_an_adapter_leaves_bolt_to_write_the_envelope() {
     assert!(
         carried
             .iter()
-            .any(|(kind, message)| kind == "time-limit" && message.contains("0.15s")),
+            .any(|(kind, message)| kind == "time-limit" && message.contains("0.5s")),
         "bolt's envelope does not say a limit caught the adapter: {carried:?}",
     );
 }
@@ -3383,7 +3404,7 @@ fn a_run_that_times_out_writes_a_result_carrying_what_completed() {
     write_limited_jig(
         root.path(),
         "bounded",
-        "0.2s",
+        "0.5s",
         concat!(
             "  - name: first\n    command: \"sh -c 'echo quick'\"\n",
             "  - name: hangs\n    command: \"sh -c 'sleep 5'\"\n",
@@ -3405,7 +3426,7 @@ fn a_run_that_times_out_writes_a_result_carrying_what_completed() {
     assert!(
         carried.iter().any(|(kind, message)| kind == "time-limit"
             && message.contains("the run")
-            && message.contains("0.2s")),
+            && message.contains("0.5s")),
         "FR-4.13: the result does not say the run passed its limit: {carried:?}",
     );
 
@@ -3444,7 +3465,7 @@ fn a_timed_out_command_leaves_no_children_running() {
         "spawner",
         concat!(
             "  - name: forks\n",
-            "    time-limit: \"0.1s\"\n",
+            "    time-limit: \"0.5s\"\n",
             "    command: \"sh -c 'while : ; do echo tick >> ticks.txt; sleep 0.02; done & sleep 5'\"\n",
         ),
     );
@@ -3583,7 +3604,7 @@ fn a_tasks_limit_is_wall_clock_and_its_adapters_spend_it() {
         "slow-adapter",
         concat!(
             "for a in \"$@\"; do case $prev in --work-dir) w=$a;; esac; prev=$a; done\n",
-            "sleep 0.2\n",
+            "sleep 0.3\n",
             "printf '\"success\": true\\n' > \"$w/output.yaml\"\n",
         ),
     );
@@ -3592,7 +3613,7 @@ fn a_tasks_limit_is_wall_clock_and_its_adapters_spend_it() {
         "adapted",
         concat!(
             "  - name: each\n",
-            "    time-limit: \"0.3s\"\n",
+            "    time-limit: \"0.5s\"\n",
             "    adapter: slow-adapter\n",
             "    matching: [\"**/*.txt\"]\n",
             "    command: \"sh -c 'echo {each_path}'\"\n",
@@ -3667,4 +3688,172 @@ fn every_timed_out_execution_has_a_valid_envelope() {
         outcome.executions, 1,
         "the task whose budget was already gone executed something",
     );
+}
+
+// ---- the jig task, and where jigs are found ---------------------------------
+
+// COVERS: FR-2.8 | positive
+/// A config directory says where jigs are found, rather than it being inferred.
+///
+/// Asserted with the jig in a tree the run never touches, so a bolt still
+/// deriving the config directory from the base cannot find it at all. The
+/// substituted `{config_dir}` is checked too: finding the jig and telling a
+/// command where it came from are two things, and a bolt that hard-coded the
+/// base into the locations would pass the first half.
+///
+/// Driven through the built binary as well as through the call, because the flag
+/// and the field are separate work and a test of one is not a test of the other.
+#[test]
+fn a_config_directory_says_where_jigs_are_found() {
+    let root = tree();
+    let elsewhere = tree();
+    write(root.path(), "a.txt", "content");
+    write_jig(
+        elsewhere.path(),
+        "remote",
+        "  - name: says\n    command: \"sh -c 'echo {config_dir}'\"\n",
+    );
+
+    let outcome = bolt::run::invoke(&bolt::run::Invocation {
+        jig: "remote",
+        base: root.path(),
+        definitions: None,
+        output_dir: None,
+        config_dir: Some(elsewhere.path()),
+    })
+    .expect("a jig in the config directory is found");
+
+    assert!(outcome.success, "the run did not pass");
+    let said = fs::read_to_string(work(&outcome, "says-1").join("stdout")).expect("stdout");
+    assert_eq!(
+        said.trim(),
+        elsewhere
+            .path()
+            .canonicalize()
+            .expect("the config directory resolves")
+            .display()
+            .to_string(),
+        "{{config_dir}} did not substitute to where the jig was found",
+    );
+
+    // The flag, which is the other half. A second tree because FR-2.6b refuses
+    // a second run landing on the same second-granular output directory.
+    let again = tree();
+    write(again.path(), "a.txt", "content");
+    let ran = bolt()
+        .arg("--config-dir")
+        .arg(elsewhere.path())
+        .arg("remote")
+        .arg(again.path())
+        .output()
+        .expect("bolt runs");
+    assert!(
+        ran.status.success(),
+        "--config-dir was not accepted: {}",
+        String::from_utf8_lossy(&ran.stderr),
+    );
+}
+
+// COVERS: FR-5.5, FR-5.13i | negative
+/// A jig task carries no condition, and the schema is what refuses one.
+///
+/// Selecting files is the nested jig's own business: the child walks its own
+/// subdirectory and its own tasks decide what they act on.
+///
+/// FR-5.13i is the half worth asserting deliberately. Every field a jig task
+/// declares is schema-checkable, which a command line would not have been, so
+/// this refusal arrives as an unreadable jig from validation rather than as a
+/// rule bolt restates. A bolt that checked it again itself would pass a test
+/// that only looked for a refusal.
+///
+/// The legitimate five are asserted in the same test rather than a separate one,
+/// because a schema that refuses everything would satisfy the first half. The
+/// pair is the claim: these five and not those.
+#[test]
+fn a_jig_task_carrying_a_condition_is_refused_by_the_schema() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "conditional",
+        "  - name: child\n    jig: inner\n    matching: [\"**/*.go\"]\n",
+    );
+
+    let refusal = bolt::run::run("conditional", root.path())
+        .expect_err("a jig task carrying a condition is refused");
+    assert!(
+        matches!(refusal, bolt::Error::JigUnreadable { .. }),
+        "the refusal did not come from validating the document: {refusal:?}",
+    );
+
+    let allowed = tree();
+    write(allowed.path(), "sub/a.txt", "content");
+    write_jig(
+        allowed.path(),
+        "parent",
+        concat!(
+            "  - name: child\n",
+            "    jig: inner\n",
+            "    in: sub\n",
+            "    config-dir: tooling\n",
+            "    output-dir: run\n",
+            "    definitions: shared\n",
+        ),
+    );
+
+    let refusal = bolt::run::run("parent", allowed.path()).expect_err("nested jigs are unbuilt");
+    assert!(
+        matches!(refusal, bolt::Error::NestedJigNotBuilt { .. }),
+        "the five fields a jig task may declare were not accepted: {refusal:?}",
+    );
+}
+
+// COVERS: FR-5.10a, FR-5.13a, FR-5.13h | negative
+/// A path variable in a jig task's field is a jig error, named by field.
+///
+/// A jig task has no command consuming paths, so `{each_path}` has no selection
+/// to be one of and `{all_paths}` has nothing to expand to. Naming one asks for
+/// something bolt cannot do rather than making a typo.
+///
+/// **Asserted against the unbuilt-feature refusal**, which is the ordering that
+/// matters and the thing a later reader might undo. Both are refusals, so a test
+/// checking only that the run was refused passes either way; this checks which,
+/// because being told nested jigs are unbuilt teaches nothing about the jig in
+/// front of you and the message changes under you when they are built.
+///
+/// FR-5.10a and FR-5.13a ride here rather than on a test of their own, and this
+/// is the test that actually discriminates them: each field is named by its
+/// hyphenated spelling, and a field bolt failed to read produces no refusal at
+/// all. A test that merely watched a jig task parse would pass against a bolt
+/// that ignored every field, because serde defaults a field it cannot find and
+/// the run still reaches the same refusal.
+#[test]
+fn a_path_variable_in_a_jig_tasks_field_is_a_jig_error() {
+    for (field, line) in [
+        ("in", "    in: \"{each_path}\"\n"),
+        ("config-dir", "    config-dir: \"{all_paths}\"\n"),
+        ("output-dir", "    output-dir: \"{each_path}\"\n"),
+        ("definitions", "    definitions: \"{each_path}\"\n"),
+    ] {
+        let root = tree();
+        write_jig(
+            root.path(),
+            "wrong",
+            &format!("  - name: child\n    jig: inner\n{line}"),
+        );
+
+        let refusal =
+            bolt::run::run("wrong", root.path()).expect_err("a path variable in a field refuses");
+        let bolt::Error::PathVariableInField {
+            field: named, task, ..
+        } = &refusal
+        else {
+            panic!("{field} was not refused as a jig error: {refusal:?}");
+        };
+        assert_eq!(*named, field, "the reason names the wrong field");
+        assert_eq!(task, "child", "the reason names the wrong task");
+        assert!(
+            refusal.to_string().contains(field),
+            "the message does not say which field: {refusal}",
+        );
+    }
 }

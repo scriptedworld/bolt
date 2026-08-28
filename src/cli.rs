@@ -20,6 +20,8 @@ struct Parsed {
     definitions: Option<String>,
     /// Where evidence goes, by FR-2.6, if the caller said.
     output_dir: Option<PathBuf>,
+    /// Where jigs are found, by FR-2.8, if the caller said.
+    config_dir: Option<PathBuf>,
 }
 
 /// Read an invocation, or `None` where it is not one.
@@ -35,6 +37,7 @@ fn parse(arguments: &[OsString]) -> Option<Parsed> {
     let mut positional = Vec::with_capacity(2);
     let mut definitions = None;
     let mut output_dir = None;
+    let mut config_dir = None;
     let mut rest = arguments.iter();
 
     while let Some(argument) = rest.next() {
@@ -55,6 +58,16 @@ fn parse(arguments: &[OsString]) -> Option<Parsed> {
                 }
                 output_dir = Some(PathBuf::from(rest.next()?));
             }
+            // FR-2.8. Where jigs live is told to bolt rather than inferred from
+            // the directory being run on, which is what lets one shared jig
+            // directory serve a tree it does not sit in. Refused twice for the
+            // same reason as the other two.
+            Some("--config-dir") => {
+                if config_dir.is_some() {
+                    return None;
+                }
+                config_dir = Some(PathBuf::from(rest.next()?));
+            }
             _ => positional.push(argument),
         }
     }
@@ -67,6 +80,7 @@ fn parse(arguments: &[OsString]) -> Option<Parsed> {
         base: PathBuf::from(base),
         definitions,
         output_dir,
+        config_dir,
     })
 }
 
@@ -100,9 +114,13 @@ where
         base,
         definitions,
         output_dir,
+        config_dir,
     }) = parse(&arguments)
     else {
-        eprintln!("usage: bolt <jig> <directory> [--definitions <name>] [--output-dir <path>]");
+        eprintln!(
+            "usage: bolt <jig> <directory> [--definitions <name>] [--output-dir <path>] \
+             [--config-dir <path>]"
+        );
         return ExitCode::from(REFUSED);
     };
 
@@ -111,6 +129,7 @@ where
         base: &base,
         definitions: definitions.as_deref(),
         output_dir: output_dir.as_deref(),
+        config_dir: config_dir.as_deref(),
     }) {
         Ok(outcome) => {
             // FR-10.3: the verdict is in the envelope, so what a caller is told

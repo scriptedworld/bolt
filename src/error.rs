@@ -140,6 +140,26 @@ pub enum Error {
         tools: Vec<String>,
     },
 
+    /// A jig task's field names a path variable, by FR-5.13h.
+    ///
+    /// A jig task has no command consuming paths, so `{each_path}` and
+    /// `{all_paths}` have nothing to resolve against and naming one asks for
+    /// something that cannot happen. The location variables are what is
+    /// available in a field.
+    ///
+    /// Refused before the run rather than at substitution, and **before the
+    /// unbuilt-feature refusal**, because a reader fixing a jig should be told
+    /// what is wrong with their jig before they are told what bolt cannot do
+    /// yet.
+    PathVariableInField {
+        /// The task whose field names it.
+        task: String,
+        /// Which field, so the reason says which line to edit.
+        field: &'static str,
+        /// The variable, without its braces.
+        variable: String,
+    },
+
     /// A `time-limit` is not a duration, by FR-4.11e.
     ///
     /// Refused before anything executes, for FR-4.18a's reason: a jig whose
@@ -199,20 +219,13 @@ impl fmt::Display for Error {
                 write!(formatter, "the directory {} is not there", path.display())
             }
             Self::JigUnreadable { path, reason } => {
-                write!(
-                    formatter,
-                    "the jig {} is unreadable: {reason}",
-                    path.display()
-                )
+                write!(formatter, "{}", unreadable("jig", path, reason))
             }
             Self::UnknownPlaceholder { task, placeholder } => write!(
                 formatter,
                 "task {task} names {{{placeholder}}}, which nothing defines",
             ),
-            Self::DuplicateTaskName { task } => write!(
-                formatter,
-                "two tasks are named {task}; a name is a work directory prefix",
-            ),
+            Self::DuplicateTaskName { task } => write!(formatter, "{}", duplicate_name(task)),
             Self::UnsafeTaskName { task } => write!(
                 formatter,
                 "task name {task} would leave the run's work directory",
@@ -234,12 +247,19 @@ impl fmt::Display for Error {
                 formatter,
                 "{source} defines {name}, which is reserved to bolt",
             ),
-            Self::DefinitionsUnreadable { path, reason } => write!(
-                formatter,
-                "the definitions file {} is unreadable: {reason}",
-                path.display()
-            ),
+            Self::DefinitionsUnreadable { path, reason } => {
+                write!(
+                    formatter,
+                    "{}",
+                    unreadable("definitions file", path, reason)
+                )
+            }
             Self::RequiresMissing { tools } => write!(formatter, "{}", requires_missing(tools)),
+            Self::PathVariableInField {
+                task,
+                field,
+                variable,
+            } => write!(formatter, "{}", path_variable(task, field, variable)),
             Self::MalformedTimeLimit { task, value } => {
                 write!(
                     formatter,
@@ -260,6 +280,24 @@ impl fmt::Display for Error {
 fn malformed_time_limit(task: Option<&str>, value: &str) -> String {
     let whose = task.map_or_else(|| "the jig".to_owned(), |task| format!("task {task}"));
     format!("{whose} sets a time limit of {value}, which is not a decimal followed by s, m or h")
+}
+
+/// FR-3.3a's reason, which says why a duplicate matters rather than that it is.
+fn duplicate_name(task: &str) -> String {
+    format!("two tasks are named {task}; a name is a work directory prefix")
+}
+
+/// FR-1.5's reason for a document that would not parse or would not validate.
+///
+/// One sentence for both the jig and the definitions file, because a reader
+/// meets them the same way and wrench produced both messages.
+fn unreadable(kind: &str, path: &std::path::Path, reason: &str) -> String {
+    format!("the {kind} {} is unreadable: {reason}", path.display())
+}
+
+/// FR-5.13h's reason, naming the field so a reader knows which line to edit.
+fn path_variable(task: &str, field: &str, variable: &str) -> String {
+    format!("task {task} names {{{variable}}} in {field}; a jig task consumes no paths")
 }
 
 /// FR-3.10b's reason, naming every entry `PATH` did not resolve.

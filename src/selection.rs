@@ -80,8 +80,17 @@ pub fn select(
 /// wanted paths.
 #[must_use]
 pub fn consumes_paths(command: &str) -> bool {
-    command.contains("{each_path}") || command.contains("{all_paths}")
+    PATH_VARIABLES
+        .iter()
+        .any(|variable| command.contains(&format!("{{{variable}}}")))
 }
+
+/// The two variables that stand for the selection, without their braces.
+///
+/// Named once because two things read them: this, deciding whether a command
+/// wants paths at all, and FR-5.13h's check that a jig task names neither. A
+/// second spelling of the pair is a second place to forget one.
+pub const PATH_VARIABLES: [&str; 2] = ["each_path", "all_paths"];
 
 /// Quote a path for substitution into a command line.
 ///
