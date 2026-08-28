@@ -116,8 +116,28 @@ Everything else is ordinary translation: errors to `Result`, `filepath` to
 than kept alongside. `silo/docs/DECISIONS/requirements-are-a-directory.md` at
 `055f0c2`.
 
-**Bolt is the measurement the ruling rests on.** FACT 2026-08-27: 245 rows in 397
-lines, the largest of eight and more than twice the next.
+**Bolt is the measurement the ruling rests on**, and the measurement has moved
+twice since it was taken.
+
+FACT 2026-08-27, re-derived: 264 row-shaped lines in 441, counting the retired
+table; the traceability checker declares 244 live. The earlier figure here, 245
+rows in 397 lines, is now **`bolt.go`'s document**, because the repository split
+forked this file and froze the copy at that point. So the number did not drift,
+it migrated, and a reader finding 245 today finds it in the other tree.
+
+**The ruling still rests on it and one half of the old sentence no longer
+holds.** Bolt is the largest of eight. "More than twice the next" was true and
+now depends on whether `bolt.go` counts, since the split created a near-copy at
+245 that is bolt's own former self. Against the largest document that is not
+bolt, qwark at 127, it holds.
+
+    for f in ~/.projects/*/REQUIREMENTS.md; do
+      printf '%-14s %s\n' "$(basename $(dirname $f))" "$(grep -cE '^\| (FR|NFR)-[0-9]+\.[0-9]+[a-z]* \|' $f)"
+    done | sort -k2 -rn
+
+**That command reads the whole estate, so this claim is not checkable from a
+clone of bolt.** It is recorded here because the ruling it supports is
+estate-wide, and the scope is stated so nobody restates it as a local fact.
 
 **Do not split the file yet.** The checker cannot read a directory: it guards
 with `.exists()`, which a directory satisfies, then `read_text()` raises
