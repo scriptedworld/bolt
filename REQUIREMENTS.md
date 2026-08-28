@@ -120,7 +120,7 @@ not help with.
 | FR-3.4a | `excluding` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
 | FR-3.4b | `matching` and `excluding` belong to a task that consumes paths. On a command naming neither path variable they are a jig error, caught in validation rather than quietly ignored. Whether a whole-project command should run at all is a question about where the jig is pointed, and FR-4.4 already answers it: a command naming neither variable always executes. | [A] |
 | FR-3.4e | FR-4.4b's guarantee reaches only the tasks bolt selects for. A command handed a directory, whose tool finds its own files, is opaque: bolt cannot know whether it read a thousand files or none, so a tool that silently matched nothing reports a pass and bolt has nothing to notice. Where that matters, the task takes `matching` and a path variable so the selection is bolt's and FR-4.4b applies. | [D] |
-| FR-3.4f | FACT 2026-08-27: 3 of 116 tasks across 26 jigs let bolt select, all three in one jig. The rest hand their tool a directory, so FR-4.4b protects three tasks on the day it lands and the evidence FR-9.5's manifest promises is absent for the other 113. That is the state to move, not a reason against the rule. Measured by `.ephemera/count-selection.py`, which counts task blocks; an earlier figure of 8 counted matching lines and triple-counted a task carrying `matching`, `excluding` and a path variable. | [D] |
+| FR-3.4f | FACT 2026-08-27: 3 of 116 tasks across 26 jigs let bolt select, all three in one jig. The rest hand their tool a directory, so FR-4.4b protects three tasks on the day it lands and the evidence FR-9.5's manifest promises is absent for the other 113. That is the state to move, not a reason against the rule. Measured by `python3 bin/count-selection.py`, which counts task blocks; an earlier figure of 8 counted matching lines and triple-counted a task carrying `matching`, `excluding` and a path variable. It reads every sibling repository's jigs, so it re-derives the figure only where the estate is checked out, and a clone of bolt alone cannot reproduce it. | [D] |
 | FR-3.4c | The jig format carries comments, and an entry's reasoning sits beside it. Somebody asking why a path is excluded finds the answer where the path is, rather than reconstructing it from git history. | [A/D] |
 | FR-3.4d | A jig is YAML, as an envelope is. One serialisation everywhere: one parser, one schema mechanism, and a jig and a result readable by the same tooling. | [A] |
 | FR-3.5 | Filter patterns are relative to the base directory of the run they are declared in. A jig written for reuse therefore says `**/*.go` and never names the subtree it was dropped into, which is what makes it the same jig at the repository root and at `backend/`. | [A] |
@@ -401,7 +401,16 @@ row looks perfectly normal. Appending is what a person does when adding a
 requirement, which is what makes this worth a warning rather than a note.
 
 The checker fails an id that is both live and retired, so the collision is
-caught. **A row that is only retired is not a collision**, and nothing objects.
+caught. **A row that is only retired is not a collision**, and nothing objects
+until something cites it. Measured 2026-08-27 by the toolbox session: a row
+appended here and cited by no test passes the gate with the id absent from the
+output entirely; the moment a test cites it, the gate fails naming the test and
+prints the row's own text back, which for an accidental retirement is the
+superseded-by cell reading as nonsense.
+
+**So the window is exactly the gap between writing a requirement and writing
+its test.** Written together there is no window, which is the argument the chain
+already makes for writing them together.
 
 A requirement can be retired or superseded. **Its ID is never reused**, because
 reuse silently rewrites what every existing reference to that ID meant and

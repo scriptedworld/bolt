@@ -257,8 +257,13 @@ rests on, and it does not change with the language.
 
     Both answers are defensible and neither is written. `hidden(false)` walks
     `.git/` too unless something else excludes it, and FR-2.2b says bolt reads
-    nothing under `.git/` rather than that the walk skips it. Probe at
-    `.ephemera/walk-probe`.
+    nothing under `.git/` rather than that the walk skips it.
+
+    The measured outputs above are the evidence and they are quoted here
+    deliberately, because the probe that produced them is in `.ephemera/` and
+    will not survive a clone or a cleanup. To re-derive: build a tree holding
+    `plain.txt`, `.editorconfig` and `.github/workflows/ci.yml`, walk it with
+    `ignore::WalkBuilder` at defaults, then again with `hidden(false)`.
 40. Does FR-2.2e mean bolt does not *traverse* a symlink, or that it does not
     *return* one? FACT 2026-08-27: with `follow_links` false, a base holding a
     file symlink pointing outside walks as
