@@ -3690,6 +3690,203 @@ fn every_timed_out_execution_has_a_valid_envelope() {
     );
 }
 
+// ---- the depth ceiling ------------------------------------------------------
+
+/// Write a jig whose one task runs bolt again on the jig named `next`.
+///
+/// The chain FR-5.6 and FR-5.7a describe: a task command invoking bolt directly
+/// rather than through a jig task. The binary's own path comes from Cargo, and
+/// each link names its own output directory so the runs do not collide under
+/// FR-2.6b when two land in the same second.
+fn write_recursing_jig(root: &Path, name: &str, next: &str) {
+    write(
+        root,
+        &bolt::jig::file_name(name),
+        &format!(
+            "version: \"1.0.0\"\ntasks:\n  - name: deeper\n    command: \"{} {next} {{base_dir}} \
+             --output-dir {{work_dir}}/nested\"\n",
+            env!("CARGO_BIN_EXE_bolt"),
+        ),
+    );
+}
+
+// COVERS: FR-5.6, FR-5.7, FR-5.7b, FR-5.8 | negative
+/// Bolt inside bolt is stopped at the ceiling, and the refusal writes a result.
+///
+/// A chain of bolts, each running the next, until one is past the ceiling. It
+/// never reads a jig: it refuses, writes its own result, and exits non-zero.
+///
+/// **This needs no nested jigs.** FR-5.6 carries the depth in the environment of
+/// every process bolt spawns rather than of child jigs alone, precisely so a
+/// task command invoking bolt is at depth too. A test waiting for jig tasks
+/// would be testing a narrower rule than the one written.
+///
+/// **The first link clears the depth and sets the ceiling to two**, so the chain
+/// is the same length however deep this suite is already running. Without that
+/// it passes for a person and fails under `bolt rust-quality .`, because the
+/// gate exports its own depth into the `tests` command and every link shifts by
+/// one. NFR-12.1 makes the suite reachable from the gate, which the Go build's
+/// `runner/60` discharge records as the trap it is: any test that invokes the
+/// gate is reachable from the gate.
+///
+/// Setting the ceiling also asserts more than the default would: FR-5.7 has it
+/// read from the environment, and a hard-coded four would pass against a bolt
+/// that ignored the variable.
+///
+/// The failure travels exactly one level, which the test plan explains.
+#[test]
+fn bolt_inside_bolt_is_stopped_at_the_ceiling() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("one"),
+        &format!(
+            "version: \"1.0.0\"\ntasks:\n  - name: deeper\n    command: \"env -u {} {}=2 {} two \
+             {{base_dir}} --output-dir {{work_dir}}/nested\"\n",
+            bolt::depth::DEPTH,
+            bolt::depth::CEILING,
+            env!("CARGO_BIN_EXE_bolt"),
+        ),
+    );
+    write_recursing_jig(root.path(), "two", "three");
+    write_recursing_jig(root.path(), "three", "four");
+    write_jig(root.path(), "four", "  - name: n\n    command: \"true\"\n");
+
+    let outcome = bolt::run::run("one", root.path()).expect("the outermost run completes");
+
+    // Each link's output directory sits in the previous one's work directory,
+    // named by the `--output-dir` its command carried. `two` is depth 1 and
+    // `four` is depth 3, one past the ceiling the first link set.
+    let nested = |at: &Path| at.join(bolt::run::WORK_DIR).join("deeper-1").join("nested");
+    let three = nested(&work(&outcome, "deeper-1").join("nested"));
+    let refused = nested(&three);
+
+    let carried = reasons_in(&refused.join(bolt::run::RESULT_FILE));
+    assert!(
+        carried
+            .iter()
+            .any(|(kind, message)| kind == "bolt-refused" && message.contains("limit is 2")),
+        "FR-5.8: the refused run's reason does not name the limit: {carried:?}",
+    );
+    assert!(
+        !refused.join(bolt::run::WORK_DIR).exists(),
+        "the refused run executed a task before refusing",
+    );
+    assert!(
+        !verdict(
+            &three.join(bolt::run::RESULT_FILE),
+            &wrench::ENVELOPE_SCHEMA
+        ),
+        "the run that invoked the refused one did not fail",
+    );
+    assert!(
+        outcome.success,
+        "FR-10.1: a bolt whose task failed still exits 0, so the run above sees \
+         a command that succeeded. If this fails, that rule changed.",
+    );
+}
+
+// COVERS: FR-5.7a, FR-5.7c | edge
+/// The ceiling is a guard against accident, and the row says so.
+///
+/// A command can unset the variable and be believed outermost. Asserted rather
+/// than left implied, because a reader meeting the depth code could reasonably
+/// take it for a security boundary and build on it as though it held.
+///
+/// Closing this needs the ancestry cross-check, which is question 24 and not a
+/// row. The test exists to record that the hole is known and deliberate: if
+/// somebody closes it, this fails and they find the reasoning.
+#[test]
+fn unsetting_the_depth_is_believed_because_the_guard_is_against_accident() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("launder"),
+        &format!(
+            "version: \"1.0.0\"\ntasks:\n  - name: resets\n    command: \"env -u {} -u {} {} inner \
+             {{base_dir}} --output-dir {{work_dir}}/nested\"\n",
+            bolt::depth::DEPTH,
+            bolt::depth::CEILING,
+            env!("CARGO_BIN_EXE_bolt"),
+        ),
+    );
+    write_jig(
+        root.path(),
+        "inner",
+        "  - name: runs\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let outcome = bolt::run::run("launder", root.path()).expect("the run completes");
+
+    assert!(
+        outcome.success,
+        "a child that cleared the depth was not believed outermost, which would \
+         mean the guard has become something the row says it is not",
+    );
+
+    // A value that will not parse is treated as absent for the same reason. A
+    // caller's environment is not a document bolt was asked to validate, and
+    // refusing on stray shell state would fail runs while stopping nobody who
+    // meant it.
+    let garbled = tree();
+    write(
+        garbled.path(),
+        &bolt::jig::file_name("garbled"),
+        &format!(
+            "version: \"1.0.0\"\ntasks:\n  - name: nonsense\n    command: \"env {}=deep {} inner \
+             {{base_dir}} --output-dir {{work_dir}}/nested\"\n",
+            bolt::depth::DEPTH,
+            env!("CARGO_BIN_EXE_bolt"),
+        ),
+    );
+    write_jig(
+        garbled.path(),
+        "inner",
+        "  - name: runs\n    command: \"true\"\n",
+    );
+
+    let outcome = bolt::run::run("garbled", garbled.path()).expect("the run completes");
+    assert!(
+        outcome.success,
+        "a depth that will not parse was not read as absent",
+    );
+}
+
+// COVERS: FR-5.6a | positive
+/// The depth reaches every process bolt spawns, under the agreed names.
+///
+/// Not only the ones that are bolt. FR-5.6 says every process, which is what
+/// makes the depth survive a command that backgrounds something or invokes bolt
+/// three layers into a shell script.
+#[test]
+fn every_spawned_process_is_told_the_depth() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "reports",
+        &format!(
+            "  - name: says\n    command: \"sh -c 'echo ${}/${}'\"\n",
+            bolt::depth::DEPTH,
+            bolt::depth::CEILING,
+        ),
+    );
+
+    let outcome = bolt::run::run("reports", root.path()).expect("the run completes");
+
+    // Against what this run's own depth is, not against 1. **The suite is
+    // reachable from the gate**: bolt running its own jig exports the variables
+    // to the `tests` command, so the depth here is 1 for a person and 2 under
+    // `bolt rust-quality .`. NFR-12.1 makes that the ordinary case rather than
+    // an oddity, and a test hard-coding 1 fails only in the run that matters.
+    let mine = bolt::depth::Depth::from_environment();
+    let said = fs::read_to_string(work(&outcome, "says-1").join("stdout")).expect("stdout");
+    assert_eq!(
+        said.trim(),
+        format!("{}/{}", mine.level, mine.ceiling),
+        "an ordinary command was not told the depth and the ceiling",
+    );
+}
+
 // ---- the jig task, and where jigs are found ---------------------------------
 
 // COVERS: FR-2.8 | positive

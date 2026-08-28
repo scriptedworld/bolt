@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 
 use crate::adapter;
 use crate::definitions::{Definitions, RESERVED};
+use crate::depth;
 use crate::jig::{self, Task};
 use crate::limit;
 use crate::selection::{self, consumes_paths, quote, quote_str};
@@ -61,6 +62,9 @@ struct Scope<'a> {
     locations: &'a Locations,
     /// The jig's block and the named file, merged by FR-4.17.
     definitions: &'a Definitions,
+    /// How deep this run is, by FR-5.6, exported to everything it spawns.
+    depth: depth::Depth,
+
     /// The run's own limit, by FR-4.13, or `None` where the jig sets none.
     ///
     /// Scope-wide because it is the one limit that reaches everything: a
@@ -493,6 +497,8 @@ fn carry_out(
     config_dir: &Path,
 ) -> Result<Outcome, Error> {
     let output_dir = output_dir.to_path_buf();
+
+    let depth = within_ceiling()?;
     let jig = jig::read(config_dir, jig)?;
 
     // FR-4.16a reads a definitions file from the config directory, where FR-3.9
@@ -522,15 +528,11 @@ fn carry_out(
 
     let walked = walk_excluding(base, &output_dir)?;
 
-    let locations = Locations {
-        project_root: base.to_path_buf(),
-        base_dir: base.to_path_buf(),
-        config_dir: config_dir.to_path_buf(),
-        output_dir: output_dir.clone(),
-    };
+    let locations = locations_for(base, config_dir, &output_dir);
     let scope = Scope {
         locations: &locations,
         definitions: &definitions,
+        depth,
         run_limit: run_limit.map(|(duration, written)| Limit {
             at: started + duration,
             written,
@@ -565,6 +567,38 @@ fn run_reasons(expired: Option<&str>) -> Vec<Value> {
         })
         .into_iter()
         .collect()
+}
+
+/// The five locations this run exposes, by FR-4.1b.
+///
+/// `project_root` and `base_dir` are the same directory while nothing nests:
+/// FR-5.13 narrows the base for a child and leaves the root alone, so the two
+/// separate only once `50b` runs one. That is also why `50d` waits, since
+/// `needs-repository-root` has nothing to reach for until they differ.
+fn locations_for(base: &Path, config_dir: &Path, output_dir: &Path) -> Locations {
+    Locations {
+        project_root: base.to_path_buf(),
+        base_dir: base.to_path_buf(),
+        config_dir: config_dir.to_path_buf(),
+        output_dir: output_dir.to_path_buf(),
+    }
+}
+
+/// This run's depth, refused by FR-5.7 where it is past the ceiling.
+///
+/// Checked before the jig is read, so a run too deep does no work and opens no
+/// files. FR-5.8 still has it write a result, which [`invoke`] arranges for
+/// every refusal, so the run that spawned it folds an ordinary failure rather
+/// than meeting a hole.
+fn within_ceiling() -> Result<depth::Depth, Error> {
+    let depth = depth::Depth::from_environment();
+    if depth.exceeded() {
+        return Err(Error::DepthExceeded {
+            level: depth.level,
+            ceiling: depth.ceiling,
+        });
+    }
+    Ok(depth)
 }
 
 /// Read a `time-limit` as written, refusing by FR-4.11e where it is not one.
@@ -1070,6 +1104,7 @@ fn execute<'a>(
         Output {
             work_dir,
             kept: true,
+            depth: scope.depth,
         },
         deadlines.command(),
     )?;
@@ -1114,6 +1149,8 @@ struct Output<'a> {
     /// and writing its chatter into the work directory would overwrite the
     /// capture it was called to read.
     kept: bool,
+    /// How deep this run is, exported to whatever it spawns by FR-5.6.
+    depth: depth::Depth,
 }
 
 /// What running a command came to.
@@ -1165,6 +1202,10 @@ fn spawn_and_wait(
         .stdin(Stdio::null())
         .stdout(stdout)
         .stderr(stderr)
+        // FR-5.6: every process bolt spawns, not every child jig. A task command
+        // that runs bolt itself is at depth too, which is what makes the ceiling
+        // reachable without a jig task and is the case FR-5.7a describes.
+        .envs(output.depth.exported())
         // FR-4.12e wants the descendants killed with the child, and this is what
         // makes that possible: the child leads a group of its own, so a signal
         // to that group reaches what it spawned and nothing else.
@@ -1358,6 +1399,7 @@ fn run_adapter<'a>(
         Output {
             work_dir,
             kept: false,
+            depth: scope.depth,
         },
         deadlines.adapter(),
     )?;

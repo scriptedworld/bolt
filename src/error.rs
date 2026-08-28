@@ -174,6 +174,23 @@ pub enum Error {
         value: String,
     },
 
+    /// The run is nested deeper than the ceiling allows, by FR-5.7.
+    ///
+    /// FR-5.8 makes this an ordinary refusal: a result carrying the reason, then
+    /// a non-zero exit, so the run above folds a failing constituent rather than
+    /// meeting a hole where one should be.
+    ///
+    /// A guard against accident and runaway, not against a jig trying to defeat
+    /// it. FR-5.7a says a command can unset the variable and be believed
+    /// outermost, and closing that needs an ancestry cross-check nothing has
+    /// asked for.
+    DepthExceeded {
+        /// How deep this run would have been.
+        level: u32,
+        /// The deepest allowed, which the reason names.
+        ceiling: u32,
+    },
+
     /// The merge found no constituent to fold, by FR-8.3a.
     ///
     /// FR-8.3 alone would pass such a run, because every constituent passing
@@ -226,10 +243,7 @@ impl fmt::Display for Error {
                 "task {task} names {{{placeholder}}}, which nothing defines",
             ),
             Self::DuplicateTaskName { task } => write!(formatter, "{}", duplicate_name(task)),
-            Self::UnsafeTaskName { task } => write!(
-                formatter,
-                "task name {task} would leave the run's work directory",
-            ),
+            Self::UnsafeTaskName { task } => write!(formatter, "{}", unsafe_name(task)),
             Self::OutputDirectoryInUse(path) => {
                 write!(formatter, "{} already holds a run", path.display())
             }
@@ -267,6 +281,9 @@ impl fmt::Display for Error {
                     malformed_time_limit(task.as_deref(), value)
                 )
             }
+            Self::DepthExceeded { level, ceiling } => {
+                write!(formatter, "{}", too_deep(*level, *ceiling))
+            }
             Self::NoConstituents => {
                 write!(formatter, "no task produced a result")
             }
@@ -280,6 +297,16 @@ impl fmt::Display for Error {
 fn malformed_time_limit(task: Option<&str>, value: &str) -> String {
     let whose = task.map_or_else(|| "the jig".to_owned(), |task| format!("task {task}"));
     format!("{whose} sets a time limit of {value}, which is not a decimal followed by s, m or h")
+}
+
+/// FR-2.3's reason, for a task name that would climb out of the work directory.
+fn unsafe_name(task: &str) -> String {
+    format!("task name {task} would leave the run's work directory")
+}
+
+/// FR-5.8's reason, which names the limit so a reader knows what was hit.
+fn too_deep(level: u32, ceiling: u32) -> String {
+    format!("this run is {level} deep and the limit is {ceiling}")
 }
 
 /// FR-3.3a's reason, which says why a duplicate matters rather than that it is.

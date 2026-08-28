@@ -11,6 +11,7 @@
 pub mod adapter;
 pub mod cli;
 pub mod definitions;
+pub mod depth;
 pub mod jig;
 pub mod limit;
 pub mod merge;
