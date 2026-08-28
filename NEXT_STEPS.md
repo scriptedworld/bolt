@@ -355,7 +355,40 @@ rests on, and it does not change with the language.
     which is what happened today by luck rather than by design.
 
     The estate ran one shared binary today, so there was one stale schema rather
-    than eight. That is the current mitigation and nothing states it.
+    than eight. That is the current mitigation and nothing states it. It holds
+    only while `~/bin/bolt` is a single file: once a repository builds its own,
+    or the link moves while somebody keeps an old binary, there are N embedded
+    schemas and nothing says which answered a given run.
+
+    **Two staleness regimes, not one.** FACT 2026-08-27, measured in wrench's
+    source and confirmed by the wrench session against a live schema edit:
+
+        Go      `//go:embed schemas/*.schema.json`              build time
+        Rust    `build.rs` generating `include_str!`            build time
+        Python  `Path(__file__).resolve().parents[2]`           RUN TIME
+
+    Bolt takes the Rust pack, so it embeds. toolbox's adapters take the Python
+    pack, so they read wrench's working tree. **Two consumers of one contract
+    can enforce different versions of it at the same moment, and both conform.**
+
+    **Which way it hurts depends on the direction of the change, and the two
+    are opposites.**
+
+    A *restrictive* change: the live reader refuses at once, the embedded one
+    keeps accepting until rebuilt. That is exactly this morning's false green,
+    where a binary carrying an older schema passed a jig with `version: 1`.
+
+    An *additive* change, such as `allow-empty`: the live reader accepts at
+    once, the embedded one does not until rebuilt. What it does instead is
+    **question 10's**, which is open: an unrecognised key either fails the jig or
+    warns. If it fails, every additive schema change breaks every consumer that
+    has not rebuilt, and the two questions are coupled more tightly than either
+    records.
+
+    So answering question 10 with "fail" makes this sharp, and answering it with
+    "warn" makes an additive change silently do nothing on an old binary. Both
+    are defensible and neither is free, which is worth knowing before question 10
+    is settled on its own merits.
 
 ## A caller that finds its output directory by timestamp is wrong
 
