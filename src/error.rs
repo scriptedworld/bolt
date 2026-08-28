@@ -101,6 +101,32 @@ pub enum Error {
         reason: String,
     },
 
+    /// A jig's `definitions` block or a definitions file names a reserved name.
+    ///
+    /// FR-4.19. `{base_dir}` redefined would substitute something other than
+    /// where FR-4.1a stands the command, so the jig would say one thing while
+    /// the process did another. FR-4.16d is why this is a refusal rather than a
+    /// precedence question: bolt's layer is reserved, not merely first.
+    ReservedDefinition {
+        /// The reserved name the layer tried to define.
+        name: String,
+        /// Which layer named it, so the reason says which file to edit.
+        source: String,
+    },
+
+    /// A named definitions file is absent, will not parse or will not validate.
+    ///
+    /// FR-4.20 validates it under FR-1.5 like everything else bolt reads as
+    /// data, and says it is not taken for an absent file. Treating an
+    /// unreadable one as absent would leave the jig's defaults standing and run
+    /// a gate the caller thought they had overridden.
+    DefinitionsUnreadable {
+        /// The file that could not be read.
+        path: PathBuf,
+        /// What the parse or the validation said.
+        reason: String,
+    },
+
     /// The merge found no constituent to fold, by FR-8.3a.
     ///
     /// FR-8.3 alone would pass such a run, because every constituent passing
@@ -173,6 +199,15 @@ impl fmt::Display for Error {
             Self::Io { path, reason } => {
                 write!(formatter, "{}: {reason}", path.display())
             }
+            Self::ReservedDefinition { name, source } => write!(
+                formatter,
+                "{source} defines {name}, which is reserved to bolt",
+            ),
+            Self::DefinitionsUnreadable { path, reason } => write!(
+                formatter,
+                "the definitions file {} is unreadable: {reason}",
+                path.display()
+            ),
             Self::NoConstituents => {
                 write!(formatter, "no task produced a result")
             }

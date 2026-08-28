@@ -1310,11 +1310,21 @@ fn a_refusal_writes_a_result() {
         "a refusal's result says success: false",
     );
 
-    let envelope = read_validated(&result, &wrench::ENVELOPE_SCHEMA);
+    assert_refusal_shape(&result);
+}
+
+/// FR-2.5a's shape, asserted where a refusal wrote a result.
+///
+/// One reason, kind `bolt-refused`, and a message saying what was refused. A
+/// helper rather than a fourth copy, since three tests want the same three
+/// assertions and only differ in which refusal produced the file.
+fn assert_refusal_shape(result: &Path) {
+    let envelope = read_validated(result, &wrench::ENVELOPE_SCHEMA);
     let reasons = envelope
         .get("reasons")
         .and_then(Value::as_array)
         .expect("a refusal carries reasons");
+
     assert_eq!(reasons.len(), 1, "one refusal is one reason: {reasons:?}");
     assert_eq!(
         reasons[0].get("kind").and_then(Value::as_str),
@@ -1629,5 +1639,348 @@ fn evidence_is_keyed_by_execution_and_carries_args_and_result() {
     assert!(
         !args.contains("{each_path}"),
         "args is what was written rather than what ran: {args:?}",
+    );
+}
+
+// ---- the three-layer definitions mapping -----------------------------------
+
+/// Write `bolt.<name>.definitions.yaml` into `root`, the config directory.
+fn write_definitions(root: &Path, name: &str, body: &str) {
+    write(root, &bolt::definitions::file_name(name), body);
+}
+
+// COVERS: FR-3.15, FR-4.16 | positive
+/// A jig's `definitions` block supplies its own placeholders.
+///
+/// FR-4.16 builds one mapping in three layers. This is the middle one on its
+/// own: no file named, so a jig whose defaults cover its placeholders runs
+/// without one, which FR-4.16b calls the ordinary case.
+///
+/// Asserted through the recorded argv rather than through the exit status,
+/// because a command whose placeholder vanished would still exit 0.
+#[test]
+fn a_jigs_definitions_block_supplies_its_placeholders() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0' {deny}\"\n",
+    );
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        "version: \"1.0.0\"\ndefinitions:\n  deny: warnings\ntasks:\n  - name: alpha\n    command: \"sh -c 'exit 0' {deny}\"\n",
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+    let manifest = read_validated(
+        &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
+        &wrench::MANIFEST_SCHEMA,
+    );
+
+    let command = manifest
+        .get("command")
+        .and_then(Value::as_str)
+        .expect("a manifest records the command as executed");
+    assert!(
+        command.contains("warnings"),
+        "the jig's own definition did not reach the command: {command:?}",
+    );
+}
+
+// COVERS: FR-4.16a, FR-4.16b, FR-4.17 | positive
+/// A definitions file merges over the jig's block, key by key.
+///
+/// FR-4.17 is successive replacement: the file replaces the keys it names and
+/// leaves every other one standing, so a project overriding one detail writes
+/// that one line and inherits the rest.
+#[test]
+fn a_definitions_file_replaces_only_the_keys_it_names() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "definitions:\n  deny: warnings\n  requirements: REQUIREMENTS.md\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0' {deny} {requirements}\"\n",
+        ),
+    );
+    write_definitions(root.path(), "override", "deny: clippy::all\n");
+
+    let outcome =
+        bolt::run::run_with("check", root.path(), Some("override")).expect("the run completes");
+    let manifest = read_validated(
+        &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
+        &wrench::MANIFEST_SCHEMA,
+    );
+    let command = manifest
+        .get("command")
+        .and_then(Value::as_str)
+        .expect("a manifest records the command as executed");
+
+    assert!(
+        command.contains("clippy::all"),
+        "the file did not replace the jig's value: {command:?}",
+    );
+    assert!(
+        !command.contains("warnings"),
+        "the jig's replaced value survived: {command:?}",
+    );
+    assert!(
+        command.contains("REQUIREMENTS.md"),
+        "a key the file did not name was not left standing: {command:?}",
+    );
+}
+
+// COVERS: FR-9.5g | positive
+/// The manifest says which layer supplied each value.
+///
+/// FR-9.5g: the same key means different things depending on which file won,
+/// and the command line alone does not say. Bolt's own locations are already
+/// `from: "bolt"`; this adds the other two layers.
+#[test]
+fn the_manifest_records_which_layer_supplied_each_value() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "definitions:\n  deny: warnings\n  requirements: REQUIREMENTS.md\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0' {deny} {requirements}\"\n",
+        ),
+    );
+    write_definitions(root.path(), "override", "deny: clippy::all\n");
+
+    let outcome =
+        bolt::run::run_with("check", root.path(), Some("override")).expect("the run completes");
+    let manifest = read_validated(
+        &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
+        &wrench::MANIFEST_SCHEMA,
+    );
+    let variables = manifest
+        .get("variables")
+        .and_then(Value::as_object)
+        .expect("a manifest records its variables");
+
+    let layer = |key: &str| {
+        variables
+            .get(key)
+            .and_then(|entry| entry.get("from"))
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{key} is not in the manifest: {variables:?}"))
+    };
+
+    assert_eq!(layer("base_dir"), "bolt", "a location is bolt's layer");
+    assert_eq!(
+        layer("requirements"),
+        "jig",
+        "a key only the jig defined is the jig's layer",
+    );
+    assert_eq!(
+        layer("deny"),
+        "file",
+        "a key the file replaced is the file's layer",
+    );
+}
+
+// COVERS: FR-4.19 | negative
+/// A jig or a file naming a reserved variable refuses the run.
+///
+/// FR-4.19: `{base_dir}` redefined would substitute something other than where
+/// FR-4.1a stands the command, so the jig would say one thing while the process
+/// did another. Both layers are checked, because a file can name one the jig did
+/// not.
+#[test]
+fn a_definition_naming_a_reserved_variable_is_refused() {
+    let from_jig = tree();
+    write(
+        from_jig.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "definitions:\n  base_dir: /somewhere/else\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+    let refusal =
+        bolt::run::run("check", from_jig.path()).expect_err("a jig redefining a location refuses");
+    assert!(
+        matches!(refusal, bolt::Error::ReservedDefinition { .. }),
+        "wrong refusal for a jig redefining a location: {refusal:?}",
+    );
+    assert!(
+        refusal.to_string().contains("base_dir"),
+        "the reason does not name the variable: {refusal}",
+    );
+
+    let from_file = tree();
+    write_jig(
+        from_file.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+    write_definitions(from_file.path(), "bad", "each_path: nonsense\n");
+    let refusal = bolt::run::run_with("check", from_file.path(), Some("bad"))
+        .expect_err("a file redefining a path variable refuses");
+    assert!(
+        matches!(refusal, bolt::Error::ReservedDefinition { .. }),
+        "wrong refusal for a file redefining a path variable: {refusal:?}",
+    );
+}
+
+// COVERS: FR-4.18b | edge
+/// A definition holding an empty value is defined.
+///
+/// FR-4.18 refuses a placeholder no layer holds **at all**, which is a different
+/// state from a layer holding the empty string. A jig wanting a flag to carry
+/// nothing says so by defining it rather than by leaving it out.
+#[test]
+fn a_definition_holding_an_empty_value_is_defined() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "definitions:\n  extra: \"\"\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0' {extra}\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("an empty definition is defined");
+    assert!(outcome.success, "the run did not pass");
+}
+
+// COVERS: FR-4.17a, FR-4.17c | property
+/// A definition's value is a literal and is never re-read as a template.
+///
+/// FR-4.17a settles every value on reading the file. FR-4.17c is what rests on
+/// it: a definition cannot introduce `{each_path}`, so FR-4.2 still reads how a
+/// task runs off the command **as written**, and substitution changes what a
+/// command says rather than how many times it runs.
+///
+/// This is the same single-pass property `7e3198f` fixed for paths, reached from
+/// the other side. A definition whose value spells a path variable must arrive
+/// as those characters.
+#[test]
+fn a_definition_value_is_a_literal_and_is_not_re_expanded() {
+    let root = tree();
+    write(root.path(), "a.txt", "content");
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "definitions:\n  sneaky: \"{each_path}\"\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0' {sneaky}\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+    assert_eq!(
+        outcome.executions, 1,
+        "a definition naming a path variable changed how many times the task ran",
+    );
+
+    let manifest = read_validated(
+        &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
+        &wrench::MANIFEST_SCHEMA,
+    );
+    let command = manifest
+        .get("command")
+        .and_then(Value::as_str)
+        .expect("a manifest records the command as executed");
+    assert!(
+        command.contains("{each_path}"),
+        "the definition's value was re-expanded rather than kept literal: {command:?}",
+    );
+    assert!(
+        !command.contains("a.txt"),
+        "a definition introduced a path variable: {command:?}",
+    );
+}
+
+// COVERS: FR-4.20 | negative
+/// A definitions file that will not validate refuses, and is not taken as absent.
+///
+/// FR-4.20: schema-validated under FR-1.5 like everything else bolt reads as
+/// data. Treating an unreadable one as absent would leave the jig's defaults
+/// standing and run a gate the caller thought they had overridden.
+#[test]
+fn a_definitions_file_that_will_not_validate_is_refused() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+    // Nested, where the schema allows one level of scalars.
+    write_definitions(root.path(), "bad", "deny:\n  nested: warnings\n");
+
+    let refusal = bolt::run::run_with("check", root.path(), Some("bad"))
+        .expect_err("an invalid definitions file refuses");
+    assert!(
+        matches!(refusal, bolt::Error::DefinitionsUnreadable { .. }),
+        "wrong refusal for an invalid definitions file: {refusal:?}",
+    );
+
+    let absent = tree();
+    write_jig(
+        absent.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+    let refusal = bolt::run::run_with("check", absent.path(), Some("missing"))
+        .expect_err("a named file that is not there refuses");
+    assert!(
+        matches!(refusal, bolt::Error::DefinitionsUnreadable { .. }),
+        "a named definitions file that is absent is still a refusal: {refusal:?}",
+    );
+}
+
+// COVERS: FR-4.18a | negative
+/// An unknown placeholder refuses before any task executes.
+///
+/// FR-4.18a puts the check where `requires` is, under FR-3.10b, so a jig run
+/// where nothing defines what it needs refuses in the first second rather than
+/// partway through a gate. Asserted by putting the offending task **second** and
+/// requiring that the first one left no evidence behind.
+#[test]
+fn an_unknown_placeholder_refuses_before_anything_executes() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        concat!(
+            "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+            "  - name: beta\n    command: \"sh -c 'exit 0' {undefined}\"\n",
+        ),
+    );
+
+    let refusal = bolt::run::run("check", root.path()).expect_err("an unknown placeholder refuses");
+    assert!(
+        matches!(refusal, bolt::Error::UnknownPlaceholder { .. }),
+        "wrong refusal for an unknown placeholder: {refusal:?}",
+    );
+    assert!(
+        refusal.to_string().contains("undefined"),
+        "the reason does not name the placeholder: {refusal}",
+    );
+
+    let ran: Vec<_> = fs::read_dir(root.path())
+        .expect("the base is readable")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with(".bolt-"))
+        })
+        .filter(|run| run.join(bolt::run::WORK_DIR).join("alpha-1").exists())
+        .collect();
+    assert!(
+        ran.is_empty(),
+        "the first task executed before the second was refused: {ran:?}",
     );
 }

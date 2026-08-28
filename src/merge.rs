@@ -158,7 +158,7 @@ fn load_manifest(path: &Path) -> Result<Value, Error> {
 }
 
 /// Read a structured file through wrench, by FR-1.12, validating it on the way in.
-fn read(path: &Path, schema: &dyn wrench::Schema) -> Result<Value, Error> {
+pub(crate) fn read(path: &Path, schema: &dyn wrench::Schema) -> Result<Value, Error> {
     let io = |reason: String| Error::Io {
         path: path.to_path_buf(),
         reason,

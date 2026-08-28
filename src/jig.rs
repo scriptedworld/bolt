@@ -23,6 +23,16 @@ pub struct Jig {
     #[serde(default)]
     pub version: Option<String>,
 
+    /// Default values for the placeholders this jig's commands name, by FR-3.15.
+    ///
+    /// Optional, and so is any entry in it: a jig leaving a value to its adopter
+    /// names the placeholder in a command and defines nothing. Kept as a raw
+    /// value because FR-4.16c's shape is the definitions schema's, which wrench
+    /// has already validated on the way in, and re-deriving it as a typed map
+    /// here would be a second statement of the same thing.
+    #[serde(default)]
+    pub definitions: Option<serde_json::Value>,
+
     /// The tasks, in the order the jig declares them.
     ///
     /// FR-4.5 says they execute serially. Whether serial means *in this order*

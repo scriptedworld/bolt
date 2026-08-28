@@ -9,6 +9,7 @@
 //! `silo/docs/PATTERNS/how-a-change-gets-made.md`.
 
 pub mod cli;
+pub mod definitions;
 pub mod jig;
 pub mod merge;
 pub mod outcome;

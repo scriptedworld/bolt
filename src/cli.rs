@@ -10,6 +10,51 @@ use std::process::ExitCode;
 
 use crate::run;
 
+/// A complete invocation, once the arguments have been read.
+struct Invocation {
+    /// Which jig, by FR-2.1 and FR-3.9. A name, never a path.
+    jig: String,
+    /// Where, and the run's base.
+    base: PathBuf,
+    /// The definitions file named by FR-4.16a, if one was.
+    definitions: Option<String>,
+}
+
+/// Read an invocation, or `None` where it is not one.
+///
+/// FR-2.1a keeps the positional arguments at exactly two: which jig and where.
+/// Running several jigs over one tree is a jig whose tasks are nested jigs, so a
+/// third positional asks for a composition mechanism bolt does not have.
+///
+/// FR-4.16b allows at most one definitions file, so naming it twice is refused
+/// rather than the last one silently winning. There is no ordering to settle
+/// between two files because there is never more than one.
+fn parse(arguments: &[OsString]) -> Option<Invocation> {
+    let mut positional = Vec::with_capacity(2);
+    let mut definitions = None;
+    let mut rest = arguments.iter();
+
+    while let Some(argument) = rest.next() {
+        if argument == "--definitions" {
+            if definitions.is_some() {
+                return None;
+            }
+            definitions = Some(rest.next()?.to_string_lossy().into_owned());
+        } else {
+            positional.push(argument);
+        }
+    }
+
+    let [jig, base] = positional.as_slice() else {
+        return None;
+    };
+    Some(Invocation {
+        jig: jig.to_string_lossy().into_owned(),
+        base: PathBuf::from(base),
+        definitions,
+    })
+}
+
 /// Bolt could not carry the run out.
 ///
 /// FR-10.5 pairs this with 0 for a run that completed, whatever the tools
@@ -35,12 +80,17 @@ where
     I: IntoIterator<Item = OsString>,
 {
     let arguments: Vec<OsString> = arguments.into_iter().collect();
-    let [jig, base] = arguments.as_slice() else {
-        eprintln!("usage: bolt <jig> <directory>");
+    let Some(Invocation {
+        jig,
+        base,
+        definitions,
+    }) = parse(&arguments)
+    else {
+        eprintln!("usage: bolt <jig> <directory> [--definitions <name>]");
         return ExitCode::from(REFUSED);
     };
 
-    match run::run(&jig.to_string_lossy(), &PathBuf::from(base)) {
+    match run::run_with(&jig, &base, definitions.as_deref()) {
         Ok(outcome) => {
             // FR-10.3: the verdict is in the envelope, so what a caller is told
             // here is where to read it rather than what it says.

@@ -7,8 +7,9 @@ use std::time::SystemTime;
 
 use serde_json::json;
 
+use crate::definitions::{Definitions, RESERVED};
 use crate::jig::{self, Task};
-use crate::selection::{self, consumes_paths, quote};
+use crate::selection::{self, consumes_paths, quote, quote_str};
 use crate::{Error, Outcome, merge, stamp, walk};
 
 /// The directory under a run's output directory holding one entry per execution.
@@ -47,6 +48,18 @@ struct Execution<'a> {
     work_dir: PathBuf,
 }
 
+/// Everything a command's placeholders resolve against.
+///
+/// The two layers travel together because FR-4.16 makes them one mapping: a
+/// value a jig defined and a location bolt exposed are written and read the
+/// same way, so nothing that substitutes or records has one without the other.
+struct Scope<'a> {
+    /// Bolt's own layer, reserved by FR-4.19.
+    locations: &'a Locations,
+    /// The jig's block and the named file, merged by FR-4.17.
+    definitions: &'a Definitions,
+}
+
 /// The locations bolt exposes to every command, by FR-4.1b.
 ///
 /// All five are reserved to bolt's own layer, which is why each is recorded
@@ -80,6 +93,21 @@ struct Locations {
 /// [`Error::CommandNamesBothPathForms`] when a command names both path forms by
 /// FR-4.2, and [`Error::Io`] when the run cannot record what it did.
 pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
+    run_with(jig, base, None)
+}
+
+/// Run the jig named `jig` over `base`, with an optional definitions file.
+///
+/// FR-4.16a names one as `--definitions <name>`, read from the config directory
+/// as `bolt.<name>.definitions.yaml`. FR-4.16b allows at most one to an
+/// invocation and calls none the ordinary case, since a jig whose defaults cover
+/// its placeholders runs without one.
+///
+/// # Errors
+///
+/// Everything [`run`] returns, plus [`Error::ReservedDefinition`] by FR-4.19 and
+/// [`Error::DefinitionsUnreadable`] by FR-4.20.
+pub fn run_with(jig: &str, base: &Path, definitions: Option<&str>) -> Result<Outcome, Error> {
     // FR-2.5 first, and before FR-2.6c's output directory, which sits at the
     // base and would create it.
     if !base.is_dir() {
@@ -119,7 +147,8 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
     // result for whatever goes wrong. The refusal is written into the directory
     // this run owns, which the two checks above have already established is not
     // somebody else's.
-    carry_out(jig, base, &output_dir).inspect_err(|refusal| write_refusal(&output_dir, refusal))
+    carry_out(jig, base, &output_dir, definitions)
+        .inspect_err(|refusal| write_refusal(&output_dir, refusal))
 }
 
 /// Where a run over `base` starting at `at` writes, by FR-2.6c.
@@ -159,14 +188,26 @@ fn write_refusal(output_dir: &Path, refusal: &Error) {
 }
 
 /// Carry the run out, once the output directory is known to be bolt's own.
-fn carry_out(jig: &str, base: &Path, output_dir: &Path) -> Result<Outcome, Error> {
+fn carry_out(
+    jig: &str,
+    base: &Path,
+    output_dir: &Path,
+    definitions: Option<&str>,
+) -> Result<Outcome, Error> {
     let output_dir = output_dir.to_path_buf();
     let jig = jig::read(base, jig)?;
 
+    // FR-2.8 puts the config directory at the base for this task; naming it
+    // separately is `runner/10`'s.
+    let definitions = Definitions::build(jig.definitions.as_ref(), base, definitions)?;
+
     // Everything a jig can be refused for, checked before any task executes.
     // FR-3.10b makes that the shape: an incomplete jig is known before half a
-    // gate has run rather than partway through it.
-    let commands = validate(&jig)?;
+    // gate has run rather than partway through it. FR-4.18a puts the unknown
+    // placeholder check here for the same reason, so a jig run where nothing
+    // defines what it needs refuses in the first second rather than partway
+    // through a gate.
+    let commands = validate(&jig, &definitions)?;
 
     let walked = walk::walk(base)?;
     create_dir(&output_dir.join(WORK_DIR))?;
@@ -177,10 +218,14 @@ fn carry_out(jig: &str, base: &Path, output_dir: &Path) -> Result<Outcome, Error
         config_dir: base.to_path_buf(),
         output_dir: output_dir.clone(),
     };
+    let scope = Scope {
+        locations: &locations,
+        definitions: &definitions,
+    };
 
     let mut executions = 0;
     for (task, command) in jig.tasks.iter().zip(commands) {
-        executions += run_task(&locations, task, command, &walked)?;
+        executions += run_task(&scope, task, command, &walked)?;
     }
 
     merge::merge(&output_dir).map(|folded| Outcome {
@@ -194,7 +239,7 @@ fn carry_out(jig: &str, base: &Path, output_dir: &Path) -> Result<Outcome, Error
 /// FR-3.10b makes that the shape: an incomplete jig is known before half a gate
 /// has run rather than partway through it. Returns each task's command, so the
 /// run loop does not re-derive what this already proved present.
-fn validate(jig: &jig::Jig) -> Result<Vec<&str>, Error> {
+fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<&'a str>, Error> {
     let mut commands = Vec::with_capacity(jig.tasks.len());
     let mut seen: Vec<&str> = Vec::with_capacity(jig.tasks.len());
 
@@ -226,21 +271,48 @@ fn validate(jig: &jig::Jig) -> Result<Vec<&str>, Error> {
         if command.contains("{each_path}") && command.contains("{all_paths}") {
             return Err(Error::CommandNamesBothPathForms { task: named() });
         }
+
+        // FR-4.18a. Checked here rather than at substitution, which happens per
+        // execution, so a jig whose second task names a placeholder nothing
+        // defines refuses before the first task runs instead of partway through
+        // a gate.
+        for placeholder in placeholders(command) {
+            if !RESERVED.contains(&placeholder) && definitions.get(placeholder).is_none() {
+                return Err(Error::UnknownPlaceholder {
+                    task: named(),
+                    placeholder: placeholder.to_owned(),
+                });
+            }
+        }
+
         commands.push(command);
     }
 
     Ok(commands)
 }
 
+/// Every `{name}` a command line spells, in the order they appear.
+///
+/// An unmatched brace is literal text rather than a placeholder, which is the
+/// same reading `substitute` takes, and the two have to agree or a command
+/// passes validation and then fails to substitute.
+fn placeholders(command: &str) -> Vec<&str> {
+    let mut found = Vec::new();
+    let mut rest = command;
+    while let Some(open) = rest.find('{') {
+        let after = &rest[open + 1..];
+        let Some(close) = after.find('}') else {
+            return found;
+        };
+        found.push(&after[..close]);
+        rest = &after[close + 1..];
+    }
+    found
+}
+
 /// Run one task, returning how many times its command executed.
-fn run_task(
-    locations: &Locations,
-    task: &Task,
-    command: &str,
-    walked: &[PathBuf],
-) -> Result<usize, Error> {
-    let base = locations.base_dir.as_path();
-    let output_dir = locations.output_dir.as_path();
+fn run_task(scope: &Scope, task: &Task, command: &str, walked: &[PathBuf]) -> Result<usize, Error> {
+    let base = scope.locations.base_dir.as_path();
     let wants_paths = consumes_paths(command);
     let selection = narrow(base, walked, task)?;
 
@@ -250,19 +322,11 @@ fn run_task(
         if task.allow_empty {
             return Ok(0);
         }
-        empty_selection(locations, task, command, &selection)?;
+        empty_selection(scope, task, command, &selection)?;
         return Ok(0);
     }
 
-    let batches = if wants_paths && command.contains("{each_path}") {
-        selection
-            .selected
-            .iter()
-            .map(|path| vec![path.clone()])
-            .collect()
-    } else {
-        vec![selection.selected.clone()]
-    };
+    let batches = batches_for(command, wants_paths, &selection);
 
     // FR-9.6: a task naming no path variable was handed no list, so its
     // manifest claims none. Recording one would say the command saw files it
@@ -270,11 +334,11 @@ fn run_task(
     let recorded = wants_paths.then_some(&selection);
 
     for (index, batch) in batches.iter().enumerate() {
-        let ordinal = index + 1;
-        let work_dir =
-            output_dir
-                .join(WORK_DIR)
-                .join(work_dir_name(&task.name, ordinal, batches.len()));
+        let work_dir = scope
+            .locations
+            .output_dir
+            .join(WORK_DIR)
+            .join(work_dir_name(&task.name, index + 1, batches.len()));
         create_dir(&work_dir)?;
 
         // Substituted before the manifest is written, because FR-9.5's
@@ -282,15 +346,31 @@ fn run_task(
         // the command runs. Both hold only if substitution comes first.
         let execution = Execution {
             task: &task.name,
-            ordinal,
-            command: substitute(command, &task.name, locations, &work_dir, batch)?,
+            ordinal: index + 1,
+            command: substitute(command, &task.name, scope, &work_dir, batch)?,
             work_dir,
         };
-        write_manifest(locations, &execution, recorded)?;
+        write_manifest(scope, &execution, recorded)?;
         execute(base, &execution)?;
     }
 
     Ok(batches.len())
+}
+
+/// How a task's selection divides into executions, by FR-4.2.
+///
+/// `{each_path}` is one execution per matched path; anything else is one
+/// execution, whether or not it was handed a list.
+fn batches_for(command: &str, wants_paths: bool, selection: &Selection) -> Vec<Vec<PathBuf>> {
+    if wants_paths && command.contains("{each_path}") {
+        selection
+            .selected
+            .iter()
+            .map(|path| vec![path.clone()])
+            .collect()
+    } else {
+        vec![selection.selected.clone()]
+    }
 }
 
 /// FR-4.4b's failing constituent for a task that matched nothing.
@@ -298,7 +378,7 @@ fn run_task(
 /// It has to be a constituent rather than a skip, or FR-8.3 folds a run that
 /// checked nothing into a pass, which is FR-8.3a's argument one level down.
 fn empty_selection(
-    locations: &Locations,
+    scope: &Scope,
     task: &Task,
     command: &str,
     selection: &Selection,
@@ -307,13 +387,14 @@ fn empty_selection(
         task: &task.name,
         ordinal: 1,
         command: command.to_owned(),
-        work_dir: locations
+        work_dir: scope
+            .locations
             .output_dir
             .join(WORK_DIR)
             .join(work_dir_name(&task.name, 1, 1)),
     };
     create_dir(&execution.work_dir)?;
-    write_manifest(locations, &execution, Some(selection))?;
+    write_manifest(scope, &execution, Some(selection))?;
     write_envelope(
         &execution.work_dir,
         false,
@@ -399,15 +480,27 @@ fn execute(base: &Path, execution: &Execution) -> Result<(), Error> {
 fn substitute(
     command: &str,
     task: &str,
-    locations: &Locations,
+    scope: &Scope,
     work_dir: &Path,
     paths: &[PathBuf],
 ) -> Result<String, Error> {
+    let Scope {
+        locations,
+        definitions,
+    } = scope;
     let joined = paths
         .iter()
         .map(|path| quote(path))
         .collect::<Vec<_>>()
         .join(" ");
+    // Bolt's layer first and unconditionally, by FR-4.16d: the locations and
+    // path variables are reserved rather than overridable, so nothing above
+    // them can win. FR-4.19 already refused any layer that named one, so this
+    // ordering and that refusal say the same thing twice on purpose.
+    //
+    // A defined value is quoted like a location, which is what makes it one
+    // argument. FR-4.16c settles it as a scalar, so a value carrying a space
+    // arrives as one word rather than splitting into two.
     let value = |name: &str| match name {
         "each_path" | "all_paths" => Some(joined.clone()),
         "work_dir" => Some(quote(work_dir)),
@@ -415,7 +508,7 @@ fn substitute(
         "base_dir" => Some(quote(&locations.base_dir)),
         "config_dir" => Some(quote(&locations.config_dir)),
         "output_dir" => Some(quote(&locations.output_dir)),
-        _ => None,
+        _ => definitions.get(name).map(quote_str),
     };
 
     let mut out = String::with_capacity(command.len());
@@ -469,10 +562,14 @@ pub fn work_dir_name(task: &str, ordinal: usize, executions: usize) -> String {
 /// attempted. FR-9.6 has a task naming no path variable claim none, because
 /// recording one would say the command saw files it never received.
 fn write_manifest(
-    locations: &Locations,
+    scope: &Scope,
     execution: &Execution,
     selection: Option<&Selection>,
 ) -> Result<(), Error> {
+    let Scope {
+        locations,
+        definitions,
+    } = scope;
     let Execution {
         task,
         ordinal,
@@ -486,21 +583,11 @@ fn write_manifest(
             .collect()
     };
 
-    // Every location is `from: "bolt"`, because all five are reserved to bolt's
-    // own layer. FR-4.16's jig and file layers merge over them and are
-    // `definitions/10`'s to add.
-    let supplied = |path: &Path| json!({ "value": path.display().to_string(), "from": "bolt" });
     let mut manifest = json!({
         "task": task,
         "ordinal": ordinal,
         "command": command,
-        "variables": {
-            "project_root": supplied(&locations.project_root),
-            "base_dir": supplied(&locations.base_dir),
-            "work_dir": supplied(work_dir),
-            "config_dir": supplied(&locations.config_dir),
-            "output_dir": supplied(&locations.output_dir),
-        },
+        "variables": variables(locations, definitions, work_dir),
     });
 
     // The key names are wrench's, not bolt's. FR-9.5 says a manifest records
@@ -519,6 +606,41 @@ fn write_manifest(
         &manifest,
         &wrench::MANIFEST_SCHEMA,
     )
+}
+
+/// Every template variable this execution was given, and where each came from.
+///
+/// FR-9.5c puts the locations here. FR-9.5g adds the other two layers, because
+/// the same key means different things depending on which file won and the
+/// command line alone does not say.
+///
+/// Every location is `from: "bolt"`, since all five are reserved to bolt's own
+/// layer. FR-4.19 refused any jig or file that named one, so the definitions
+/// below cannot overwrite a location and the insertion order is not load
+/// bearing.
+fn variables(
+    locations: &Locations,
+    definitions: &Definitions,
+    work_dir: &Path,
+) -> serde_json::Value {
+    let supplied = |path: &Path| json!({ "value": path.display().to_string(), "from": "bolt" });
+    let mut variables = json!({
+        "project_root": supplied(&locations.project_root),
+        "base_dir": supplied(&locations.base_dir),
+        "work_dir": supplied(work_dir),
+        "config_dir": supplied(&locations.config_dir),
+        "output_dir": supplied(&locations.output_dir),
+    });
+
+    if let Some(map) = variables.as_object_mut() {
+        for (name, definition) in definitions.entries() {
+            map.insert(
+                name.clone(),
+                json!({ "value": definition.value, "from": definition.from }),
+            );
+        }
+    }
+    variables
 }
 
 /// Write an execution's envelope.

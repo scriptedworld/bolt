@@ -98,5 +98,15 @@ pub fn consumes_paths(command: &str) -> bool {
 /// single quotes a shell interprets nothing else.
 #[must_use]
 pub fn quote(path: &Path) -> String {
-    format!("'{}'", path.to_string_lossy().replace('\'', r"'\''"))
+    quote_str(&path.to_string_lossy())
+}
+
+/// The same quoting for a value that is not a path.
+///
+/// A definition's value is a scalar by FR-4.16c and is quoted like a location,
+/// which is what makes it one argument: a value carrying a space arrives as one
+/// word rather than splitting into two.
+#[must_use]
+pub fn quote_str(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r"'\''"))
 }
