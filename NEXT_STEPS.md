@@ -560,12 +560,37 @@ left with the split, and the Rust bolt has no working CLI yet.
 keeps working while the Rust rebuild happens, and the alternative was every gate
 in the ecosystem going dark for the length of the rebuild.
 
-## It is not reproducible today, and that is fixable
+## It was not reproducible, and it gave false verdicts. Swapped 2026-08-27
 
-FACT 2026-08-27: the live binary reports
-`v0.0.0-20260827184032-ddf14b15eb75+dirty`. The `+dirty` means it was built from
-uncommitted changes at 11:51, before the split, so no committed source
-reproduces it.
+**Done, on our user's decision.** `bin/bolt` is now built from `bolt.go` at
+`7604557`, reporting `v0.0.0-20260827201109-7604557974a5` with no `+dirty`.
+
+    md5 4d319301bfda9673fc19a01f6a36dfa5   the old one, built 11:51, +dirty
+    md5 7a2d3bb04e12738e71fad84c38047495   the current one, from a clean tree
+
+    cd ~/.projects/bolt.go && CGO_ENABLED=0 go build -o ../bolt/bin/bolt ./cmd/bolt
+
+**The old one is unreproducible and a copy is kept at
+`.ephemera/bolt-stale-4d319301`.** That path is gitignored and will not survive a
+cleanup, which is why the two checksums are recorded here instead: the fact
+outlives the artifact.
+
+**Why it had to go, and it was not tidiness.** The two builds disagreed about
+whether a jig is valid, because the old one bundles an older schema. Filed by
+toolbox and reproduced here on a jig whose only fault is `version: 1`, a YAML
+number where the schema wants a semver string:
+
+    old binary   passed: 1 execution(s)          exit 0
+    new binary   at '/version': got number,      exit 1
+                 want string
+
+So a repository with that fault gated green on whatever PATH resolved and was
+refused by the newer build, with no output naming which ran. That is the
+false-green class the estate exists to refuse, arriving through tooling rather
+than through a check.
+
+FACT 2026-08-27, after the swap: `bolt badversion .` exits 1 and refuses, and
+`bolt rust-quality .` still runs eight tasks with six passing.
 
 FACT 2026-08-27: `bolt.go` at `7604557` is clean and rebuilds it without the
 suffix, at `v0.0.0-20260827201109-7604557974a5`, with a **byte-identical help
