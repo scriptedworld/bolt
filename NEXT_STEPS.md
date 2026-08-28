@@ -294,6 +294,42 @@ rests on, and it does not change with the language.
     The row's own rationale is about `link-jigs` leaving tracked symlinks
     pointing into toolbox, and those are file symlinks, so the case the row was
     written for is the case it does not settle.
+41. May a task name another task's output directory as an input? **FR-4.6 says
+    no today**: no task consumes another task's output, and work needing several
+    steps is one script. Promoted from `clank/inbox/bolt/`, filed by silo from
+    our user 2026-08-27, arguing the refusal costs too much in one real case.
+
+    Four tasks where the third needs the first's artifact *while it runs*. The
+    aggregator sees every envelope but only after all have finished. Scripting
+    the chain works and collapses four tasks into one, losing three sets of
+    evidence: an intermediate step inside a script produces no envelope, no
+    manifest and no work directory.
+
+    It is explicitly **not** the task-to-task chaining removed from the
+    architecture the same day. Naming a path is weaker than a dependency graph.
+
+    Two things need settling before any spelling is chosen. **Where the name
+    comes from**: a task cannot know another's output directory until the run
+    assigns one, so a jig either predicts `work/<name>-<n>/`, coupling every jig
+    to bolt's layout, or is handed it by a substitution, which is a small
+    language and a decision about how much of one bolt wants. And **what
+    `depends` would mean**, which covers visibility, ordering and verdict
+    separately, so one word for all three decides two of them by accident.
+
+    **This is where question 38 stops being theoretical.** If task three reads
+    task one's output, something must guarantee task one ran first, and no row
+    states an execution order at all.
+42. What does the console summary say, and does any row govern it? **None does.**
+    Two sessions found the same defect independently: `failed: 9 execution(s)`
+    over a run with two failing tasks reads as nine failures and is the count of
+    executions in a failed run. Measured by skid against its own gate, and here
+    against bolt's.
+
+    The Rust rebuild will write that line from nothing, so the wording is a
+    decision waiting to be taken rather than a bug to port. What a reader needs
+    is which tasks failed, not how many executions there were.
+
+    The defect itself is `bolt.go`'s, at `internal/cli/cli.go` in `report`.
 
 ## Adapters
 
