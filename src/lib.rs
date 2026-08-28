@@ -8,6 +8,7 @@
 //! surface and fail against it deliberately, per stage 4 of
 //! `silo/docs/PATTERNS/how-a-change-gets-made.md`.
 
+pub mod adapter;
 pub mod cli;
 pub mod definitions;
 pub mod jig;

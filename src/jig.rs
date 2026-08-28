@@ -109,6 +109,33 @@ pub struct Task {
     /// this field is the asking.
     #[serde(default, rename = "short-circuit-failure")]
     pub short_circuit_failure: bool,
+
+    /// The adapter that turns this task's output into a verdict, by FR-6.1.
+    ///
+    /// Resolved by name from the config directory by FR-6.10, where FR-2.8
+    /// already finds jigs, so a jig and the adapters it names travel together.
+    /// Left out, FR-6.9's generic exit-code adapter runs: every command has an
+    /// exit status, so it is the one adapter that needs to know nothing about
+    /// the tool it reads.
+    pub adapter: Option<String>,
+
+    /// An explicit adapter invocation in place of FR-6.2's default one.
+    ///
+    /// FR-6.2d gives it the same substitutions a command gets, so it names the
+    /// locations and the captures the same way; two spellings would make the
+    /// jig format teach itself twice. FR-6.2e still expects the envelope where
+    /// the default would leave it, because FR-6.2b's name never varies.
+    #[serde(rename = "adapter-command")]
+    pub adapter_command: Option<String>,
+
+    /// The files this task produces that its adapter should read, by FR-6.2c.
+    ///
+    /// Declared, never discovered. Discovery would hand an adapter whatever a
+    /// tool happened to leave behind and let something irrelevant ruin a run.
+    /// FR-6.14 fails the task where a declared file was not produced, since
+    /// FR-6.2c's refusal to discover means nothing else notices.
+    #[serde(default)]
+    pub evidence: Vec<String>,
 }
 
 /// Read the jig named `name` from `config_dir` and validate it.

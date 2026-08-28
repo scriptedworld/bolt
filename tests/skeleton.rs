@@ -1644,6 +1644,418 @@ fn evidence_is_keyed_by_execution_and_carries_args_and_result() {
     );
 }
 
+// ---- adapters ----------------------------------------------------------------
+
+/// Write an executable adapter script into `root`, the config directory.
+///
+/// FR-6.10 resolves an adapter by name from there, where FR-2.8 already finds
+/// jigs, so a jig and its adapters travel together.
+fn write_adapter(root: &Path, name: &str, body: &str) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let path = root.join(name);
+    fs::write(&path, format!("#!/bin/sh\n{body}")).expect("the adapter script");
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).expect("executable");
+}
+
+// COVERS: FR-6.1, FR-6.4, FR-6.10, FR-6.12 | positive
+/// An adapter's verdict is the verdict, whatever the exit status said.
+///
+/// FR-6.1: where an adapter reached an authoritative result, that result **is**
+/// the verdict and bolt does not second-guess it. Asserted the hard way round,
+/// with a command that **exits 0** and an adapter that reads its output and says
+/// the run failed. Under FR-6.9's exit-code adapter that task passes, so a bolt
+/// ignoring the adapter would produce the opposite verdict.
+///
+/// FR-6.4: the adapter is chosen by the format it reads, not by the tool. This
+/// one reads a count off stdout and would serve any tool emitting it.
+#[test]
+fn an_adapters_verdict_is_the_verdict() {
+    let root = tree();
+    write_adapter(
+        root.path(),
+        "counting-adapter",
+        concat!(
+            "for a in \"$@\"; do case $prev in --stdout) out=$a;; --work-dir) w=$a;; esac; prev=$a; done\n",
+            "n=$(cat \"$out\")\n",
+            "if [ \"$n\" -gt 0 ]; then\n",
+            "  printf '\"success\": false\\n\"reasons\":\\n  - \"kind\": \"findings\"\\n    \"message\": \"%s problems\"\\n' \"$n\" > \"$w/output.yaml\"\n",
+            "else\n",
+            "  printf '\"success\": true\\n' > \"$w/output.yaml\"\n",
+            "fi\n",
+        ),
+    );
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'echo 3'\"\n    adapter: counting-adapter\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    assert!(
+        !outcome.success,
+        "the adapter said the tool found problems and bolt overrode it",
+    );
+    let envelope = read_validated(
+        &work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE),
+        &wrench::ENVELOPE_SCHEMA,
+    );
+    let reasons = envelope
+        .get("reasons")
+        .and_then(Value::as_array)
+        .expect("the adapter's envelope carries its reasons");
+    assert_eq!(
+        reasons[0].get("kind").and_then(Value::as_str),
+        Some("findings"),
+        "the adapter's own kind did not survive: {reasons:?}",
+    );
+    assert_eq!(
+        reasons[0].get("message").and_then(Value::as_str),
+        Some("3 problems"),
+        "the adapter's own message did not survive: {reasons:?}",
+    );
+}
+
+// COVERS: FR-6.2, FR-6.2a, FR-6.2c, FR-6.3 | positive
+/// The default invocation names the captures, the locations and the evidence.
+///
+/// FR-6.2 fixes the flags. FR-6.2a hands over the same locations every task
+/// gets. FR-6.3 passes the exit code **as a file**, because whether that number
+/// explains anything is the adapter's judgement rather than bolt's.
+///
+/// FR-6.2c has `--evidence` name what the task declared and nothing else: an
+/// artifact nobody declared still sits in the work directory, it is simply not
+/// passed. Asserted by writing two files and declaring one.
+#[test]
+fn the_default_invocation_names_the_captures_and_only_declared_evidence() {
+    let root = tree();
+    write_adapter(
+        root.path(),
+        "recording-adapter",
+        concat!(
+            "for a in \"$@\"; do case $prev in --work-dir) w=$a;; esac; prev=$a; done\n",
+            "printf '%s\\n' \"$@\" > \"$w/argv\"\n",
+            "printf '\"success\": true\\n' > \"$w/output.yaml\"\n",
+        ),
+    );
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "tasks:\n  - name: alpha\n",
+            "    command: \"sh -c 'echo declared > {work_dir}/report.json; echo stray > {work_dir}/scratch.tmp'\"\n",
+            "    adapter: recording-adapter\n",
+            "    evidence: [\"report.json\"]\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+    let argv = fs::read_to_string(work(&outcome, "alpha-1").join("argv"))
+        .expect("the adapter recorded its argv");
+
+    for flag in [
+        "--stdout",
+        "--stderr",
+        "--exitcode",
+        "--project-root",
+        "--base-dir",
+        "--work-dir",
+    ] {
+        assert!(argv.contains(flag), "the invocation omits {flag}: {argv}");
+    }
+    assert!(
+        argv.contains("report.json"),
+        "the declared evidence was not passed: {argv}",
+    );
+    assert!(
+        !argv.contains("scratch.tmp"),
+        "an undeclared artifact was discovered and passed: {argv}",
+    );
+    // FR-6.3: the exit code arrives as a file, so the adapter reads it or does
+    // not, and bolt records no verdict of its own from it.
+    assert!(
+        work(&outcome, "alpha-1")
+            .join(bolt::run::EXITCODE_FILE)
+            .is_file(),
+        "the exit code was not left as a file for the adapter",
+    );
+}
+
+// COVERS: FR-6.2b, FR-6.2d, FR-6.2e | positive
+/// An explicit invocation gets the same substitutions and the same envelope path.
+///
+/// FR-6.2d: two spellings of a substitution would make the jig format teach
+/// itself twice. FR-6.2e: it is still expected to leave the envelope where the
+/// default would, because FR-6.2b's name never varies and no flag says where it
+/// goes.
+#[test]
+fn an_explicit_adapter_invocation_is_substituted_like_a_command() {
+    let root = tree();
+    write_adapter(
+        root.path(),
+        "plain-adapter",
+        "printf '\"success\": true\\n' > \"$1/output.yaml\"\n",
+    );
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+            "    adapter: plain-adapter\n",
+            "    adapter-command: \"{config_dir}/plain-adapter {work_dir}\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    assert!(
+        outcome.success,
+        "the explicit invocation did not produce a verdict"
+    );
+    assert!(
+        work(&outcome, "alpha-1")
+            .join(bolt::run::OUTPUT_FILE)
+            .is_file(),
+        "the envelope is not where FR-6.2b says it goes",
+    );
+}
+
+// COVERS: FR-6.1a, FR-6.11, FR-7.6, FR-7.9 | negative
+/// Each of the three broken-adapter cases gets its own kind.
+///
+/// FR-6.11 keeps them apart because they have different causes: a crashing
+/// adapter, a silent one, and one whose output is not an envelope are three
+/// different things to go and fix. FR-7.6 is what makes the second and third
+/// different conditions rather than one.
+///
+/// FR-7.9's kind is what lets a consumer tell them apart without reading
+/// English, so this asserts on the kinds rather than on the messages.
+#[test]
+fn each_broken_adapter_case_has_its_own_kind() {
+    let cases = [
+        ("exits", "exit 7\n", "adapter-failed"),
+        ("silent", "exit 0\n", "adapter-wrote-nothing"),
+        (
+            "garbage",
+            "for a in \"$@\"; do case $prev in --work-dir) w=$a;; esac; prev=$a; done\nprintf 'not an envelope\\n' > \"$w/output.yaml\"\n",
+            "adapter-wrote-invalid",
+        ),
+    ];
+
+    for (name, body, expected) in cases {
+        let root = tree();
+        write_adapter(root.path(), "broken-adapter", body);
+        write(
+            root.path(),
+            &bolt::jig::file_name("check"),
+            concat!(
+                "version: \"1.0.0\"\n",
+                "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0'\"\n    adapter: broken-adapter\n",
+            ),
+        );
+
+        let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+        assert!(
+            !outcome.success,
+            "{name}: a broken adapter did not fail the task"
+        );
+
+        let envelope = read_validated(
+            &work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE),
+            &wrench::ENVELOPE_SCHEMA,
+        );
+        let kind = envelope
+            .get("reasons")
+            .and_then(Value::as_array)
+            .and_then(|reasons| reasons.first())
+            .and_then(|reason| reason.get("kind"))
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{name}: no kind on the reason"));
+        assert_eq!(kind, expected, "{name}: the wrong case was reported");
+    }
+}
+
+// COVERS: FR-6.11 | regression
+/// A silent adapter does not inherit an earlier fold's envelope.
+///
+/// Carried over from the Go build, which found it. An `output.yaml` already in
+/// the work directory would satisfy "the adapter wrote one", so a silent adapter
+/// would be handed a verdict it did not reach and FR-6.11's
+/// `adapter-wrote-nothing` would never fire.
+///
+/// The command plants the envelope rather than an earlier run, which reaches the
+/// same condition inside one run: FR-2.6b refuses a second run into the same
+/// directory, so two runs cannot set this up.
+#[test]
+fn a_silent_adapter_does_not_inherit_an_envelope_it_did_not_write() {
+    let root = tree();
+    write_adapter(root.path(), "silent-adapter", "exit 0\n");
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "tasks:\n  - name: alpha\n",
+            "    command: \"sh -c 'printf \\\"success: true\\\\n\\\" > {work_dir}/output.yaml'\"\n",
+            "    adapter: silent-adapter\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    assert!(
+        !outcome.success,
+        "a silent adapter inherited an envelope it did not write",
+    );
+    let kind = read_validated(
+        &work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE),
+        &wrench::ENVELOPE_SCHEMA,
+    )
+    .get("reasons")
+    .and_then(Value::as_array)
+    .and_then(|reasons| reasons.first())
+    .and_then(|reason| reason.get("kind"))
+    .and_then(Value::as_str)
+    .map(str::to_owned)
+    .expect("a reason saying why");
+    assert_eq!(
+        kind, "adapter-wrote-nothing",
+        "the stale envelope was taken as the adapter's own",
+    );
+}
+
+// COVERS: FR-6.14, FR-7.8 | negative
+/// A declared evidence file that was not produced fails the task, naming it.
+///
+/// FR-6.2c's refusal to discover means nothing else notices: a task declaring
+/// evidence it did not write did not do what it said.
+#[test]
+fn declared_evidence_that_was_not_produced_fails_the_task() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+            "    evidence: [\"report.json\"]\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+    assert!(
+        !outcome.success,
+        "undeclared evidence did not fail the task"
+    );
+
+    let envelope = read_validated(
+        &work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE),
+        &wrench::ENVELOPE_SCHEMA,
+    );
+    let message = envelope
+        .get("reasons")
+        .and_then(Value::as_array)
+        .and_then(|reasons| reasons.first())
+        .and_then(|reason| reason.get("message"))
+        .and_then(Value::as_str)
+        .expect("a reason saying why");
+    assert!(
+        message.contains("report.json"),
+        "the reason does not name the path: {message}",
+    );
+}
+
+// COVERS: FR-6.6, FR-6.13 | property
+/// Re-folding a finished run costs no re-execution.
+///
+/// FR-6.6: every input an adapter reads is already on disk, so fixing an adapter
+/// and folding again is free. FR-6.13 is why bolt does not reparse and compare
+/// to check canonical form: comments do not survive a round trip, so that check
+/// would fail every jig documenting itself.
+#[test]
+fn refolding_a_finished_run_costs_no_re_execution() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+    let ran = fs::read_to_string(work(&outcome, "alpha-1").join(bolt::run::EXITCODE_FILE))
+        .expect("the exit code is on disk");
+
+    bolt::merge::merge(&outcome.output_dir, root.path()).expect("a finished directory refolds");
+
+    assert_eq!(
+        fs::read_to_string(work(&outcome, "alpha-1").join(bolt::run::EXITCODE_FILE))
+            .expect("still on disk"),
+        ran,
+        "re-folding re-executed the command",
+    );
+}
+
+// COVERS: FR-7.10 | property
+/// A task that could not execute is distinguishable in the MERGED result.
+///
+/// FR-7.10 is about the merged file, not the per-execution envelope: the kind
+/// says which, and FR-8.4 carries reasons up. So a reader with only
+/// `result.yaml` tells a tool that found problems from a task that never got
+/// far enough to have findings.
+///
+/// This was `runner/20`'s row and stayed with `runner/30` because telling them
+/// apart needs more than one kind to exist, which only real adapters give.
+///
+/// Two tasks, two different failures: one whose command ran and reported
+/// problems, one whose adapter produced nothing authoritative.
+#[test]
+fn a_task_that_could_not_execute_is_distinguishable_in_the_merged_result() {
+    let root = tree();
+    write_adapter(root.path(), "silent-adapter", "exit 0\n");
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "tasks:\n",
+            "  - name: found-problems\n    command: \"sh -c 'exit 3'\"\n",
+            "  - name: never-concluded\n    command: \"sh -c 'exit 0'\"\n    adapter: silent-adapter\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+    let merged = read_validated(
+        &outcome.output_dir.join(bolt::run::RESULT_FILE),
+        &wrench::ENVELOPE_SCHEMA,
+    );
+    let kinds: Vec<&str> = merged
+        .get("reasons")
+        .and_then(Value::as_array)
+        .expect("a failing merge carries reasons")
+        .iter()
+        .filter_map(|reason| reason.get("kind").and_then(Value::as_str))
+        .collect();
+
+    assert!(
+        kinds.contains(&"nonzero-exit"),
+        "the tool that reported problems is not distinguishable: {kinds:?}",
+    );
+    assert!(
+        kinds.contains(&"adapter-wrote-nothing"),
+        "the task that reached no verdict is not distinguishable: {kinds:?}",
+    );
+    assert_ne!(
+        kinds[0], kinds[1],
+        "both failures arrived as one kind, so a reader cannot tell them apart",
+    );
+}
+
 // ---- requires, and stopping when a jig asks ---------------------------------
 
 // COVERS: FR-3.10, FR-3.10b, FR-3.10d | negative

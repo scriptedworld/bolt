@@ -7,6 +7,7 @@ use std::time::SystemTime;
 
 use serde_json::json;
 
+use crate::adapter;
 use crate::definitions::{Definitions, RESERVED};
 use crate::jig::{self, Task};
 use crate::selection::{self, consumes_paths, quote, quote_str};
@@ -590,7 +591,7 @@ fn run_task(scope: &Scope, task: &Task, command: &str, walked: &[PathBuf]) -> Re
             work_dir,
         };
         write_manifest(scope, &execution, recorded)?;
-        execute(base, &execution)?;
+        execute(scope, task, &execution)?;
     }
 
     Ok(batches.len())
@@ -637,6 +638,7 @@ fn empty_selection(
     write_envelope(
         &execution.work_dir,
         false,
+        "empty-selection",
         &format!(
             "{} matched no paths, and does not allow an empty selection",
             task.name
@@ -661,7 +663,8 @@ fn narrow(base: &Path, walked: &[PathBuf], task: &Task) -> Result<Selection, Err
 /// FR-4.15 runs it as a subprocess, so the streams and the status FR-9.2 keeps
 /// come from the process boundary rather than from bookkeeping bolt would
 /// otherwise have to trust.
-fn execute(base: &Path, execution: &Execution) -> Result<(), Error> {
+fn execute(scope: &Scope, task: &Task, execution: &Execution) -> Result<(), Error> {
+    let base = scope.locations.base_dir.as_path();
     let work_dir = execution.work_dir.as_path();
     let output = Command::new("sh")
         .arg("-c")
@@ -675,8 +678,8 @@ fn execute(base: &Path, execution: &Execution) -> Result<(), Error> {
             reason: source.to_string(),
         })?;
 
-    write(&work_dir.join("stdout"), &output.stdout)?;
-    write(&work_dir.join("stderr"), &output.stderr)?;
+    write(&work_dir.join(adapter::STDOUT_FILE), &output.stdout)?;
+    write(&work_dir.join(adapter::STDERR_FILE), &output.stderr)?;
     let status = output.status.code().unwrap_or(-1);
     write(
         &work_dir.join(EXITCODE_FILE),
@@ -687,13 +690,103 @@ fn execute(base: &Path, execution: &Execution) -> Result<(), Error> {
     // command is stood at the base, so anything it addressed at {work_dir} is
     // already here and nothing needs collecting.
 
-    // FR-6.9: a task naming no adapter gets the generic exit-code one, which is
-    // the only adapter that needs to know nothing about the tool it reads.
-    write_envelope(
-        work_dir,
-        status == 0,
-        &format!("{} exited {status}", execution.task),
-    )
+    adapt(scope, task, execution, status)
+}
+
+/// Reach a verdict for one execution, by FR-6.1.
+///
+/// FR-6.14 first: a declared evidence file that was not produced fails the task
+/// with a reason naming the path. A task declaring evidence it did not write did
+/// not do what it said, and FR-6.2c's refusal to discover means nothing else
+/// notices. Checked before the adapter runs, since an adapter handed a path that
+/// is not there can only guess.
+///
+/// FR-6.9 then: a task naming no adapter gets the generic exit-code one, which
+/// is the one adapter that needs to know nothing about the tool it reads.
+fn adapt(scope: &Scope, task: &Task, execution: &Execution, status: i32) -> Result<(), Error> {
+    let work_dir = execution.work_dir.as_path();
+
+    if let Some(missing) = task
+        .evidence
+        .iter()
+        .find(|file| !work_dir.join(file).exists())
+    {
+        return write_envelope(
+            work_dir,
+            false,
+            "evidence-missing",
+            &format!("{} declared {missing} and did not write it", task.name),
+        );
+    }
+
+    let Some(name) = task.adapter.as_deref() else {
+        return write_envelope(
+            work_dir,
+            status == 0,
+            "nonzero-exit",
+            &format!("{} exited {status}", execution.task),
+        );
+    };
+
+    run_adapter(scope, task, execution, name)
+}
+
+/// Run a named adapter and take its verdict, or say why bolt could not.
+///
+/// **The envelope is removed before the adapter runs.** An `output.yaml` left by
+/// an earlier fold would otherwise satisfy "the adapter wrote one", and a silent
+/// adapter would inherit the previous run's verdict. Carried over from the Go
+/// build, which found it.
+///
+/// FR-6.11's three cases are kept apart because they have different causes, and
+/// FR-6.12 leaves canonical form to the adapter: bolt validates on the way in
+/// and does not reparse to compare, which FR-6.13 says would fail every jig that
+/// documents itself.
+fn run_adapter(scope: &Scope, task: &Task, execution: &Execution, name: &str) -> Result<(), Error> {
+    let work_dir = execution.work_dir.as_path();
+    let envelope = work_dir.join(OUTPUT_FILE);
+    let _ = fs::remove_file(&envelope);
+
+    // FR-6.2d: an explicit invocation gets the same substitutions a command
+    // gets, so it names the locations and the captures the same way.
+    let written = task.adapter_command.clone().unwrap_or_else(|| {
+        adapter::default_invocation(
+            &adapter::path(&scope.locations.config_dir, name)
+                .display()
+                .to_string(),
+            &task.evidence,
+        )
+    });
+    let line = substitute(&written, &task.name, scope, work_dir, &[])?;
+
+    let output = Command::new("sh")
+        .arg("-c")
+        .arg(&line)
+        .current_dir(&scope.locations.base_dir)
+        .output()
+        .map_err(|source| Error::Io {
+            path: work_dir.to_path_buf(),
+            reason: source.to_string(),
+        })?;
+
+    let unauthoritative = if !output.status.success() {
+        Some(adapter::Unauthoritative::Exited(
+            output.status.code().unwrap_or(-1),
+        ))
+    } else if !envelope.is_file() {
+        Some(adapter::Unauthoritative::WroteNothing)
+    } else if merge::read(&envelope, &wrench::ENVELOPE_SCHEMA).is_err() {
+        Some(adapter::Unauthoritative::WroteInvalid)
+    } else {
+        None
+    };
+
+    // FR-6.1: where the adapter reached an authoritative result, that result is
+    // the verdict and bolt does not second-guess it.
+    match unauthoritative {
+        None => Ok(()),
+        Some(why) => write_envelope(work_dir, false, why.kind(), &why.message(name)),
+    }
 }
 
 /// Substitute a command's template variables, in ONE left-to-right pass.
@@ -883,10 +976,13 @@ fn variables(
 }
 
 /// Write an execution's envelope.
-fn write_envelope(work_dir: &Path, success: bool, message: &str) -> Result<(), Error> {
+fn write_envelope(work_dir: &Path, success: bool, kind: &str, message: &str) -> Result<(), Error> {
     let mut envelope = json!({ "success": success });
     if !success {
-        envelope["reasons"] = json!([{ "kind": "nonzero-exit", "message": message }]);
+        // FR-7.9's kind, so a consumer tells one sort of failure from another
+        // without reading English, and FR-7.8's message, which every reason
+        // carries so one consumer can render every reason it meets.
+        envelope["reasons"] = json!([{ "kind": kind, "message": message }]);
     }
     save(
         &work_dir.join(OUTPUT_FILE),
