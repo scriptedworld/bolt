@@ -92,7 +92,30 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
     // FR-3.10b makes that the shape: an incomplete jig is known before half a
     // gate has run rather than partway through it.
     let mut commands = Vec::with_capacity(jig.tasks.len());
+    let mut seen: Vec<&str> = Vec::with_capacity(jig.tasks.len());
     for task in &jig.tasks {
+        // FR-3.3a. The name prefixes this task's work directories, so a
+        // duplicate puts two tasks' executions in one place: the second
+        // overwrites the first's evidence and the fold sees one constituent, so
+        // a failing task disappears into a green result.
+        if seen.contains(&task.name.as_str()) {
+            return Err(Error::DuplicateTaskName {
+                task: task.name.clone(),
+            });
+        }
+        seen.push(&task.name);
+
+        // The name becomes a path component, so it must stay one. Without this
+        // a task named `../../victim` writes a full evidence directory outside
+        // the base, which is FR-2.3's containment rather than a naming nicety.
+        if Path::new(&task.name).components().count() != 1
+            || task.name.contains(std::path::MAIN_SEPARATOR)
+        {
+            return Err(Error::UnsafeTaskName {
+                task: task.name.clone(),
+            });
+        }
+
         let Some(command) = task.command.as_deref() else {
             return Err(Error::NestedJigNotBuilt {
                 task: task.name.clone(),
@@ -109,6 +132,14 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
 
     let walked = walk::walk(base)?;
     let output_dir = base.join(format!(".bolt-{}", stamp::iso8601(SystemTime::now())));
+
+    // FR-2.6b. The stamp is second-granular, so two runs started in one second
+    // would share a directory and each fold the other's evidence. Reproduced
+    // 2026-08-28: a second jig's result reported a failing task belonging to the
+    // first, and both callers were handed the same conflated file.
+    if output_dir.exists() {
+        return Err(Error::OutputDirectoryInUse(output_dir));
+    }
     create_dir(&output_dir.join(WORK_DIR))?;
 
     let locations = Locations {
@@ -180,7 +211,7 @@ fn run_task(
         let execution = Execution {
             task: &task.name,
             ordinal,
-            command: substitute(command, locations, &work_dir, batch),
+            command: substitute(command, &task.name, locations, &work_dir, batch)?,
             work_dir,
         };
         write_manifest(locations, &execution, recorded)?;
@@ -273,24 +304,70 @@ fn execute(base: &Path, execution: &Execution) -> Result<(), Error> {
     )
 }
 
-/// Substitute a command's template variables.
+/// Substitute a command's template variables, in ONE left-to-right pass.
 ///
-/// FR-4.3 quotes every path individually, so a path carrying a space, a quote
-/// or a semicolon can neither split the command line nor inject into it.
-fn substitute(command: &str, locations: &Locations, work_dir: &Path, paths: &[PathBuf]) -> String {
+/// **Chained `str::replace` is a command injection, and it was one here.**
+/// Measured 2026-08-28 against the built binary by a cold-read reviewer: a file
+/// named `p{all_paths};id #`, selected by a `{each_path}` task, was quoted
+/// correctly by [`quote`] and then had the literal `{all_paths}` *inside its own
+/// name* expanded by the next `replace`. That spliced a fresh `'…'` string into
+/// the middle of the already-quoted region, broke the quoting, and put the rest
+/// of the filename on the command line unquoted. `id` executed. A second fixture
+/// escaped the base and created a file beside it while the run reported success.
+///
+/// So FR-4.3's guarantee is not a property of the quoting alone. It is a
+/// property of the quoting AND of never reading substituted bytes again, which
+/// is what a single pass gives and what chaining cannot.
+///
+/// # Errors
+///
+/// [`Error::UnknownPlaceholder`] for a `{name}` no layer supplies, by FR-4.18.
+/// Chained replace left an unknown placeholder in the string and handed it to
+/// the shell; the row wants a refusal naming it before anything executes.
+fn substitute(
+    command: &str,
+    task: &str,
+    locations: &Locations,
+    work_dir: &Path,
+    paths: &[PathBuf],
+) -> Result<String, Error> {
     let joined = paths
         .iter()
         .map(|path| quote(path))
         .collect::<Vec<_>>()
         .join(" ");
-    command
-        .replace("{each_path}", &joined)
-        .replace("{all_paths}", &joined)
-        .replace("{work_dir}", &quote(work_dir))
-        .replace("{project_root}", &quote(&locations.project_root))
-        .replace("{base_dir}", &quote(&locations.base_dir))
-        .replace("{config_dir}", &quote(&locations.config_dir))
-        .replace("{output_dir}", &quote(&locations.output_dir))
+    let value = |name: &str| match name {
+        "each_path" | "all_paths" => Some(joined.clone()),
+        "work_dir" => Some(quote(work_dir)),
+        "project_root" => Some(quote(&locations.project_root)),
+        "base_dir" => Some(quote(&locations.base_dir)),
+        "config_dir" => Some(quote(&locations.config_dir)),
+        "output_dir" => Some(quote(&locations.output_dir)),
+        _ => None,
+    };
+
+    let mut out = String::with_capacity(command.len());
+    let mut rest = command;
+    while let Some(open) = rest.find('{') {
+        out.push_str(&rest[..open]);
+        let after = &rest[open + 1..];
+        let Some(close) = after.find('}') else {
+            // An unmatched brace is literal text rather than a placeholder.
+            out.push_str(&rest[open..]);
+            return Ok(out);
+        };
+        let name = &after[..close];
+        let Some(substituted) = value(name) else {
+            return Err(Error::UnknownPlaceholder {
+                task: task.to_owned(),
+                placeholder: name.to_owned(),
+            });
+        };
+        out.push_str(&substituted);
+        rest = &after[close + 1..];
+    }
+    out.push_str(rest);
+    Ok(out)
 }
 
 /// The directory name for one execution of a task.

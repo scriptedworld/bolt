@@ -6,7 +6,7 @@
 
 use std::path::{Path, PathBuf};
 
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{GlobBuilder, GlobSet, GlobSetBuilder};
 
 use crate::Error;
 
@@ -14,10 +14,18 @@ use crate::Error;
 fn compile(patterns: &[String]) -> Result<GlobSet, Error> {
     let mut builder = GlobSetBuilder::new();
     for pattern in patterns {
-        let glob = Glob::new(pattern).map_err(|source| Error::JigUnreadable {
-            path: PathBuf::from(pattern),
-            reason: source.to_string(),
-        })?;
+        // FR-3.4 distinguishes `**`, which matches zero or more directory
+        // levels, from `*`, which does not. globset's default is the opposite:
+        // `*` matches `/` too, which makes the two operators the same and a
+        // narrow pattern silently broad. Measured 2026-08-28 before this line
+        // existed: `matching: ["*.txt"]` selected `nested/deep.txt`.
+        let glob = GlobBuilder::new(pattern)
+            .literal_separator(true)
+            .build()
+            .map_err(|source| Error::JigUnreadable {
+                path: PathBuf::from(pattern),
+                reason: source.to_string(),
+            })?;
         builder.add(glob);
     }
     builder.build().map_err(|source| Error::JigUnreadable {

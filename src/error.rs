@@ -39,6 +39,47 @@ pub enum Error {
         task: String,
     },
 
+    /// A command names a placeholder no layer supplies.
+    ///
+    /// FR-4.18 refuses before anything executes, with a reason naming it.
+    /// Substituting nothing and handing `{requirements}` to a shell is what the
+    /// row exists to prevent.
+    UnknownPlaceholder {
+        /// The task whose command names it.
+        task: String,
+        /// The placeholder, without its braces.
+        placeholder: String,
+    },
+
+    /// Two tasks in one jig share a name.
+    ///
+    /// FR-3.3a: the name prefixes a task's work directories by FR-3.3, so a
+    /// duplicate puts two tasks' executions in the same place. Reproduced
+    /// 2026-08-28: the second overwrote the first's evidence, the fold saw one
+    /// constituent, and a failing task vanished into a green result.
+    DuplicateTaskName {
+        /// The name used twice.
+        task: String,
+    },
+
+    /// A task's name would not stay inside the run's work directory.
+    ///
+    /// The name becomes a path component by FR-3.3, so `..` in one climbs out.
+    /// Reproduced 2026-08-28: a task named `../../../victim/EVIL` wrote a full
+    /// evidence directory outside the base, which is FR-2.3's containment.
+    UnsafeTaskName {
+        /// The name that would leave the work directory.
+        task: String,
+    },
+
+    /// The run's output directory already holds a run.
+    ///
+    /// FR-2.6b. `.bolt-<iso8601>` is second-granular, so two runs started in one
+    /// second share a directory and each folds the other's evidence. Reproduced
+    /// 2026-08-28: a second jig's result reported a failing task belonging to
+    /// the first, and both callers were handed the same conflated file.
+    OutputDirectoryInUse(PathBuf),
+
     /// A task's command names both `{each_path}` and `{all_paths}`.
     ///
     /// FR-4.2 calls that a jig error. Which of the two shapes a task takes is
@@ -80,6 +121,21 @@ impl fmt::Display for Error {
                     "the jig {} is unreadable: {reason}",
                     path.display()
                 )
+            }
+            Self::UnknownPlaceholder { task, placeholder } => write!(
+                formatter,
+                "task {task} names {{{placeholder}}}, which nothing defines",
+            ),
+            Self::DuplicateTaskName { task } => write!(
+                formatter,
+                "two tasks are named {task}; a name is a work directory prefix",
+            ),
+            Self::UnsafeTaskName { task } => write!(
+                formatter,
+                "task name {task} would leave the run's work directory",
+            ),
+            Self::OutputDirectoryInUse(path) => {
+                write!(formatter, "{} already holds a run", path.display())
             }
             Self::NestedJigNotBuilt { task } => write!(
                 formatter,

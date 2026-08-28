@@ -263,6 +263,119 @@ fn a_task_naming_a_jig_is_refused_by_name() {
     }
 }
 
+// COVERS: FR-4.3, FR-2.3 | regression
+/// A filename containing a template token is not re-expanded into its own
+/// substitution.
+///
+/// **This was a working remote code execution.** Substitution chained
+/// `str::replace` once per variable, so a path spliced in for `{each_path}` that
+/// contained the literal text `{all_paths}` had that token expanded by the next
+/// replace. The second expansion spliced a fresh quoted string into the middle
+/// of the already-quoted region, broke the quoting, and put the rest of the
+/// filename on the command line unquoted. A cold-read reviewer ran `id` with it
+/// and escaped the base to write a file beside it, while the run reported
+/// success.
+///
+/// `quote` was correct throughout. FR-4.3 is not a property of the quoting
+/// alone; it needs substituted bytes never to be read again.
+#[test]
+fn a_filename_containing_a_template_token_is_not_re_expanded() {
+    let root = tree();
+    let canary = root.path().join("PWNED");
+    write(root.path(), "p{all_paths};id > PWNED #", "x");
+    write_jig(
+        root.path(),
+        "inject",
+        "  - name: t\n    matching: [\"p*\"]\n    command: \"echo {each_path}\"\n",
+    );
+
+    let outcome = bolt::run::run("inject", root.path()).expect("the run completes");
+
+    let stdout =
+        fs::read_to_string(work(&outcome, "t-1").join("stdout")).expect("the task wrote stdout");
+    assert_eq!(
+        stdout.trim(),
+        root.path()
+            .join("p{all_paths};id > PWNED #")
+            .display()
+            .to_string(),
+        "the path did not reach the command intact",
+    );
+    assert!(!canary.exists(), "the filename injected a command");
+}
+
+// COVERS: FR-4.18 | negative
+/// A placeholder nothing defines is refused before anything executes.
+#[test]
+fn an_unknown_placeholder_is_refused() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "undefined",
+        "  - name: t\n    command: \"check {requirements}\"\n",
+    );
+
+    let refusal = bolt::run::run("undefined", root.path()).expect_err("nothing defines it");
+
+    match refusal {
+        bolt::Error::UnknownPlaceholder { task, placeholder } => {
+            assert_eq!(task, "t");
+            assert_eq!(placeholder, "requirements", "the reason must name it");
+        }
+        other => panic!("wrong refusal for an unknown placeholder: {other:?}"),
+    }
+}
+
+// COVERS: FR-3.3a, FR-8.3 | regression
+/// Two tasks sharing a name are refused, because the second would erase the
+/// first's evidence and its failure with it.
+///
+/// Reproduced before this check existed: a jig with two tasks named `lint`, the
+/// first failing and the second passing, produced `success: true` and exit 0.
+/// The failing task vanished from the fold entirely.
+#[test]
+fn a_duplicate_task_name_is_refused() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "twice",
+        concat!(
+            "  - name: lint\n    command: \"sh -c 'exit 1'\"\n",
+            "  - name: lint\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+
+    let refusal = bolt::run::run("twice", root.path()).expect_err("a duplicate name is refused");
+
+    assert!(
+        matches!(refusal, bolt::Error::DuplicateTaskName { .. }),
+        "wrong refusal for a duplicate task name: {refusal:?}",
+    );
+}
+
+// COVERS: FR-2.3, FR-9.2 | regression
+/// A task name that would climb out of the work directory is refused.
+///
+/// The name is a path component by FR-3.3. Reproduced before this check: a task
+/// named `../../../victim/EVIL` wrote a complete evidence directory outside the
+/// base and outside the run's output directory.
+#[test]
+fn a_task_name_that_leaves_the_work_directory_is_refused() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "escape",
+        "  - name: ../../escaped\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let refusal = bolt::run::run("escape", root.path()).expect_err("the name would climb out");
+
+    assert!(
+        matches!(refusal, bolt::Error::UnsafeTaskName { .. }),
+        "wrong refusal for a name leaving the work directory: {refusal:?}",
+    );
+}
+
 // COVERS: FR-2.5, FR-10.7a | negative
 /// A base that is not there is refused, and nothing is created.
 ///
