@@ -91,44 +91,7 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
     // Everything a jig can be refused for, checked before any task executes.
     // FR-3.10b makes that the shape: an incomplete jig is known before half a
     // gate has run rather than partway through it.
-    let mut commands = Vec::with_capacity(jig.tasks.len());
-    let mut seen: Vec<&str> = Vec::with_capacity(jig.tasks.len());
-    for task in &jig.tasks {
-        // FR-3.3a. The name prefixes this task's work directories, so a
-        // duplicate puts two tasks' executions in one place: the second
-        // overwrites the first's evidence and the fold sees one constituent, so
-        // a failing task disappears into a green result.
-        if seen.contains(&task.name.as_str()) {
-            return Err(Error::DuplicateTaskName {
-                task: task.name.clone(),
-            });
-        }
-        seen.push(&task.name);
-
-        // The name becomes a path component, so it must stay one. Without this
-        // a task named `../../victim` writes a full evidence directory outside
-        // the base, which is FR-2.3's containment rather than a naming nicety.
-        if Path::new(&task.name).components().count() != 1
-            || task.name.contains(std::path::MAIN_SEPARATOR)
-        {
-            return Err(Error::UnsafeTaskName {
-                task: task.name.clone(),
-            });
-        }
-
-        let Some(command) = task.command.as_deref() else {
-            return Err(Error::NestedJigNotBuilt {
-                task: task.name.clone(),
-            });
-        };
-        // FR-4.2's jig error.
-        if command.contains("{each_path}") && command.contains("{all_paths}") {
-            return Err(Error::CommandNamesBothPathForms {
-                task: task.name.clone(),
-            });
-        }
-        commands.push(command);
-    }
+    let commands = validate(&jig)?;
 
     let walked = walk::walk(base)?;
     let output_dir = base.join(format!(".bolt-{}", stamp::iso8601(SystemTime::now())));
@@ -158,6 +121,49 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
         executions,
         ..folded
     })
+}
+
+/// Everything a jig is refused for, checked before any task executes.
+///
+/// FR-3.10b makes that the shape: an incomplete jig is known before half a gate
+/// has run rather than partway through it. Returns each task's command, so the
+/// run loop does not re-derive what this already proved present.
+fn validate(jig: &jig::Jig) -> Result<Vec<&str>, Error> {
+    let mut commands = Vec::with_capacity(jig.tasks.len());
+    let mut seen: Vec<&str> = Vec::with_capacity(jig.tasks.len());
+
+    for task in &jig.tasks {
+        let named = || task.name.clone();
+
+        // FR-3.3a. The name prefixes this task's work directories, so a
+        // duplicate puts two tasks' executions in one place: the second
+        // overwrites the first's evidence and the fold sees one constituent, so
+        // a failing task disappears into a green result.
+        if seen.contains(&task.name.as_str()) {
+            return Err(Error::DuplicateTaskName { task: named() });
+        }
+        seen.push(&task.name);
+
+        // The name becomes a path component, so it must stay one. Without this
+        // a task named `../../victim` writes a full evidence directory outside
+        // the base, which is FR-2.3's containment rather than a naming nicety.
+        if Path::new(&task.name).components().count() != 1
+            || task.name.contains(std::path::MAIN_SEPARATOR)
+        {
+            return Err(Error::UnsafeTaskName { task: named() });
+        }
+
+        let Some(command) = task.command.as_deref() else {
+            return Err(Error::NestedJigNotBuilt { task: named() });
+        };
+        // FR-4.2's jig error.
+        if command.contains("{each_path}") && command.contains("{all_paths}") {
+            return Err(Error::CommandNamesBothPathForms { task: named() });
+        }
+        commands.push(command);
+    }
+
+    Ok(commands)
 }
 
 /// Run one task, returning how many times its command executed.
