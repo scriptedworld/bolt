@@ -22,10 +22,4 @@ pub struct Outcome {
 
     /// How many executions ran, across every task.
     pub executions: usize,
-
-    /// Tasks that did not execute because their selection was empty.
-    ///
-    /// FR-4.4. Reported so a reader sees what was skipped rather than
-    /// inferring it from what is absent.
-    pub skipped: Vec<String>,
 }

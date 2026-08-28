@@ -28,7 +28,7 @@ pub struct Jig {
 /// One task in a jig.
 #[derive(Debug, Deserialize)]
 pub struct Task {
-    /// The task's name, which names its work directories by FR-9.2.
+    /// The task's name, which prefixes its work directories by FR-3.3.
     pub name: String,
 
     /// The command line, carrying whichever path form the task takes.
@@ -41,8 +41,8 @@ pub struct Task {
 
     /// Patterns or literal paths saying which files this task acts on.
     ///
-    /// FR-3.4, where `**` matches zero or more directory levels. A task never
-    /// sees a path its condition rejects.
+    /// FR-3.4, where `**` matches zero or more directory levels, and FR-3.5
+    /// makes them relative to the run's base.
     #[serde(default)]
     pub matching: Vec<String>,
 
@@ -52,18 +52,41 @@ pub struct Task {
     /// to select.
     #[serde(default)]
     pub excluding: Vec<String>,
+
+    /// Whether an empty selection is an acceptable result for this task.
+    ///
+    /// FR-4.4b makes an empty selection a failure by default, because a pattern
+    /// matching nothing is usually a typo or a moved directory and a silent
+    /// skip leaves it green forever. FR-4.4c is this field: a shared jig
+    /// spanning languages declares it on the tasks that legitimately find
+    /// nothing in a given project.
+    ///
+    /// FR-4.4d and FR-4.4h make it a jig error on a task naming no path
+    /// variable, enforced by the schema rather than here.
+    #[serde(default, rename = "allow-empty")]
+    pub allow_empty: bool,
 }
 
-/// Read a jig from disk and validate it.
+/// Read the jig named `name` from `config_dir` and validate it.
+///
+/// FR-3.9 makes a jig file `bolt.<name>.yaml` and has a jig spoken of by its
+/// name rather than by a path. FR-2.8 says where those files are found.
 ///
 /// # Errors
 ///
-/// [`Error::JigUnreadable`] when the file will not parse or does not meet the
-/// schema, which FR-10.5 makes a refusal rather than a failed task.
+/// [`Error::JigUnreadable`] when the file is absent, will not parse, or does
+/// not meet the schema, which FR-10.5 makes a refusal rather than a failed
+/// task.
 ///
 /// # Panics
 ///
 /// Always, for now. Nothing is implemented.
-pub fn read(path: &Path) -> Result<Jig, Error> {
-    todo!("read and validate the jig at {}", path.display())
+pub fn read(config_dir: &Path, name: &str) -> Result<Jig, Error> {
+    todo!("read bolt.{name}.yaml from {}", config_dir.display())
+}
+
+/// The file a jig named `name` is read from, by FR-3.9.
+#[must_use]
+pub fn file_name(name: &str) -> String {
+    format!("bolt.{name}.yaml")
 }
