@@ -181,6 +181,30 @@ by enabling four lints in `Cargo.toml`, where the `lint` task already refuses
 warnings. It has not, because the common-jig shape is still the one being tried
 and moving early would prejudge it.
 
+**That swap would loosen the gate, and nothing in it says so.** Two of those
+lints are already enabled through `pedantic` and both are dead, because lizard's
+thresholds are stricter and bind first:
+
+    lizard      --length 60      --arguments 5
+    clippy      too_many_lines   100    too_many_arguments  7
+
+There is no `clippy.toml`, so those are the defaults. FACT 2026-08-28, measured
+while implementing the skeleton: `run_task` at 73 lines and `write_manifest` at
+6 parameters both **failed lizard and passed clippy** under
+`--all-targets -- -D warnings` with `pedantic` on. So the four lints are not
+equivalent to the task they would replace, and dropping lizard without setting
+`clippy.toml` moves the limits from 60 and 5 to 100 and 7 with no line of the
+diff mentioning a threshold.
+
+Two thresholds where the looser cannot bind is the shape the wrench session
+found in the shared Python jig, filed at
+`clank/inbox/toolbox/two-docstring-thresholds-and-the-lower-one-is-dead/`:
+interrogate at 80% under pylint's implicit 100%. Same mechanism, opposite end,
+and here the dead one becomes live the moment the strict one is removed.
+
+**So the swap owes a `clippy.toml` pinning 60 and 5**, written in the same
+change, or it is a relaxation disguised as a tooling simplification.
+
 **Cyclomatic and cognitive complexity are different measures and neither
 substitutes for the other.** toolbox's Python jig says so and pairs lizard with
 complexipy. It is the reason a single number may not be what this task wants,
