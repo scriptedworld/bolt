@@ -1418,3 +1418,72 @@ fn a_refusal_does_not_write_into_the_directory_it_refused() {
         }
     }
 }
+
+// ---- the merge carries its constituents up --------------------------------
+
+// COVERS: FR-8.4 | positive
+/// The merged result carries the reasons its constituents produced.
+///
+/// FR-8.4 wants what failed **and why** readable from the merged file alone.
+/// Synthesising one reason per failing constituent satisfies "what failed" and
+/// loses "why": every failure then arrives as the same kind with the same
+/// message, and a reader is sent back to the work directories the merge exists
+/// to summarise.
+///
+/// Asserted on the constituent's own `kind` and `message` rather than on the
+/// count, because a merge that renamed its synthesised kind would satisfy a
+/// count and still carry nothing.
+#[test]
+fn the_merge_carries_its_constituents_reasons() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "mixed",
+        concat!(
+            "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+            "  - name: beta\n    command: \"sh -c 'exit 3'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("mixed", root.path()).expect("the run completes");
+    assert!(!outcome.success, "a failing constituent fails the run");
+
+    let result = outcome.output_dir.join(bolt::run::RESULT_FILE);
+    let merged = read_validated(&result, &wrench::ENVELOPE_SCHEMA);
+    let reasons = merged
+        .get("reasons")
+        .and_then(Value::as_array)
+        .expect("a failing merge carries reasons");
+
+    assert_eq!(
+        reasons.len(),
+        1,
+        "one failing constituent is one reason: {reasons:?}",
+    );
+
+    let kinds: Vec<&str> = reasons
+        .iter()
+        .filter_map(|reason| reason.get("kind").and_then(Value::as_str))
+        .collect();
+    assert!(
+        kinds.contains(&"nonzero-exit"),
+        "the constituent's own kind did not survive the fold: {kinds:?}",
+    );
+
+    let messages: Vec<&str> = reasons
+        .iter()
+        .filter_map(|reason| reason.get("message").and_then(Value::as_str))
+        .collect();
+    assert!(
+        messages.iter().any(|message| message.contains("beta")),
+        "no reason names the task that failed: {messages:?}",
+    );
+    assert!(
+        messages.iter().any(|message| message.contains('3')),
+        "no reason says what happened, only that something did: {messages:?}",
+    );
+    assert!(
+        !messages.iter().any(|message| message.contains("alpha")),
+        "a passing constituent contributed a reason: {messages:?}",
+    );
+}

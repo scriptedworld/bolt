@@ -77,10 +77,21 @@ struct Folded {
 
 /// Read every constituent and collect what the result is built from.
 ///
-/// FR-8.4 has the merged result say which constituents failed, so a reader is
-/// not sent to open every work directory to find out. The envelope schema
-/// requires `reasons` whenever success is false, so a fold that only flipped
-/// the boolean would not validate.
+/// FR-8.4 has the merged result carry the reasons its constituents produced, so
+/// what failed **and why** is readable from the merged file alone. Synthesising
+/// one reason per failure satisfies the first half and loses the second: every
+/// failure arrives as the same kind with the same message, and a reader is sent
+/// back to the work directories this exists to summarise. It also makes FR-7.10
+/// unsatisfiable, since that row distinguishes a task that could not execute
+/// from one that executed and failed **by the kind**, and there is only one kind
+/// left to read.
+///
+/// A constituent that failed while carrying no reason of its own still
+/// contributes one, because the envelope schema requires `reasons` whenever
+/// success is false and a fold that only flipped the boolean would not
+/// validate. That case is an adapter that wrote an envelope FR-6.11 would have
+/// caught, so the reason says the constituent failed without saying why rather
+/// than pretending to know.
 fn fold(entries: &[std::path::PathBuf]) -> Result<Folded, Error> {
     let mut evidence = serde_json::Map::new();
     let mut reasons = Vec::new();
@@ -98,16 +109,35 @@ fn fold(entries: &[std::path::PathBuf]) -> Result<Folded, Error> {
             .and_then(Value::as_bool)
             .unwrap_or(false)
         {
-            reasons.push(json!({
-                "kind": "constituent-failed",
-                "message": format!("{name} did not pass"),
-            }));
+            reasons.extend(carried(&envelope, &name));
         }
 
         evidence.insert(name, json!(entry.join(OUTPUT_FILE).display().to_string()));
     }
 
     Ok(Folded { evidence, reasons })
+}
+
+/// One failing constituent's reasons, as the merged result should carry them.
+///
+/// The constituent's own reasons where it produced any, so its `kind` and
+/// `message` reach the merged file unaltered. FR-8.5 keeps the envelope on disk
+/// too, so this is a copy rather than a move, and a reader who wants the
+/// untouched original still has it.
+fn carried(envelope: &Value, name: &str) -> Vec<Value> {
+    let own: Vec<Value> = envelope
+        .get("reasons")
+        .and_then(Value::as_array)
+        .map(|reasons| reasons.iter().filter(|r| r.is_object()).cloned().collect())
+        .unwrap_or_default();
+
+    if own.is_empty() {
+        return vec![json!({
+            "kind": "constituent-failed",
+            "message": format!("{name} failed and gave no reason"),
+        })];
+    }
+    own
 }
 
 /// Read an envelope through wrench, by FR-1.12, validating it on the way in.
