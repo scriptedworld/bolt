@@ -6,18 +6,34 @@
 
 use std::path::{Path, PathBuf};
 
+use globset::{Glob, GlobSet, GlobSetBuilder};
+
 use crate::Error;
+
+/// Compile a task's pattern list into something a path can be tested against.
+fn compile(patterns: &[String]) -> Result<GlobSet, Error> {
+    let mut builder = GlobSetBuilder::new();
+    for pattern in patterns {
+        let glob = Glob::new(pattern).map_err(|source| Error::JigUnreadable {
+            path: PathBuf::from(pattern),
+            reason: source.to_string(),
+        })?;
+        builder.add(glob);
+    }
+    builder.build().map_err(|source| Error::JigUnreadable {
+        path: PathBuf::from("<patterns>"),
+        reason: source.to_string(),
+    })
+}
 
 /// Apply one task's `matching` and `excluding` to a walk.
 ///
 /// `paths` are what [`walk`](crate::walk::walk) returned, which are absolute.
-/// FR-3.5 makes patterns relative to `base`, so the patterns are matched
-/// against each path's position under it and a jig written for reuse says
-/// `**/*.rs` without naming the subtree it was dropped into.
-///
-/// `matching` is a list of patterns or literal paths, where `**` matches zero
-/// or more directory levels, by FR-3.4. `excluding` takes the same list and
-/// removes from what `matching` selected, by FR-3.4a.
+/// FR-3.5 makes patterns relative to `base`, so each path is tested by its
+/// position under it and a jig written for reuse says `**/*.rs` without naming
+/// the subtree it was dropped into. Matching the absolute path instead would
+/// leave `**/*.rs` working and every literal entry silently matching nothing,
+/// which is the shape a stage 4 review measured.
 ///
 /// Paths keep the order they arrived in, so a sorted walk gives a sorted
 /// selection and FR-2.2d carries through to FR-9.2a's ordinals.
@@ -26,23 +42,25 @@ use crate::Error;
 ///
 /// [`Error::JigUnreadable`] when a pattern will not compile, which is a
 /// property of the jig rather than of the tree.
-///
-/// # Panics
-///
-/// Always, for now. Nothing is implemented.
 pub fn select(
     base: &Path,
     paths: &[PathBuf],
     matching: &[String],
     excluding: &[String],
 ) -> Result<Vec<PathBuf>, Error> {
-    todo!(
-        "select from {} paths under {} with {} matching and {} excluding patterns",
-        paths.len(),
-        base.display(),
-        matching.len(),
-        excluding.len(),
-    )
+    let selects = compile(matching)?;
+    let removes = compile(excluding)?;
+
+    Ok(paths
+        .iter()
+        .filter(|path| {
+            let Ok(relative) = path.strip_prefix(base) else {
+                return false;
+            };
+            selects.is_match(relative) && !removes.is_match(relative)
+        })
+        .cloned()
+        .collect())
 }
 
 /// Whether a task consumes paths at all.
@@ -66,14 +84,11 @@ pub fn consumes_paths(command: &str) -> bool {
 /// wrapping in single quotes is the obvious implementation and a path
 /// containing one escapes it.
 ///
-/// The test for this runs the result through a shell and compares what arrives
-/// with what went in, because a shape assertion cannot tell quoting from
-/// wrapping.
-///
-/// # Panics
-///
-/// Always, for now. Nothing is implemented.
+/// Single quotes with each embedded quote written as `'\''`, which is the one
+/// form a POSIX shell reads back literally: close the quoting, emit an escaped
+/// quote, reopen it. There is no other metacharacter to handle, because inside
+/// single quotes a shell interprets nothing else.
 #[must_use]
 pub fn quote(path: &Path) -> String {
-    todo!("quote {}", path.display())
+    format!("'{}'", path.to_string_lossy().replace('\'', r"'\''"))
 }

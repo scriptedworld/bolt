@@ -14,8 +14,14 @@ use crate::Error;
 /// A jig: a named set of tasks run over one directory.
 #[derive(Debug, Deserialize)]
 pub struct Jig {
-    /// The jig's schema version.
-    pub version: String,
+    /// The version of the format this jig claims to conform to.
+    ///
+    /// Optional, because wrench's schema requires only `tasks`. Making it
+    /// mandatory here was stricter than the contract and refused six of the
+    /// estate's jigs, including bolt's own, which is how it was found: the
+    /// first time the Rust bolt was pointed at its own gate by NFR-12.1.
+    #[serde(default)]
+    pub version: Option<String>,
 
     /// The tasks, in the order the jig declares them.
     ///
@@ -77,12 +83,29 @@ pub struct Task {
 /// [`Error::JigUnreadable`] when the file is absent, will not parse, or does
 /// not meet the schema, which FR-10.5 makes a refusal rather than a failed
 /// task.
-///
-/// # Panics
-///
-/// Always, for now. Nothing is implemented.
 pub fn read(config_dir: &Path, name: &str) -> Result<Jig, Error> {
-    todo!("read bolt.{name}.yaml from {}", config_dir.display())
+    let path = config_dir.join(file_name(name));
+    let unreadable = |reason: String| Error::JigUnreadable {
+        path: path.clone(),
+        reason,
+    };
+
+    // FR-1.12: every structured file goes through wrench, which reads, decodes
+    // and validates against the shipped jig schema in one call. FR-1.5 makes
+    // that validation the thing a broken jig fails, so there is nothing to
+    // check here that wrench has not already refused.
+    let value = wrench::load_formatted_file(
+        path.to_str()
+            .ok_or_else(|| unreadable("the path is not utf-8".to_owned()))?,
+        &wrench::JIG_SCHEMA,
+        &wrench::YamlCodec,
+        &wrench::LocalFileIo,
+    )
+    .map_err(|source| unreadable(source.to_string()))?;
+
+    // FR-1.9: wrench hands back a `serde_json::Value`, so a jig is a derive
+    // rather than eighty lines of map digging.
+    serde_json::from_value(value).map_err(|source| unreadable(source.to_string()))
 }
 
 /// The file a jig named `name` is read from, by FR-3.9.

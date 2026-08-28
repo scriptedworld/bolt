@@ -17,6 +17,7 @@ pub mod selection;
 pub mod walk;
 
 mod error;
+mod stamp;
 
 pub use error::Error;
 pub use outcome::Outcome;

@@ -216,6 +216,27 @@ fn a_jig_that_will_not_parse_is_refused() {
     );
 }
 
+// COVERS: FR-1.5, FR-3.9 | edge
+/// A jig with no `version` is valid, because the schema requires only `tasks`.
+///
+/// Bolt validates what wrench's schema says and not what it would have chosen.
+/// Requiring `version` here refused six of the estate's jigs including bolt's
+/// own, and nothing said so until the Rust bolt was pointed at its own gate.
+#[test]
+fn a_jig_without_a_version_is_read() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("bare"),
+        "tasks:\n  - name: passes\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let outcome = bolt::run::run("bare", root.path()).expect("a jig with no version is valid");
+
+    assert!(outcome.success, "the run did not complete");
+    assert_eq!(outcome.executions, 1, "the task did not execute");
+}
+
 // COVERS: FR-2.5, FR-10.7a | negative
 /// A base that is not there is refused, and nothing is created.
 ///
@@ -725,11 +746,14 @@ fn an_execution_keeps_its_native_results() {
     write_jig(
         root.path(),
         "noisy",
+        // The artifact is addressed at {work_dir}. FR-4.1a stands a command at
+        // the base, and FR-9.2 keeps what the command wrote *there*, meaning in
+        // its work directory, so a command wanting an artifact kept says where.
+        // Declaring `evidence` is how a task names files bolt did not see it
+        // write, and that is `runner/30`'s rather than the skeleton's.
         concat!(
             "  - name: noisy\n",
-            "    command: \"sh -c 'echo out; echo err >&2; echo made > artifact.txt'\"\n",
-            "    evidence:\n",
-            "      - artifact.txt\n",
+            "    command: \"sh -c 'echo out; echo err >&2; echo made > {work_dir}/artifact.txt'\"\n",
         ),
     );
 
@@ -864,25 +888,37 @@ fn the_manifest_records_what_was_selected_and_removed() {
         &wrench::MANIFEST_SCHEMA,
     );
 
+    // `selection.matched` and `selection.excluded` are wrench's names for the
+    // two lists FR-9.5 requires. This first invented `selected` and `removed`,
+    // and writing the manifest through wrench refused them, which is what
+    // reading a structured file through a schema is for.
     let listed = |key: &str| -> Vec<String> {
         manifest
-            .get(key)
+            .get("selection")
+            .and_then(|selection| selection.get(key))
             .and_then(Value::as_array)
-            .unwrap_or_else(|| panic!("the manifest has no {key} list: {manifest}"))
+            .unwrap_or_else(|| panic!("the manifest has no selection.{key} list: {manifest}"))
             .iter()
             .filter_map(|item| item.as_str().map(str::to_owned))
+            .map(|path| {
+                Path::new(&path)
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .into_owned()
+            })
             .collect()
     };
 
     assert_eq!(
-        listed("selected"),
+        listed("matched"),
         ["a.py"],
-        "the manifest's selected list is wrong"
+        "the manifest's matched list is wrong"
     );
     assert_eq!(
-        listed("removed"),
+        listed("excluded"),
         ["generated.py"],
-        "the manifest's removed list is wrong"
+        "the manifest's excluded list is wrong",
     );
 }
 
@@ -937,10 +973,11 @@ fn a_task_naming_no_path_variable_claims_no_paths() {
         &wrench::MANIFEST_SCHEMA,
     );
 
-    let selected = manifest.get("selected").and_then(Value::as_array);
+    // wrench's schema says `selection` is "present for a task that consumes
+    // paths", so absent is the claim rather than an empty pair of lists.
     assert!(
-        selected.is_none_or(Vec::is_empty),
-        "a task handed no list has a manifest claiming paths: {manifest}",
+        manifest.get("selection").is_none(),
+        "a task handed no list has a manifest claiming a selection: {manifest}",
     );
 }
 

@@ -36,6 +36,18 @@ pub enum Error {
         task: String,
     },
 
+    /// Bolt could not write what a run needs on disk.
+    ///
+    /// FR-10.5 lists an unwritable output directory as a refusal, and this is
+    /// every other filesystem failure with it: a run that cannot record what it
+    /// did has not carried out the ETL, whatever the tools concluded.
+    Io {
+        /// What bolt was trying to write or read.
+        path: PathBuf,
+        /// What the operating system said.
+        reason: String,
+    },
+
     /// The merge found no constituent to fold, by FR-8.3a.
     ///
     /// FR-8.3 alone would pass such a run, because every constituent passing
@@ -59,6 +71,9 @@ impl fmt::Display for Error {
             }
             Self::CommandNamesBothPathForms { task } => {
                 write!(formatter, "task {task} names both each_path and all_paths")
+            }
+            Self::Io { path, reason } => {
+                write!(formatter, "{}: {reason}", path.display())
             }
             Self::NoConstituents => {
                 write!(formatter, "no task produced a result")

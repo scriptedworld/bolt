@@ -5,7 +5,10 @@
 //! package.
 
 use std::ffi::OsString;
+use std::path::PathBuf;
 use std::process::ExitCode;
+
+use crate::run;
 
 /// Bolt could not carry the run out.
 ///
@@ -26,15 +29,27 @@ pub const COMPLETED: u8 = 0;
 ///
 /// FR-10.6 leaves one status unchosen: a bolt killed by a signal exits 128 plus
 /// the signal number, which is the shell's convention and never reaches here.
-///
-/// # Panics
-///
-/// Always, for now. Nothing is implemented.
 #[must_use]
 pub fn main<I>(arguments: I) -> ExitCode
 where
     I: IntoIterator<Item = OsString>,
 {
     let arguments: Vec<OsString> = arguments.into_iter().collect();
-    todo!("run bolt with {} argument(s)", arguments.len())
+    let [jig, base] = arguments.as_slice() else {
+        eprintln!("usage: bolt <jig> <directory>");
+        return ExitCode::from(REFUSED);
+    };
+
+    match run::run(&jig.to_string_lossy(), &PathBuf::from(base)) {
+        Ok(outcome) => {
+            // FR-10.3: the verdict is in the envelope, so what a caller is told
+            // here is where to read it rather than what it says.
+            println!("{}", outcome.output_dir.join(run::RESULT_FILE).display());
+            ExitCode::from(COMPLETED)
+        }
+        Err(refusal) => {
+            eprintln!("bolt: {refusal}");
+            ExitCode::from(REFUSED)
+        }
+    }
 }
