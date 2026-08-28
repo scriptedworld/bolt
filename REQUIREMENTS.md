@@ -387,7 +387,7 @@ A run's whole output is one directory:
 |---|---|---|
 | NFR-12.1 | Bolt runs itself. Its own quality gate is a bolt run over its own repository. | [A] |
 | NFR-12.2 | Bolt installs into a standardised development image beside a toolchain it knows nothing about. | [D] |
-| NFR-12.3 | Bolt is MIT licensed. | [A] |
+| NFR-12.3 | Bolt is Apache-2.0 licensed, with a `NOTICE` naming the copyright holder. Every manifest that declares a licence declares the same one, so the machine-readable answer and the file agree. Was MIT when this row was written; the licence changed at `ada063b` and `Cargo.toml` went on saying MIT until 2026-08-28, which is the case the row now covers rather than the one it started as. | [A] |
 | NFR-12.4 | Bolt builds without a C toolchain and links statically, so an image carries one file and a cross-build needs no target compiler. Anything bolt links against inherits that constraint. | [D] |
 
 ## 13. Open
