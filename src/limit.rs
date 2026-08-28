@@ -40,18 +40,21 @@ pub fn parse(value: &str) -> Option<Duration> {
     Duration::try_from_secs_f64(decimal(quantity)? * per_unit).ok()
 }
 
-/// A decimal: ASCII digits and at most one point, with at least one digit.
+/// A decimal: ASCII digits and at most one point, ending in a digit.
+///
+/// `.5` is one and `5.` is not, though Rust parses both. The whole grammar is
+/// then `^[0-9]*\.?[0-9]+$`, which a schema or a second implementation can state
+/// in one line instead of reproducing this function's judgement calls.
 fn decimal(text: &str) -> Option<f64> {
     let mut points = 0;
-    let mut digits = 0;
     for character in text.chars() {
         match character {
             '.' => points += 1,
-            _ if character.is_ascii_digit() => digits += 1,
+            _ if character.is_ascii_digit() => (),
             _ => return None,
         }
     }
-    if points > 1 || digits == 0 {
+    if points > 1 || !text.ends_with(|last: char| last.is_ascii_digit()) {
         return None;
     }
     text.parse().ok()

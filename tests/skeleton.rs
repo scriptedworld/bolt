@@ -3549,8 +3549,12 @@ fn a_time_limit_is_a_decimal_and_a_unit() {
         );
     }
 
+    // `5.s` is the one Rust would parse and this does not. The whole grammar is
+    // then `^[0-9]*\.?[0-9]+[smh]$`, which a schema can carry in one line rather
+    // than restating the reference implementation's judgement.
     for written in [
         "30", "", "s", "30x", "1e3s", "+5s", "-1s", "1.2.3s", "infs", "NaNs", " 30s", "30 s",
+        "5.s", ".s",
     ] {
         assert_eq!(
             bolt::limit::parse(written),
