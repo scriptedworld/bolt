@@ -1365,7 +1365,7 @@ fn the_missing_base_refusal_writes_nothing_and_says_so() {
     );
 }
 
-// COVERS: FR-10.7, FR-2.6b | regression
+// COVERS: FR-10.7, FR-10.7a, FR-2.6b | regression
 /// Refusing a directory as unusable does not write into it.
 ///
 /// **This is the guarantee FR-10.7 can be satisfied without, which is why it is

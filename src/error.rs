@@ -113,25 +113,22 @@ impl Error {
     /// Whether a refusal of this kind leaves a `result.yaml` behind.
     ///
     /// FR-10.7 has bolt write one whenever it is alive and in control when it
-    /// stops, so a caller finding none knows the process was killed. Two kinds
-    /// cannot, and both are about a directory bolt must not create or touch.
+    /// stops, so a caller finding none knows the process was killed. FR-10.7a
+    /// exempts two, and both are about the directory the result would go in.
     ///
-    /// FR-10.7a names the first: the default output directory sits inside the
-    /// base, so writing a result for [`Self::BaseMissing`] would create the
-    /// very thing whose absence is being refused.
+    /// [`Self::BaseMissing`]: the default output directory sits inside the
+    /// base, so writing a result would create the very thing whose absence is
+    /// being refused.
     ///
-    /// **[`Self::OutputDirectoryInUse`] is a second case and FR-10.7a does not
-    /// name it.** The directory is a previous run's, so writing a refusal into
-    /// it replaces a completed verdict with `kind: bolt-refused` while the
-    /// per-task evidence still says otherwise. The Go build does exactly that,
-    /// reproduced 2026-08-28 and filed at
+    /// [`Self::OutputDirectoryInUse`]: the directory is a previous run's, so
+    /// writing a refusal into it replaces a completed verdict with
+    /// `kind: bolt-refused` while the per-task evidence still says otherwise.
+    /// The Go build does exactly that, reproduced 2026-08-28 and filed at
     /// `clank/inbox/bolt.go/a-refusal-overwrites-the-run-it-refused/`. Writing
     /// it anywhere else would invent a location no caller was told about.
     ///
-    /// So the rows and this code disagree by one case, and the code is the
-    /// conservative side of the disagreement. `NEXT_STEPS.md` carries it as a
-    /// question for our user, because widening FR-10.7a is not a session's to
-    /// decide.
+    /// FR-10.7b is the way out of both: a caller wanting a parseable refusal in
+    /// every case names an output directory outside the tree being checked.
     #[must_use]
     pub fn writes_a_result(&self) -> bool {
         !matches!(self, Self::BaseMissing(_) | Self::OutputDirectoryInUse(_))

@@ -571,35 +571,22 @@ directory, which is the Go build's shape, fails only
 `a_refusal_does_not_write_into_the_directory_it_refused`; writing no refusal at
 all fails only `a_refusal_writes_a_result`.
 
-### 22. FR-10.7a names one exemption and there are two
+### FR-10.7a exempts two refusals, settled 2026-08-28
 
-**A decision, not a defect.** FR-10.7a exempts FR-2.5's missing base, because
-writing the result would create the thing whose absence is being refused, and
-its wording makes that the only case.
+Was a question, and is not one now. FR-10.7a named one exemption where the code
+needed two, and our user widened the row rather than giving the collision one of
+its own or sending the result elsewhere.
 
-`OutputDirectoryInUse` is a second one and no row names it. The directory
-belongs to a previous run, so writing a refusal into it destroys a completed
-verdict, and writing it anywhere else invents a location no caller was told
-about. `Error::writes_a_result` therefore exempts both, which is bolt being
-conservative where the rows and the code disagree.
+The row now names both and says what they have in common: each is about the
+directory the result would go in. FR-2.5's is about **creating** the thing whose
+absence is being refused. FR-2.6b's is about **overwriting** a completed run's
+verdict with a refusal that executed nothing. FR-10.7b is the way out of both,
+since a caller naming an output directory outside the tree gets a result in
+every case.
 
-Three ways to settle it, and the choice is our user's:
-
-1. Widen FR-10.7a to name both, keeping "exactly one" as the shape of the
-   sentence rather than a count.
-2. Give the collision its own row, since its reason differs: FR-2.5's exemption
-   is about *creating*, this one is about *overwriting*.
-3. Decide bolt should write it somewhere else, which needs saying where and how
-   a caller learns of it. FR-10.7b's `--output-dir` is the closest thing to an
-   answer already written.
-
-Nothing is blocked on this. The code is safe under all three and the tests
-assert the behaviour rather than the row, so settling it changes a document and
-possibly a `COVERS:` mark.
-
-## Adapters
-
-11. May an adapter read the repository tree, or only the files it was handed?
+`Error::writes_a_result` is the one place that decides, and
+`a_refusal_does_not_write_into_the_directory_it_refused` holds the half FR-10.7
+can otherwise be satisfied without.
 
 ### The contract is undocumented, and that has already cost a port
 
