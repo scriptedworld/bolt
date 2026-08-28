@@ -504,6 +504,56 @@ to discover it. FR-10.7b already says a caller wanting a parseable refusal in
 every case names one outside the tree, and this is the same advice reached from
 the other direction.
 
+## `allow-empty` becomes `optional`, settled 2026-08-28
+
+Decided by our user. The field says an empty selection is an acceptable result
+for this task, and `optional` says that where `allow-empty` describes the
+mechanism instead.
+
+**Do it now, because it is free now.** FACT 2026-08-28: no jig in the estate
+carries `allow-empty`. Nothing to migrate, and that stops being true the first
+time somebody writes one.
+
+**Three places, and two of them are not bolt's.** The field is enforced by the
+schema rather than the runner, by FR-4.4h, so bolt cannot rename it alone: a jig
+carrying `optional` is rejected on the way in until wrench ships it.
+
+    wrench/schemas/jig.schema.json    what bolt validates against
+    toolbox/schema/jig.schema.json    a second copy of the same schema
+    bolt                             FR-4.4c, FR-4.4d, FR-4.4g, FR-4.4h and the
+                                     `allow_empty` field on `jig::Task`
+
+**The two schema copies have already drifted over this exact field**, which
+toolbox's own `NEXT_STEPS.md` records: `allow-empty` was in one bolt build and
+absent from another on 2026-08-27. Renaming one and not the other reproduces
+that, so the two moves belong together.
+
+Filed to wrench, which owns the shipped schema, at
+`clank/inbox/wrench/allow-empty-should-be-optional/`.
+
+### The success-kind idea, and why it is uglier than it looks
+
+Considered alongside the rename: a passing envelope carrying `success-no-match`
+against `success-complete`, so a reader can tell a task that matched nothing
+from one that did its work.
+
+**`kind` lives on a reason, and reasons only exist on failure.** FR-7.8 makes
+`message` required on one, and the envelope schema wants `reasons` when
+`success` is false. There is nowhere on a passing envelope to hang a kind
+without either putting reasons on a success, which contradicts what a reason is,
+or adding a field beside `success` that no row describes.
+
+**And under `optional` there is no envelope at all.** FR-4.4c has the task
+produce no constituent, so the information does not survive to be labelled. That
+is the real gap rather than the missing kind.
+
+**It is the same question as FR-4.9's stopped list**, recorded in
+`runner/20`'s task: a reader with only the evidence directory cannot tell a task
+that was not reached from one that skipped an empty selection from one that was
+never in the jig. Three different absences, all spelled as nothing on disk.
+Worth answering once, as *what does the evidence say about a task that did not
+run*, rather than twice as two field designs. Not blocking anything today.
+
 ## FR-10.3 is why bolt prints no summary line, and the Go build shows the cost
 
 Not a question. Recorded because the pressure to add one will recur, and the
