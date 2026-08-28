@@ -140,6 +140,20 @@ pub enum Error {
         tools: Vec<String>,
     },
 
+    /// A `time-limit` is not a duration, by FR-4.11e.
+    ///
+    /// Refused before anything executes, for FR-4.18a's reason: a jig whose
+    /// third task spells its limit `30` refuses in the first second rather than
+    /// two tasks into a gate. Reading it as no limit is the alternative that
+    /// fails silently, running unbounded exactly where somebody asked for a
+    /// ceiling.
+    MalformedTimeLimit {
+        /// The task whose limit it is, or `None` for the jig's own.
+        task: Option<String>,
+        /// What was written where a duration was wanted.
+        value: String,
+    },
+
     /// The merge found no constituent to fold, by FR-8.3a.
     ///
     /// FR-8.3 alone would pass such a run, because every constituent passing
@@ -225,17 +239,36 @@ impl fmt::Display for Error {
                 "the definitions file {} is unreadable: {reason}",
                 path.display()
             ),
-            Self::RequiresMissing { tools } => write!(
-                formatter,
-                "the jig requires {}, which {} not on PATH",
-                tools.join(", "),
-                if tools.len() == 1 { "is" } else { "are" },
-            ),
+            Self::RequiresMissing { tools } => write!(formatter, "{}", requires_missing(tools)),
+            Self::MalformedTimeLimit { task, value } => {
+                write!(
+                    formatter,
+                    "{}",
+                    malformed_time_limit(task.as_deref(), value)
+                )
+            }
             Self::NoConstituents => {
                 write!(formatter, "no task produced a result")
             }
         }
     }
+}
+
+/// FR-4.11e's reason, naming whose limit it is so the caller knows what to edit.
+///
+/// `task` is `None` for the jig's own limit, which is the run's by FR-4.11d.
+fn malformed_time_limit(task: Option<&str>, value: &str) -> String {
+    let whose = task.map_or_else(|| "the jig".to_owned(), |task| format!("task {task}"));
+    format!("{whose} sets a time limit of {value}, which is not a decimal followed by s, m or h")
+}
+
+/// FR-3.10b's reason, naming every entry `PATH` did not resolve.
+fn requires_missing(tools: &[String]) -> String {
+    format!(
+        "the jig requires {}, which {} not on PATH",
+        tools.join(", "),
+        if tools.len() == 1 { "is" } else { "are" },
+    )
 }
 
 impl std::error::Error for Error {}

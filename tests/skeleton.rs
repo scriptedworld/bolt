@@ -1185,7 +1185,8 @@ fn the_merge_folds_every_envelope_repeatably() {
     let result = outcome.output_dir.join(bolt::run::RESULT_FILE);
     let first = fs::read(&result).expect("a run has a result");
 
-    bolt::merge::merge(&outcome.output_dir, root.path()).expect("a finished directory refolds");
+    bolt::merge::merge(&outcome.output_dir, root.path(), &[])
+        .expect("a finished directory refolds");
 
     assert_eq!(
         first,
@@ -1243,8 +1244,8 @@ fn a_merge_finding_no_constituent_fails() {
     let empty = tree();
     fs::create_dir(empty.path().join(bolt::run::WORK_DIR)).expect("an empty work directory");
 
-    let refusal =
-        bolt::merge::merge(empty.path(), empty.path()).expect_err("no constituent is a failure");
+    let refusal = bolt::merge::merge(empty.path(), empty.path(), &[])
+        .expect_err("no constituent is a failure");
 
     assert!(
         matches!(refusal, bolt::Error::NoConstituents),
@@ -1991,7 +1992,8 @@ fn refolding_a_finished_run_costs_no_re_execution() {
     let ran = fs::read_to_string(work(&outcome, "alpha-1").join(bolt::run::EXITCODE_FILE))
         .expect("the exit code is on disk");
 
-    bolt::merge::merge(&outcome.output_dir, root.path()).expect("a finished directory refolds");
+    bolt::merge::merge(&outcome.output_dir, root.path(), &[])
+        .expect("a finished directory refolds");
 
     assert_eq!(
         fs::read_to_string(work(&outcome, "alpha-1").join(bolt::run::EXITCODE_FILE))
@@ -3006,5 +3008,659 @@ fn an_unknown_placeholder_refuses_before_anything_executes() {
     assert!(
         ran.is_empty(),
         "the first task executed before the second was refused: {ran:?}",
+    );
+}
+
+// ---- time limits -------------------------------------------------------------
+
+/// Write a jig carrying a run-wide `time-limit`, by FR-4.11d.
+///
+/// The run's limit sits on the jig, which is the one document describing the run
+/// as a whole. A task's sits on the task and needs no helper.
+fn write_limited_jig(root: &Path, name: &str, limit: &str, tasks: &str) {
+    write(
+        root,
+        &bolt::jig::file_name(name),
+        &format!("version: \"1.0.0\"\ntime-limit: \"{limit}\"\ntasks:\n{tasks}"),
+    );
+}
+
+/// Every reason an envelope or a result carries, as `(kind, message)`.
+///
+/// Read through `read_validated`, so a caller asking what an envelope says has
+/// already asserted that it is one. FR-4.12d is that property, and this is where
+/// most of the tests below happen to check it.
+fn reasons_in(path: &Path) -> Vec<(String, String)> {
+    read_validated(path, &wrench::ENVELOPE_SCHEMA)
+        .get("reasons")
+        .and_then(Value::as_array)
+        .map(|reasons| {
+            reasons
+                .iter()
+                .map(|reason| {
+                    let field = |name: &str| {
+                        reason
+                            .get(name)
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                            .to_owned()
+                    };
+                    (field("kind"), field("message"))
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The envelope one execution wrote.
+fn envelope_of(outcome: &bolt::Outcome, entry: &str) -> PathBuf {
+    work(outcome, entry).join(bolt::run::OUTPUT_FILE)
+}
+
+/// Whether any run under `base` got as far as creating a work directory.
+fn executed_anything(base: &Path) -> bool {
+    fs::read_dir(base)
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with(".bolt-"))
+        })
+        .any(|run| {
+            fs::read_dir(run.join(bolt::run::WORK_DIR))
+                .into_iter()
+                .flatten()
+                .next()
+                .is_some()
+        })
+}
+
+// COVERS: FR-4.11 | positive
+/// Both limits are options, so a jig setting neither lets a tool finish.
+///
+/// The command sleeps for longer than every limit this file sets, so a bolt that
+/// applied a ceiling of its own, or that read an absent field as zero, kills it
+/// here. Asserted on the command's last line rather than on the verdict, because
+/// a killed `sleep` also reports failure and the two would be indistinguishable.
+#[test]
+fn a_jig_setting_no_limit_lets_a_slow_command_finish() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "unbounded",
+        "  - name: slow\n    command: \"sh -c 'sleep 0.4; echo done'\"\n",
+    );
+
+    let outcome = bolt::run::run("unbounded", root.path()).expect("the run completes");
+
+    assert!(outcome.success, "an unlimited run killed its own command");
+    let stdout =
+        fs::read_to_string(work(&outcome, "slow-1").join("stdout")).expect("the task wrote stdout");
+    assert!(
+        stdout.contains("done"),
+        "the command did not reach its own last line: {stdout}",
+    );
+}
+
+// COVERS: FR-4.11a, FR-4.11b, FR-4.12f, FR-6.9a | property
+/// A task's limit covers all of its executions taken together.
+///
+/// **Each command finishes well inside the limit and the task still runs out**,
+/// which is the whole of the difference between the two readings. Four paths at
+/// a tenth of a second each against a quarter of a second: under a per-execution
+/// budget every path has more than twice what it needs and all four pass, and
+/// under FR-4.11a the third is killed partway and FR-4.11b stops the fourth.
+///
+/// An earlier version used commands that each outran the limit on their own. It
+/// passed against a bolt that restarted the budget every execution, because the
+/// first execution is killed either way and FR-4.11b then stops the rest, so
+/// nothing downstream could tell the two apart. Found by mutation.
+#[test]
+fn a_tasks_limit_covers_all_its_executions_together() {
+    let root = tree();
+    for name in ["a.txt", "b.txt", "c.txt", "d.txt"] {
+        write(root.path(), name, "content");
+    }
+    write_jig(
+        root.path(),
+        "budget",
+        concat!(
+            "  - name: slow\n",
+            "    time-limit: \"0.25s\"\n",
+            "    matching: [\"**/*.txt\"]\n",
+            "    command: \"sh -c 'sleep 0.1; echo {each_path}'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("budget", root.path()).expect("the run completes");
+
+    assert!(
+        outcome.executions < 4,
+        "every execution got the limit to itself: {} ran",
+        outcome.executions,
+    );
+    assert!(
+        !work(&outcome, "slow-4").exists(),
+        "FR-4.11b: an execution started after the task's limit had passed",
+    );
+    assert!(!outcome.success, "a task that ran out of budget passed");
+
+    // The killed execution is whichever one the budget ran out under, so the
+    // reason is read off the last work directory rather than a fixed one.
+    let last = format!("slow-{}", outcome.executions);
+    let carried = reasons_in(&envelope_of(&outcome, &last));
+    // FR-6.9a: the limit is the only reason. Bolt's exit-code adapter does not
+    // add `exited -1` beside it, which is bolt's own signal reported as though
+    // the tool had chosen it.
+    assert_eq!(
+        carried
+            .iter()
+            .map(|(kind, _)| kind.as_str())
+            .collect::<Vec<_>>(),
+        vec!["time-limit"],
+        "the killed execution does not say a limit killed it, and only that: {carried:?}",
+    );
+    assert!(
+        carried[0].1.contains("were not attempted"),
+        "FR-4.12f: the reason does not say how many were not attempted: {carried:?}",
+    );
+}
+
+// COVERS: FR-4.13, FR-4.14a | edge
+/// A run whose budget is gone before it starts runs nothing, and says so.
+///
+/// A limit of `0s` puts the deadline in the past at the first check, which is
+/// the reachable case for the test bolt makes **before** each task rather than
+/// only after one. Without that check the first task starts and is killed a
+/// moment later; that looks similar and is not, because it leaves a work
+/// directory, an execution and a killed process behind.
+///
+/// It is also the one shape where the merge finds no constituent at all and must
+/// still write a result, so it is where FR-4.14a is separable from FR-8.3a. That
+/// row refuses a run with nothing folded, because a green result over zero
+/// checks reads as checked and fine; a run carrying its own reason is not green.
+///
+/// And it is the only place the run's own reason can be told apart from the ones
+/// its executions carry, since there are no executions. The earlier test for
+/// FR-4.13 passed against a merge that dropped the run's reason entirely, having
+/// found the same words on a killed execution's envelope. Found by mutation.
+#[test]
+fn a_run_with_no_budget_left_executes_nothing_and_still_writes_a_result() {
+    let root = tree();
+    write_limited_jig(
+        root.path(),
+        "spent",
+        "0s",
+        concat!(
+            "  - name: first\n    command: \"sh -c 'echo never'\"\n",
+            "  - name: second\n    command: \"sh -c 'echo never'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("spent", root.path()).expect("the run completes");
+
+    assert_eq!(
+        outcome.executions, 0,
+        "a run with no budget left executed something",
+    );
+    assert_eq!(
+        outcome.stopped,
+        vec!["first".to_owned(), "second".to_owned()],
+        "the tasks that never ran are not recorded",
+    );
+    assert!(
+        !outcome.success,
+        "a run that checked nothing reported success"
+    );
+
+    let carried = reasons_in(&outcome.output_dir.join(bolt::run::RESULT_FILE));
+    assert_eq!(
+        carried.len(),
+        1,
+        "the result carries something other than the run's own reason: {carried:?}",
+    );
+    assert!(
+        carried[0].0 == "time-limit" && carried[0].1.contains("the run passed its time limit"),
+        "FR-4.14a: the result does not say why nothing ran: {carried:?}",
+    );
+}
+
+// COVERS: FR-4.11c, FR-4.12a, FR-4.12b | positive
+/// The adapter runs after the limit fired, over what the command had gathered.
+///
+/// FR-4.11c: the limit governs commands, and the adapter is what records that it
+/// fired, so a budget the command exhausted does not also kill the adapter.
+/// FR-4.12a: a tool that reported a problem before it hung reported a real
+/// problem. FR-4.12b: the execution fails anyway.
+///
+/// The adapter concludes **success** and leaves a note of what it read, so the
+/// two halves are separable. The note proves it ran and saw the partial output;
+/// the verdict proves bolt overrode what it concluded. A test asserting only the
+/// verdict cannot tell those apart, because a bolt that never ran the adapter
+/// also fails the execution.
+#[test]
+fn a_killed_command_keeps_its_output_and_its_adapter_still_runs() {
+    let root = tree();
+    write_adapter(
+        root.path(),
+        "noting-adapter",
+        concat!(
+            "for a in \"$@\"; do case $prev in --stdout) out=$a;; --work-dir) w=$a;; esac; prev=$a; done\n",
+            "cp \"$out\" \"$w/adapter-saw\"\n",
+            "printf '\"success\": true\\n' > \"$w/output.yaml\"\n",
+        ),
+    );
+    write_jig(
+        root.path(),
+        "hangs",
+        concat!(
+            "  - name: reporting\n",
+            "    time-limit: \"0.05s\"\n",
+            "    adapter: noting-adapter\n",
+            "    command: \"sh -c 'echo forty-problems; sleep 5'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("hangs", root.path()).expect("the run completes");
+
+    let saw = fs::read_to_string(work(&outcome, "reporting-1").join("adapter-saw"))
+        .expect("FR-4.11c: the adapter did not run once the limit had fired");
+    assert!(
+        saw.contains("forty-problems"),
+        "FR-4.12a: the adapter did not see what the command gathered: {saw}",
+    );
+
+    assert!(!outcome.success, "a timed-out task passed the run");
+    let carried = reasons_in(&envelope_of(&outcome, "reporting-1"));
+    assert!(
+        carried.iter().any(|(kind, _)| kind == "time-limit"),
+        "FR-4.12b: the adapter's success stood: {carried:?}",
+    );
+}
+
+// COVERS: FR-4.12, FR-4.11d | negative
+/// A task that passes its limit fails, and the run carries on past it.
+///
+/// FR-4.8's rule holds for a slow task exactly as it does for a failing one: the
+/// tasks after it still execute, because stopping throws away the evidence they
+/// would have produced.
+#[test]
+fn a_slow_task_fails_and_the_run_carries_on() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "carries-on",
+        concat!(
+            "  - name: hangs\n",
+            "    time-limit: \"0.05s\"\n",
+            "    command: \"sh -c 'sleep 5'\"\n",
+            "  - name: after\n",
+            "    command: \"sh -c 'echo reached'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("carries-on", root.path()).expect("the run completes");
+
+    assert!(
+        !outcome.success,
+        "a task that passed its limit did not fail"
+    );
+    assert_eq!(outcome.executions, 2, "the run stopped at the slow task");
+    assert!(
+        outcome.stopped.is_empty(),
+        "a task's limit stopped the whole run: {:?}",
+        outcome.stopped,
+    );
+    assert!(
+        verdict(&envelope_of(&outcome, "after-1"), &wrench::ENVELOPE_SCHEMA),
+        "the task after the slow one did not pass",
+    );
+
+    let carried = reasons_in(&envelope_of(&outcome, "hangs-1"));
+    assert!(
+        carried
+            .iter()
+            .any(|(kind, message)| kind == "time-limit" && message.contains("0.05s")),
+        "no reason names the limit that was passed: {carried:?}",
+    );
+}
+
+// COVERS: FR-4.12c, FR-4.12d | edge
+/// Where the run's limit catches the adapter, bolt writes that envelope itself.
+///
+/// FR-4.11c keeps a task's limit off its adapter; the run's is the one that can
+/// still reach it, and then nothing else is left to write an envelope. FR-4.12d
+/// is what that guarantees: a timed-out execution has a valid one whichever of
+/// the two was running, which is what distinguishes it from an adapter that died
+/// of its own accord and left none.
+#[test]
+fn the_runs_limit_catching_an_adapter_leaves_bolt_to_write_the_envelope() {
+    let root = tree();
+    write_adapter(root.path(), "hanging-adapter", "sleep 5\n");
+    write_limited_jig(
+        root.path(),
+        "slow-adapter",
+        "0.15s",
+        concat!(
+            "  - name: quick\n",
+            "    adapter: hanging-adapter\n",
+            "    command: \"sh -c 'echo done'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("slow-adapter", root.path()).expect("the run completes");
+
+    let envelope = envelope_of(&outcome, "quick-1");
+    assert!(
+        envelope.is_file(),
+        "FR-4.12d: the killed adapter left no envelope and bolt wrote none",
+    );
+    assert!(
+        !verdict(&envelope, &wrench::ENVELOPE_SCHEMA),
+        "a timed-out execution reported success",
+    );
+    let carried = reasons_in(&envelope);
+    assert!(
+        carried
+            .iter()
+            .any(|(kind, message)| kind == "time-limit" && message.contains("0.15s")),
+        "bolt's envelope does not say a limit caught the adapter: {carried:?}",
+    );
+}
+
+// COVERS: FR-4.13, FR-4.14, FR-4.14a, FR-4.11d | negative
+/// A run that passes its limit fails, and still writes what it managed.
+///
+/// FR-4.14a is the half worth asserting hardest: the task that finished before
+/// the limit is still in the evidence mapping with its own verdict. A run that
+/// reported only the timeout would discard evidence already written and paid
+/// for.
+#[test]
+fn a_run_that_times_out_writes_a_result_carrying_what_completed() {
+    let root = tree();
+    write_limited_jig(
+        root.path(),
+        "bounded",
+        "0.2s",
+        concat!(
+            "  - name: first\n    command: \"sh -c 'echo quick'\"\n",
+            "  - name: hangs\n    command: \"sh -c 'sleep 5'\"\n",
+            "  - name: third\n    command: \"sh -c 'echo never'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("bounded", root.path()).expect("the run completes");
+
+    assert!(!outcome.success, "a run that passed its limit did not fail");
+    assert_eq!(
+        outcome.stopped,
+        vec!["third".to_owned()],
+        "the tasks the limit kept from running are not recorded",
+    );
+
+    let result = outcome.output_dir.join(bolt::run::RESULT_FILE);
+    let carried = reasons_in(&result);
+    assert!(
+        carried.iter().any(|(kind, message)| kind == "time-limit"
+            && message.contains("the run")
+            && message.contains("0.2s")),
+        "FR-4.13: the result does not say the run passed its limit: {carried:?}",
+    );
+
+    let keys: Vec<String> = read_validated(&result, &wrench::ENVELOPE_SCHEMA)
+        .get("metadata")
+        .and_then(|metadata| metadata.get("evidence"))
+        .and_then(Value::as_object)
+        .map(|evidence| evidence.keys().cloned().collect())
+        .expect("the result carries an evidence mapping");
+    assert!(
+        keys.contains(&"first-1".to_owned()),
+        "FR-4.14a: what completed before the limit is missing from the result: {keys:?}",
+    );
+    assert!(
+        verdict(&envelope_of(&outcome, "first-1"), &wrench::ENVELOPE_SCHEMA),
+        "the completed task's own verdict did not survive the timeout",
+    );
+}
+
+// COVERS: FR-4.12e | regression
+/// A killed command takes the children it spawned with it.
+///
+/// The command backgrounds a loop appending to a file every twenty milliseconds
+/// and then blocks. Signalling the child alone leaves that loop running, writing
+/// into the tree after bolt has finished with it, so the file goes on growing
+/// once the run has returned. `SIGKILL` to the process group stops it.
+///
+/// Asserted as quiescence rather than as a process lookup: the file not growing
+/// is the property the row is about, and a pid check would pass against a child
+/// that was reparented and still writing.
+#[test]
+fn a_timed_out_command_leaves_no_children_running() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "spawner",
+        concat!(
+            "  - name: forks\n",
+            "    time-limit: \"0.1s\"\n",
+            "    command: \"sh -c 'while : ; do echo tick >> ticks.txt; sleep 0.02; done & sleep 5'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("spawner", root.path()).expect("the run completes");
+    assert!(!outcome.success, "the timed-out task passed");
+
+    let ticks = root.path().join("ticks.txt");
+    let size = || fs::metadata(&ticks).map_or(0, |meta| meta.len());
+
+    let when_the_run_returned = size();
+    assert!(
+        when_the_run_returned > 0,
+        "the child never ran, so this proves nothing about killing it",
+    );
+
+    std::thread::sleep(std::time::Duration::from_millis(300));
+
+    assert_eq!(
+        size(),
+        when_the_run_returned,
+        "an orphaned child was still writing after the run returned",
+    );
+}
+
+// COVERS: FR-4.11e | negative
+/// A limit that is not a duration refuses the run before anything executes.
+///
+/// Declared on the **second** task, so a bolt reading limits as it reached them
+/// would run the first one first. The assertion is that no work directory
+/// exists, which is what separates a check made up front from one made in
+/// passing; the exit status is the same either way.
+#[test]
+fn a_time_limit_that_is_not_a_duration_refuses_the_run() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "malformed",
+        concat!(
+            "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+            "  - name: beta\n    time-limit: \"30\"\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+
+    let refusal = bolt::run::run("malformed", root.path()).expect_err("a malformed limit refuses");
+    assert!(
+        matches!(refusal, bolt::Error::MalformedTimeLimit { .. }),
+        "wrong refusal for a malformed limit: {refusal:?}",
+    );
+    let said = refusal.to_string();
+    assert!(
+        said.contains("beta") && said.contains("30"),
+        "the reason names neither the task nor what was written: {said}",
+    );
+    assert!(
+        !executed_anything(root.path()),
+        "a task executed before the malformed limit was refused",
+    );
+
+    // The jig's own limit is refused the same way, and says so as the jig's
+    // rather than as some task's. In a tree of its own, because the refusal
+    // above wrote its result into this one's default output directory and
+    // FR-2.6b refuses a second run that lands on the same second.
+    let other = tree();
+    write_limited_jig(
+        other.path(),
+        "malformed-run",
+        "soon",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+    let refusal =
+        bolt::run::run("malformed-run", other.path()).expect_err("a malformed run limit refuses");
+    assert!(
+        matches!(refusal, bolt::Error::MalformedTimeLimit { task: None, .. }),
+        "the jig's own limit was reported as a task's: {refusal:?}",
+    );
+}
+
+// COVERS: FR-4.11e | property
+/// A limit is a decimal followed by `s`, `m` or `h`, and nothing else is one.
+///
+/// The rejected column is the point. `f64` parsing on its own takes `1e3`, `+5`,
+/// `inf` and `NaN`, none of which anybody writes in a jig on purpose, and
+/// accepting them would make the grammar something a second implementation has
+/// to discover rather than read.
+#[test]
+fn a_time_limit_is_a_decimal_and_a_unit() {
+    use std::time::Duration;
+
+    for (written, expected) in [
+        ("30s", Duration::from_secs(30)),
+        ("0.05s", Duration::from_millis(50)),
+        (".5s", Duration::from_millis(500)),
+        ("1.5m", Duration::from_secs(90)),
+        ("2h", Duration::from_hours(2)),
+        ("0s", Duration::ZERO),
+    ] {
+        assert_eq!(
+            bolt::limit::parse(written),
+            Some(expected),
+            "{written} did not read as a duration",
+        );
+    }
+
+    for written in [
+        "30", "", "s", "30x", "1e3s", "+5s", "-1s", "1.2.3s", "infs", "NaNs", " 30s", "30 s",
+    ] {
+        assert_eq!(
+            bolt::limit::parse(written),
+            None,
+            "{written} was taken for a duration",
+        );
+    }
+}
+
+// COVERS: FR-4.11f | property
+/// A task's limit is wall clock from when the task started.
+///
+/// So the adapters between its executions spend it, even though FR-4.11c keeps
+/// the limit from killing one. Three paths whose commands are instant and whose
+/// adapter takes a fifth of a second each: under wall-clock accounting the
+/// budget is gone before the third starts, and under an accounting that charged
+/// only the commands all three would run with almost the whole limit unspent.
+#[test]
+fn a_tasks_limit_is_wall_clock_and_its_adapters_spend_it() {
+    let root = tree();
+    for name in ["a.txt", "b.txt", "c.txt"] {
+        write(root.path(), name, "content");
+    }
+    write_adapter(
+        root.path(),
+        "slow-adapter",
+        concat!(
+            "for a in \"$@\"; do case $prev in --work-dir) w=$a;; esac; prev=$a; done\n",
+            "sleep 0.2\n",
+            "printf '\"success\": true\\n' > \"$w/output.yaml\"\n",
+        ),
+    );
+    write_jig(
+        root.path(),
+        "adapted",
+        concat!(
+            "  - name: each\n",
+            "    time-limit: \"0.3s\"\n",
+            "    adapter: slow-adapter\n",
+            "    matching: [\"**/*.txt\"]\n",
+            "    command: \"sh -c 'echo {each_path}'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("adapted", root.path()).expect("the run completes");
+
+    assert_eq!(
+        outcome.executions, 2,
+        "the task's adapters did not spend its budget",
+    );
+
+    // FR-9.5a and FR-4.12f together: the execution that never started still
+    // records what it was going to attempt, and says how many were left.
+    assert!(
+        work(&outcome, "each-3")
+            .join(bolt::run::MANIFEST_FILE)
+            .is_file(),
+        "an execution that never started recorded nothing it was going to do",
+    );
+    let carried = reasons_in(&envelope_of(&outcome, "each-3"));
+    assert!(
+        carried.iter().any(|(kind, message)| kind == "time-limit"
+            && message.contains("1 of its executions were not attempted")),
+        "the unattempted execution carries no count: {carried:?}",
+    );
+}
+
+// COVERS: FR-4.12d | property
+/// Every timed-out execution has a valid envelope, however the limit caught it.
+///
+/// Two shapes in one run: an execution killed mid-command, and one that never
+/// started because the budget had already gone. A limit of `0s` gives the second
+/// deterministically, with no sleep to race against.
+#[test]
+fn every_timed_out_execution_has_a_valid_envelope() {
+    let root = tree();
+    write(root.path(), "a.txt", "content");
+    write(root.path(), "b.txt", "content");
+    write_jig(
+        root.path(),
+        "shapes",
+        concat!(
+            "  - name: killed\n",
+            "    time-limit: \"0.05s\"\n",
+            "    command: \"sh -c 'sleep 5'\"\n",
+            "  - name: never\n",
+            "    time-limit: \"0s\"\n",
+            "    matching: [\"**/*.txt\"]\n",
+            "    command: \"sh -c 'echo {each_path}'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("shapes", root.path()).expect("the run completes");
+
+    for entry in ["killed-1", "never-1"] {
+        let envelope = envelope_of(&outcome, entry);
+        assert!(envelope.is_file(), "{entry} left no envelope");
+        assert!(
+            !verdict(&envelope, &wrench::ENVELOPE_SCHEMA),
+            "{entry} timed out and reported success",
+        );
+        let carried = reasons_in(&envelope);
+        assert!(
+            carried.iter().any(|(kind, _)| kind == "time-limit"),
+            "{entry} does not say a limit caught it: {carried:?}",
+        );
+    }
+
+    assert_eq!(
+        outcome.executions, 1,
+        "the task whose budget was already gone executed something",
     );
 }

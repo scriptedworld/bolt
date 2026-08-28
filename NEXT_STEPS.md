@@ -46,6 +46,12 @@ flags, and the merge reading task and args off disk.
 | Subprocess or in-process | FR-4.15 | Subprocess. |
 | A jig task's missing subdirectory | FR-5.15a | Same as an empty one: it does not run, the run carries on. |
 | A jig task per path | FR-5.16 | Once against its base. |
+| Where each time limit is declared | FR-4.11d | `time-limit`, on the task and on the jig. Not on the command line. |
+| How a time limit is spelled | FR-4.11e | A decimal and `s`, `m` or `h`. Malformed refuses up front. |
+| What a task's limit measures | FR-4.11f | Wall clock from the task's start, so its adapters spend it. |
+| How a timed-out child is killed | FR-4.12e | `SIGKILL` to its process group, descendants included, no grace period. |
+| What records the executions never reached | FR-4.12f | The timed-out execution's reason carries the count. |
+| Whether a timed-out run folds what completed | FR-4.14a | It folds them, and carries its own reason beside theirs. |
 | Adapter when a task names none | FR-6.9 | The generic exit-code adapter. |
 | Resolving an adapter by name | FR-6.10 | From the config directory, where jigs already come from. |
 | A broken adapter | FR-6.11 | Bolt writes the envelope, and the reason says which of the three happened. |
@@ -745,20 +751,18 @@ entrypoint pattern down once per language**, not for a dependency graph.
 Nothing in the architecture mentions time, and what is here now comes from
 answers rather than from it.
 
-12. Where is each limit declared? A task's belongs on the task; a run's could
-    sit on the jig, on the command line, or both, and if both then which wins.
-13. How is a timed-out child terminated, which signal and with what grace, and
-    are its descendants killed with it? A command that spawns its own children
-    leaves them running when only the child is signalled, and they go on
-    writing into a work directory bolt has finished with, and into the streams
-    an adapter is about to read under FR-4.12a.
-14. What records the executions a task never reached? A per-path task cut off
-    at path fifty leaves fifty work directories and nothing saying the other
-    three hundred and fifty were never attempted. The run fails, correctly, and
-    a reader still cannot see how much went unchecked.
-15. Does a run that times out fold in the constituents that completed, or does
-    its result carry only the timeout? FR-4.14 keeps the evidence; whether the
-    merge runs over what is there is the part that is not settled.
+Questions 12 to 15 are closed, by defaults taken while building `runner/40`.
+Each became a row, and each row is one edit away from being right if the default
+was wrong:
+
+    12  where each limit is declared            FR-4.11d
+    13  how a timed-out child is terminated     FR-4.12e
+    14  what records the executions not reached FR-4.12f
+    15  whether a timed-out run folds           FR-4.14a
+
+Two more were not on this list and had to be answered to build it. What a task's
+limit measures, which is wall clock from the task's start, is FR-4.11f; how a
+limit is spelled, which is a decimal and `s`, `m` or `h`, is FR-4.11e.
 
 ## The output directory
 

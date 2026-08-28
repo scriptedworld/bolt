@@ -1,15 +1,17 @@
 //! Executing a jig's tasks and keeping what they produced.
 
-use std::fs;
+use std::fs::{self, File};
+use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::SystemTime;
+use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant, SystemTime};
 
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::adapter;
 use crate::definitions::{Definitions, RESERVED};
 use crate::jig::{self, Task};
+use crate::limit;
 use crate::selection::{self, consumes_paths, quote, quote_str};
 use crate::{Error, Outcome, merge, stamp, walk};
 
@@ -59,6 +61,117 @@ struct Scope<'a> {
     locations: &'a Locations,
     /// The jig's block and the named file, merged by FR-4.17.
     definitions: &'a Definitions,
+    /// The run's own limit, by FR-4.13, or `None` where the jig sets none.
+    ///
+    /// Scope-wide because it is the one limit that reaches everything: a
+    /// command, an adapter by FR-4.12c, and whether a later task starts at all.
+    run_limit: Option<Limit<'a>>,
+}
+
+/// A limit that has been read: when it runs out, and how the jig spelled it.
+///
+/// The written form travels with the instant so a reason quotes the jig rather
+/// than a rounding of it. A task told it passed `90s` when the jig says `1.5m`
+/// sends a reader looking for a number that is not in the file.
+#[derive(Debug, Clone, Copy)]
+struct Limit<'a> {
+    /// When it runs out.
+    at: Instant,
+    /// The limit as written in the jig.
+    written: &'a str,
+}
+
+/// The limits governing one task, by FR-4.11.
+#[derive(Debug, Clone, Copy)]
+struct Deadlines<'a> {
+    /// The run's, which outlives any one task.
+    run: Option<Limit<'a>>,
+    /// This task's own, measured from when the task started by FR-4.11f.
+    task: Option<Limit<'a>>,
+}
+
+/// Which limit fired, and how it was written.
+#[derive(Debug, Clone, Copy)]
+struct Expired<'a> {
+    /// Whether the run's limit or the task's, which decides what stops.
+    whose: Whose,
+    /// The limit as written in the jig, for the reason to quote.
+    written: &'a str,
+}
+
+/// Whose limit it was.
+///
+/// The two differ in what they stop. FR-4.12 has a task's limit fail that task
+/// and leave the run going, by FR-4.8. FR-4.13 has the run's stop the run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Whose {
+    /// The task's own limit.
+    Task,
+    /// The run's.
+    Run,
+}
+
+impl<'a> Deadlines<'a> {
+    /// When a command must be killed: whichever limit runs out first.
+    fn command(self) -> Option<Instant> {
+        limit::soonest(self.run.map(|run| run.at), self.task.map(|task| task.at))
+    }
+
+    /// When an adapter must be killed, by FR-4.11c.
+    ///
+    /// The run's limit alone. A task's limit does not reach its adapter, because
+    /// the adapter is what records that the limit fired and a budget exhausted
+    /// by the command it was killing would leave nothing to write the envelope
+    /// FR-4.12d requires.
+    fn adapter(self) -> Option<Instant> {
+        self.run.map(|run| run.at)
+    }
+
+    /// Which limit has already passed at `now`, where one has.
+    ///
+    /// The run's is tested first. Where both have passed the run's is the one
+    /// that matters, since it stops everything and the task's would stop one
+    /// task.
+    fn expired(self, now: Instant) -> Option<Expired<'a>> {
+        for (whose, limit) in [(Whose::Run, self.run), (Whose::Task, self.task)] {
+            if let Some(limit) = limit
+                && now >= limit.at
+            {
+                return Some(Expired {
+                    whose,
+                    written: limit.written,
+                });
+            }
+        }
+        None
+    }
+}
+
+impl Expired<'_> {
+    /// What a reason says when this limit fired, by FR-4.12 and FR-4.13.
+    ///
+    /// FR-4.12f puts the unattempted count here. A per-path task cut off at path
+    /// fifty leaves fifty work directories and nothing else saying the other
+    /// three hundred and fifty were never tried, so the reader who wants to know
+    /// how much went unchecked has only the reason to read it from.
+    fn message(self, task: &str, unattempted: usize) -> String {
+        let written = self.written;
+        // Both name the task, because this reason sits on an execution and a
+        // reader meets it there. The run's own reason, which FR-4.13 puts in the
+        // result, is written separately and names no task: the two would
+        // otherwise be the same sentence twice in one file.
+        let passed = match self.whose {
+            Whose::Task => format!("task {task} passed its time limit of {written}"),
+            Whose::Run => {
+                format!("task {task} was stopped when the run passed its time limit of {written}")
+            }
+        };
+        if unattempted == 0 {
+            passed
+        } else {
+            format!("{passed}; {unattempted} of its executions were not attempted")
+        }
+    }
 }
 
 /// The locations bolt exposes to every command, by FR-4.1b.
@@ -378,9 +491,17 @@ fn carry_out(
     // gate has run rather than partway through it. FR-4.18a puts the unknown
     // placeholder check here for the same reason, so a jig run where nothing
     // defines what it needs refuses in the first second rather than partway
-    // through a gate.
-    let commands = validate(&jig, &definitions)?;
+    // through a gate. FR-4.11e joins them: a limit that is not a duration is a
+    // jig error, and finding it two tasks in would waste the run it was meant
+    // to bound.
+    let plans = validate(&jig, &definitions)?;
+    let run_limit = read_limit(jig.time_limit.as_deref(), None)?;
     check_requires(&jig)?;
+
+    // FR-4.11f: the run's clock starts once the jig is known good. A refused jig
+    // spends none of the budget, and the walk, which is real work over a real
+    // tree, spends it like anything else does.
+    let started = Instant::now();
 
     // Created before the walk. Creating it afterwards made FR-2.2c's exclusion
     // below true by accident, for a directory bolt had not made yet.
@@ -397,15 +518,64 @@ fn carry_out(
     let scope = Scope {
         locations: &locations,
         definitions: &definitions,
+        run_limit: run_limit.map(|(duration, written)| Limit {
+            at: started + duration,
+            written,
+        }),
     };
 
-    let (executions, stopped) = run_tasks(&scope, &jig, commands, &walked)?;
+    let progress = run_tasks(&scope, &jig, plans, &walked)?;
 
-    merge::merge(&output_dir, base).map(|folded| Outcome {
-        executions,
-        stopped,
+    merge::merge(&output_dir, base, &run_reasons(progress.expired)).map(|folded| Outcome {
+        executions: progress.executions,
+        stopped: progress.stopped,
         ..folded
     })
+}
+
+/// The reasons a run carries in its own right, by FR-4.13.
+///
+/// Handed to the merge rather than left on disk for it to find, because a passed
+/// run limit is a property of the run and no constituent can carry it. FR-4.14
+/// is why the merge still runs at all: a run that times out carries what
+/// completed.
+///
+/// Named without a task, unlike the reason each stopped execution carries, so
+/// one file does not say the same sentence twice.
+fn run_reasons(expired: Option<&str>) -> Vec<Value> {
+    expired
+        .map(|written| {
+            json!({
+                "kind": limit::KIND,
+                "message": format!("the run passed its time limit of {written}"),
+            })
+        })
+        .into_iter()
+        .collect()
+}
+
+/// Read a `time-limit` as written, refusing by FR-4.11e where it is not one.
+///
+/// `task` names the task whose limit it is, or `None` for the jig's own, so the
+/// reason says which line to edit.
+///
+/// Reading an unparseable limit as no limit is the alternative, and it fails
+/// silently: the run goes unbounded exactly where somebody asked for a ceiling,
+/// and the jig looks like it has one.
+fn read_limit<'a>(
+    written: Option<&'a str>,
+    task: Option<&str>,
+) -> Result<Option<(Duration, &'a str)>, Error> {
+    let Some(written) = written else {
+        return Ok(None);
+    };
+    let Some(duration) = limit::parse(written) else {
+        return Err(Error::MalformedTimeLimit {
+            task: task.map(str::to_owned),
+            value: written.to_owned(),
+        });
+    };
+    Ok(Some((duration, written)))
 }
 
 /// Execute a jig's tasks in order, returning how many ran and what did not.
@@ -419,27 +589,77 @@ fn carry_out(
 /// just wrote rather than tracked alongside. The envelope is the authoritative
 /// result by FR-6.1, and a second copy in bookkeeping is a second thing that can
 /// disagree with the evidence on disk.
-fn run_tasks(
-    scope: &Scope,
-    jig: &jig::Jig,
-    commands: Vec<&str>,
+fn run_tasks<'a>(
+    scope: &Scope<'a>,
+    jig: &'a jig::Jig,
+    plans: Vec<Plan<'a>>,
     walked: &[PathBuf],
-) -> Result<(usize, Vec<String>), Error> {
+) -> Result<Progress<'a>, Error> {
     let mut executions = 0;
+    let names_from = |index: usize| -> Vec<String> {
+        jig.tasks[index..]
+            .iter()
+            .map(|later| later.name.clone())
+            .collect()
+    };
 
-    for (index, (task, command)) in jig.tasks.iter().zip(commands).enumerate() {
-        executions += run_task(scope, task, command, walked)?;
+    for (index, (task, plan)) in jig.tasks.iter().zip(plans).enumerate() {
+        // FR-4.13's limit stops tasks starting, the same way FR-4.11b's stops
+        // executions starting. Checked before the task rather than after, so a
+        // run already over its budget does not begin work it will have to kill.
+        if let Some(expired) = scope.run_limit.filter(|run| Instant::now() >= run.at) {
+            return Ok(Progress {
+                executions,
+                stopped: names_from(index),
+                expired: Some(expired.written),
+            });
+        }
+
+        let ran = run_task(scope, task, &plan, walked)?;
+        executions += ran.executions;
+
+        // A task's own limit fails that task and leaves the run going, by
+        // FR-4.12 and FR-4.8. Only the run's stops everything.
+        if let Some(expired) = ran.expired.filter(|it| it.whose == Whose::Run) {
+            return Ok(Progress {
+                executions,
+                stopped: names_from(index + 1),
+                expired: Some(expired.written),
+            });
+        }
 
         if task.short_circuit_failure && !task_passed(&scope.locations.output_dir, &task.name) {
-            let stopped = jig.tasks[index + 1..]
-                .iter()
-                .map(|later| later.name.clone())
-                .collect();
-            return Ok((executions, stopped));
+            return Ok(Progress {
+                executions,
+                stopped: names_from(index + 1),
+                expired: None,
+            });
         }
     }
 
-    Ok((executions, Vec::new()))
+    Ok(Progress {
+        executions,
+        stopped: Vec::new(),
+        expired: None,
+    })
+}
+
+/// How far a run got.
+struct Progress<'a> {
+    /// How many executions ran, across every task.
+    executions: usize,
+    /// Tasks that did not run, in declaration order.
+    stopped: Vec<String>,
+    /// The run's limit as written, where it was the run's limit that stopped it.
+    expired: Option<&'a str>,
+}
+
+/// How far one task got.
+struct TaskRun<'a> {
+    /// How many times its command executed.
+    executions: usize,
+    /// Which limit fired during it, where one did.
+    expired: Option<Expired<'a>>,
 }
 
 /// Whether every execution of `task` passed, read back off what it wrote.
@@ -474,12 +694,26 @@ fn task_passed(output_dir: &Path, task: &str) -> bool {
         })
 }
 
+/// What validation settled about one task, so the run does not re-derive it.
+///
+/// Everything here was proved before any task executed, which is what FR-3.10b
+/// and FR-4.18a ask for and what FR-4.11e joins.
+struct Plan<'a> {
+    /// The command line as written, which validation proved present.
+    command: &'a str,
+    /// Whether the command names a path variable, by FR-4.2.
+    wants_paths: bool,
+    /// This task's limit and how the jig spelled it, proved a duration by
+    /// FR-4.11e. It becomes a deadline when the task starts, by FR-4.11f.
+    limit: Option<(Duration, &'a str)>,
+}
+
 /// Everything a jig is refused for, checked before any task executes.
 ///
 /// FR-3.10b makes that the shape: an incomplete jig is known before half a gate
-/// has run rather than partway through it. Returns each task's command, so the
-/// run loop does not re-derive what this already proved present.
-fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<&'a str>, Error> {
+/// has run rather than partway through it. Returns each task's plan, so the run
+/// loop does not re-derive what this already proved.
+fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<Plan<'a>>, Error> {
     let mut commands = Vec::with_capacity(jig.tasks.len());
     let mut seen: Vec<&str> = Vec::with_capacity(jig.tasks.len());
 
@@ -525,7 +759,11 @@ fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<&'a 
             }
         }
 
-        commands.push(command);
+        commands.push(Plan {
+            command,
+            wants_paths: consumes_paths(command),
+            limit: read_limit(task.time_limit.as_deref(), Some(&task.name))?,
+        });
     }
 
     Ok(commands)
@@ -550,28 +788,55 @@ fn placeholders(command: &str) -> Vec<&str> {
     found
 }
 
-/// Run one task, returning how many times its command executed.
-fn run_task(scope: &Scope, task: &Task, command: &str, walked: &[PathBuf]) -> Result<usize, Error> {
+/// Run one task, returning how far it got.
+fn run_task<'a>(
+    scope: &Scope<'a>,
+    task: &Task,
+    plan: &Plan<'a>,
+    walked: &[PathBuf],
+) -> Result<TaskRun<'a>, Error> {
     let base = scope.locations.base_dir.as_path();
-    let wants_paths = consumes_paths(command);
     let selection = narrow(base, walked, task)?;
 
-    if wants_paths && selection.selected.is_empty() {
+    if plan.wants_paths && selection.selected.is_empty() {
         // FR-4.4c: an allowed empty selection produces no constituent at all,
         // which is what FR-4.4 alone used to mean for every task.
         if task.allow_empty {
-            return Ok(0);
+            return Ok(TaskRun {
+                executions: 0,
+                expired: None,
+            });
         }
-        empty_selection(scope, task, command, &selection)?;
-        return Ok(0);
+        empty_selection(scope, task, plan.command, &selection)?;
+        return Ok(TaskRun {
+            executions: 0,
+            expired: None,
+        });
     }
 
-    let batches = batches_for(command, wants_paths, &selection);
+    execute_batches(scope, task, plan, &selection)
+}
+
+/// Execute a task's batches in turn, stopping at whichever limit fires first.
+///
+/// FR-4.11f measures the task's limit from here, which is wall clock from the
+/// moment the task starts. FR-4.11c keeps that budget off the adapters, so what
+/// it charges for is the task's own commands and the short gaps between them,
+/// never a tool bolt promised would get to record the kill.
+fn execute_batches<'a>(
+    scope: &Scope<'a>,
+    task: &Task,
+    plan: &Plan<'a>,
+    selection: &Selection,
+) -> Result<TaskRun<'a>, Error> {
+    let batches = batches_for(plan.command, plan.wants_paths, selection);
 
     // FR-9.6: a task naming no path variable was handed no list, so its
     // manifest claims none. Recording one would say the command saw files it
     // never received, so the key is absent rather than empty.
-    let recorded = wants_paths.then_some(&selection);
+    let recorded = plan.wants_paths.then_some(selection);
+
+    let deadlines = deadlines_for(scope, plan);
 
     for (index, batch) in batches.iter().enumerate() {
         let work_dir = scope
@@ -587,14 +852,98 @@ fn run_task(scope: &Scope, task: &Task, command: &str, walked: &[PathBuf]) -> Re
         let execution = Execution {
             task: &task.name,
             ordinal: index + 1,
-            command: substitute(command, &task.name, scope, &work_dir, batch)?,
+            command: substitute(plan.command, &task.name, scope, &work_dir, batch)?,
             work_dir,
         };
         write_manifest(scope, &execution, recorded)?;
-        execute(scope, task, &execution)?;
+
+        // FR-4.11b: the executions after a killed one do not start. This is the
+        // case where the limit fell between two of them rather than during one,
+        // so nothing was killed and nothing would otherwise record that the
+        // task ran out. FR-9.5a's manifest is already written above, which is
+        // that row's "never got started" clause doing its work.
+        if let Some(expired) = deadlines.expired(Instant::now()) {
+            return stopped_at(&execution, expired, index, batches.len());
+        }
+
+        if let Some(expired) = execute(scope, task, &execution, deadlines)? {
+            return stopped_at(&execution, expired, index + 1, batches.len());
+        }
     }
 
-    Ok(batches.len())
+    Ok(TaskRun {
+        executions: batches.len(),
+        expired: None,
+    })
+}
+
+/// The limits governing one task, taken as it starts.
+///
+/// FR-4.11f measures the task's from here, so it is wall clock from the moment
+/// the task starts rather than a total of what its commands spent.
+fn deadlines_for<'a>(scope: &Scope<'a>, plan: &Plan<'a>) -> Deadlines<'a> {
+    Deadlines {
+        run: scope.run_limit,
+        task: plan.limit.map(|(duration, written)| Limit {
+            at: Instant::now() + duration,
+            written,
+        }),
+    }
+}
+
+/// What a task returns when a limit stopped it after `executions` of `total`.
+///
+/// The two ways a task stops share this, because they differ only in whether the
+/// execution holding the reason ran: one was killed partway, the other never
+/// started. Either way what is left unattempted is the rest of the list, and
+/// FR-4.12f wants that count in the reason.
+fn stopped_at<'a>(
+    execution: &Execution,
+    expired: Expired<'a>,
+    executions: usize,
+    total: usize,
+) -> Result<TaskRun<'a>, Error> {
+    timed_out(execution, expired, total - executions)?;
+    Ok(TaskRun {
+        executions,
+        expired: Some(expired),
+    })
+}
+
+/// Record on one execution that a limit fired.
+///
+/// FR-4.12b: it fails whatever its adapter concluded, and its reasons carry at
+/// least the limit being passed. The adapter's own reasons are kept beside it,
+/// because a tool that reported forty problems before hanging reported forty
+/// real problems and FR-4.12a keeps them.
+///
+/// FR-4.12d holds either way. An adapter that wrote an envelope has it amended;
+/// an execution that never started gets one written here. So a timed-out
+/// execution always has a valid envelope, which is what distinguishes it from
+/// one whose adapter died of its own accord and left none.
+fn timed_out(execution: &Execution, expired: Expired, unattempted: usize) -> Result<(), Error> {
+    let path = execution.work_dir.join(OUTPUT_FILE);
+
+    // The limit first, because it is why the rest is partial.
+    let mut reasons = vec![json!({
+        "kind": limit::KIND,
+        "message": expired.message(execution.task, unattempted),
+    })];
+    if let Ok(envelope) = merge::read(&path, &wrench::ENVELOPE_SCHEMA) {
+        reasons.extend(
+            envelope
+                .get("reasons")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default(),
+        );
+    }
+
+    save(
+        &path,
+        &json!({ "success": false, "reasons": reasons }),
+        &wrench::ENVELOPE_SCHEMA,
+    )
 }
 
 /// How a task's selection divides into executions, by FR-4.2.
@@ -660,37 +1009,205 @@ fn narrow(base: &Path, walked: &[PathBuf], task: &Task) -> Result<Selection, Err
 
 /// Run one execution's command and capture what it produced.
 ///
-/// FR-4.15 runs it as a subprocess, so the streams and the status FR-9.2 keeps
-/// come from the process boundary rather than from bookkeeping bolt would
-/// otherwise have to trust.
-fn execute(scope: &Scope, task: &Task, execution: &Execution) -> Result<(), Error> {
-    let base = scope.locations.base_dir.as_path();
+/// Returns which limit fired, where one did, so the task loop knows whether to
+/// stop this task or the whole run.
+fn execute<'a>(
+    scope: &Scope<'a>,
+    task: &Task,
+    execution: &Execution,
+    deadlines: Deadlines<'a>,
+) -> Result<Option<Expired<'a>>, Error> {
     let work_dir = execution.work_dir.as_path();
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(&execution.command)
-        // FR-4.1a stands the command at the base, so a relative path in a jig
-        // means the same thing as a relative path in the tree.
-        .current_dir(base)
-        .output()
-        .map_err(|source| Error::Io {
-            path: work_dir.to_path_buf(),
-            reason: source.to_string(),
-        })?;
+    let ran = spawn_and_wait(
+        &execution.command,
+        scope.locations.base_dir.as_path(),
+        Output {
+            work_dir,
+            kept: true,
+        },
+        deadlines.command(),
+    )?;
 
-    write(&work_dir.join(adapter::STDOUT_FILE), &output.stdout)?;
-    write(&work_dir.join(adapter::STDERR_FILE), &output.stderr)?;
-    let status = output.status.code().unwrap_or(-1);
+    // Read at the kill rather than after the adapter, because both limits keep
+    // running while the adapter does and the answer would drift.
+    let expired = if ran.killed {
+        deadlines.expired(Instant::now())
+    } else {
+        None
+    };
+
     write(
         &work_dir.join(EXITCODE_FILE),
-        format!("{status}\n").as_bytes(),
+        format!("{}\n", ran.status).as_bytes(),
     )?;
 
     // FR-9.2 keeps whatever files the command wrote in its work directory. A
     // command is stood at the base, so anything it addressed at {work_dir} is
     // already here and nothing needs collecting.
+    //
+    // FR-4.12a: a killed command keeps whatever output it gathered and its
+    // adapter runs over that. The streams went to their files as the command
+    // wrote them, so a partial capture is already there and there is nothing to
+    // recover from a pipe the kill closed.
+    let adapter_expired = adapt(scope, task, execution, &ran, deadlines)?;
 
-    adapt(scope, task, execution, status)
+    // The adapter's answer wins where there is one, because only the run's limit
+    // can reach an adapter and the run's limit is what stops everything.
+    Ok(adapter_expired.or(expired))
+}
+
+/// Where an execution's streams go, and where a failure to start is reported.
+#[derive(Debug, Clone, Copy)]
+struct Output<'a> {
+    /// The work directory this execution owns.
+    work_dir: &'a Path,
+    /// Whether the streams are kept as evidence or discarded.
+    ///
+    /// A command's are kept, by FR-9.2, and FR-6.2 hands them to the adapter.
+    /// An adapter's own are discarded: FR-6.2b puts its result in the envelope,
+    /// and writing its chatter into the work directory would overwrite the
+    /// capture it was called to read.
+    kept: bool,
+}
+
+/// What running a command came to.
+struct Ran {
+    /// Its exit status, or -1 where a signal ended it.
+    status: i32,
+    /// Whether a limit killed it rather than it finishing on its own.
+    killed: bool,
+}
+
+/// How long a poll waits before looking again, at most.
+///
+/// A limit set in tens of milliseconds is still observed promptly, because the
+/// interval starts far below this and doubles up to it. A gate running for
+/// minutes is not woken hundreds of times a second to be told nothing changed.
+const POLL_CEILING: Duration = Duration::from_millis(50);
+
+/// Run a command line to completion, or to `deadline` where one is set.
+///
+/// FR-4.15 runs it as a subprocess, so the streams and the status FR-9.2 keeps
+/// come from the process boundary rather than from bookkeeping bolt would
+/// otherwise have to trust.
+///
+/// **The streams go straight to their files rather than through a pipe**, which
+/// is what makes FR-4.12a hold: a killed command's partial output is already on
+/// disk, with nothing left to drain from a pipe its own death closed. It also
+/// removes the deadlock a polled wait would otherwise invite, where a child
+/// blocks filling a pipe nobody is reading while bolt waits for it to exit.
+fn spawn_and_wait(
+    command: &str,
+    base: &Path,
+    output: Output,
+    deadline: Option<Instant>,
+) -> Result<Ran, Error> {
+    let io = |source: std::io::Error| Error::Io {
+        path: output.work_dir.to_path_buf(),
+        reason: source.to_string(),
+    };
+    let (stdout, stderr) = streams(&output)?;
+
+    let mut child = Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        // FR-4.1a stands the command at the base, so a relative path in a jig
+        // means the same thing as a relative path in the tree.
+        .current_dir(base)
+        // As `Command::output` left it. A gate command that inherited a terminal
+        // could block on a read nobody is going to answer.
+        .stdin(Stdio::null())
+        .stdout(stdout)
+        .stderr(stderr)
+        // FR-4.12e wants the descendants killed with the child, and this is what
+        // makes that possible: the child leads a group of its own, so a signal
+        // to that group reaches what it spawned and nothing else.
+        .process_group(0)
+        .spawn()
+        .map_err(io)?;
+
+    wait_for(&mut child, deadline).map_err(io)
+}
+
+/// The two stdio handles an execution's streams go to.
+fn streams(output: &Output) -> Result<(Stdio, Stdio), Error> {
+    if !output.kept {
+        return Ok((Stdio::null(), Stdio::null()));
+    }
+    let create = |name: &str| -> Result<Stdio, Error> {
+        let path = output.work_dir.join(name);
+        File::create(&path)
+            .map(Stdio::from)
+            .map_err(|source| Error::Io {
+                path,
+                reason: source.to_string(),
+            })
+    };
+    Ok((create(adapter::STDOUT_FILE)?, create(adapter::STDERR_FILE)?))
+}
+
+/// Wait for a child, killing it and its group where `deadline` passes first.
+///
+/// Polled rather than blocked, because a blocking wait cannot be interrupted by
+/// a clock and bolt has no other thread to hold one.
+fn wait_for(child: &mut Child, deadline: Option<Instant>) -> std::io::Result<Ran> {
+    let code = |status: std::process::ExitStatus| status.code().unwrap_or(-1);
+
+    let Some(deadline) = deadline else {
+        return Ok(Ran {
+            status: code(child.wait()?),
+            killed: false,
+        });
+    };
+
+    let mut interval = Duration::from_millis(1);
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Ok(Ran {
+                status: code(status),
+                killed: false,
+            });
+        }
+        let now = Instant::now();
+        if now >= deadline {
+            kill_group(child);
+            return Ok(Ran {
+                status: code(child.wait()?),
+                killed: true,
+            });
+        }
+        std::thread::sleep(interval.min(deadline - now));
+        interval = (interval * 2).min(POLL_CEILING);
+    }
+}
+
+/// Kill a child and everything it started, by FR-4.12e.
+///
+/// `SIGKILL` to the process group rather than to the child alone. A command that
+/// spawned its own children leaves them running when only the child is
+/// signalled, and they go on writing into a work directory bolt has finished
+/// with and into the streams an adapter is about to read under FR-4.12a.
+///
+/// No grace period and no `SIGTERM` first. The limit is the grace period: it was
+/// declared in the jig, the command has had all of it, and a second countdown
+/// would make the declared number mean something other than what it says.
+///
+/// The group is the child's own, established by `process_group(0)` at spawn, so
+/// the negative pid reaches what bolt started and nothing else. Signalling
+/// bolt's own group would include bolt.
+///
+/// The child is not reaped before this, so its pid is still its own and cannot
+/// have been reused by an unrelated process.
+fn kill_group(child: &Child) {
+    let Ok(leader) = i32::try_from(child.id()) else {
+        return;
+    };
+    // SAFETY: `kill` takes two integers and touches no memory bolt owns. The
+    // negative pid names the group this child leads, which the spawn
+    // established, so nothing bolt did not start is in it.
+    unsafe {
+        libc::kill(-leader, libc::SIGKILL);
+    }
 }
 
 /// Reach a verdict for one execution, by FR-6.1.
@@ -703,7 +1220,13 @@ fn execute(scope: &Scope, task: &Task, execution: &Execution) -> Result<(), Erro
 ///
 /// FR-6.9 then: a task naming no adapter gets the generic exit-code one, which
 /// is the one adapter that needs to know nothing about the tool it reads.
-fn adapt(scope: &Scope, task: &Task, execution: &Execution, status: i32) -> Result<(), Error> {
+fn adapt<'a>(
+    scope: &Scope<'a>,
+    task: &Task,
+    execution: &Execution,
+    ran: &Ran,
+    deadlines: Deadlines<'a>,
+) -> Result<Option<Expired<'a>>, Error> {
     let work_dir = execution.work_dir.as_path();
 
     if let Some(missing) = task
@@ -716,19 +1239,28 @@ fn adapt(scope: &Scope, task: &Task, execution: &Execution, status: i32) -> Resu
             false,
             "evidence-missing",
             &format!("{} declared {missing} and did not write it", task.name),
-        );
+        )
+        .map(|()| None);
     }
 
     let Some(name) = task.adapter.as_deref() else {
+        // FR-6.9a: the generic exit-code adapter does not run on a command a
+        // limit killed. That status is bolt's own signal rather than an answer
+        // the tool gave, so `timed_out` writes the envelope and FR-4.12b's
+        // reason is the verdict.
+        if ran.killed {
+            return Ok(None);
+        }
         return write_envelope(
             work_dir,
-            status == 0,
+            ran.status == 0,
             "nonzero-exit",
-            &format!("{} exited {status}", execution.task),
-        );
+            &format!("{} exited {}", execution.task, ran.status),
+        )
+        .map(|()| None);
     };
 
-    run_adapter(scope, task, execution, name)
+    run_adapter(scope, task, execution, name, deadlines)
 }
 
 /// Run a named adapter and take its verdict, or say why bolt could not.
@@ -742,50 +1274,90 @@ fn adapt(scope: &Scope, task: &Task, execution: &Execution, status: i32) -> Resu
 /// FR-6.12 leaves canonical form to the adapter: bolt validates on the way in
 /// and does not reparse to compare, which FR-6.13 says would fail every jig that
 /// documents itself.
-fn run_adapter(scope: &Scope, task: &Task, execution: &Execution, name: &str) -> Result<(), Error> {
+fn run_adapter<'a>(
+    scope: &Scope<'a>,
+    task: &Task,
+    execution: &Execution,
+    name: &str,
+    deadlines: Deadlines<'a>,
+) -> Result<Option<Expired<'a>>, Error> {
     let work_dir = execution.work_dir.as_path();
     let envelope = work_dir.join(OUTPUT_FILE);
     let _ = fs::remove_file(&envelope);
 
-    // FR-6.2d: an explicit invocation gets the same substitutions a command
-    // gets, so it names the locations and the captures the same way.
-    let written = task.adapter_command.clone().unwrap_or_else(|| {
+    // FR-4.12c: the run's limit is the one that reaches an adapter, and bolt
+    // writes that envelope itself because nothing else is left to. An adapter
+    // whose budget has already gone is not started at all: spawning it to kill
+    // it a moment later would let it write half of something first, and the
+    // observable outcome is the same either way.
+    let out_of_time = |limit: Limit<'a>| Expired {
+        whose: Whose::Run,
+        written: limit.written,
+    };
+    if let Some(run) = scope.run_limit.filter(|run| Instant::now() >= run.at) {
+        return Ok(Some(out_of_time(run)));
+    }
+
+    let line = substitute(
+        &invocation(scope, task, name),
+        &task.name,
+        scope,
+        work_dir,
+        &[],
+    )?;
+
+    let ran = spawn_and_wait(
+        &line,
+        &scope.locations.base_dir,
+        Output {
+            work_dir,
+            kept: false,
+        },
+        deadlines.adapter(),
+    )?;
+
+    if ran.killed {
+        return Ok(scope.run_limit.map(out_of_time));
+    }
+
+    // FR-6.1: where the adapter reached an authoritative result, that result is
+    // the verdict and bolt does not second-guess it.
+    match unauthoritative(&ran, &envelope) {
+        None => Ok(None),
+        Some(why) => write_envelope(work_dir, false, why.kind(), &why.message(name)).map(|()| None),
+    }
+}
+
+/// The adapter invocation, as written before substitution.
+///
+/// FR-6.2d: an explicit one gets the same substitutions a command gets, so it
+/// names the locations and the captures the same way. Two spellings would make
+/// the jig format teach itself twice.
+fn invocation(scope: &Scope, task: &Task, name: &str) -> String {
+    task.adapter_command.clone().unwrap_or_else(|| {
         adapter::default_invocation(
             &adapter::path(&scope.locations.config_dir, name)
                 .display()
                 .to_string(),
             &task.evidence,
         )
-    });
-    let line = substitute(&written, &task.name, scope, work_dir, &[])?;
+    })
+}
 
-    let output = Command::new("sh")
-        .arg("-c")
-        .arg(&line)
-        .current_dir(&scope.locations.base_dir)
-        .output()
-        .map_err(|source| Error::Io {
-            path: work_dir.to_path_buf(),
-            reason: source.to_string(),
-        })?;
-
-    let unauthoritative = if !output.status.success() {
-        Some(adapter::Unauthoritative::Exited(
-            output.status.code().unwrap_or(-1),
-        ))
+/// Why an adapter's result cannot be taken, where it cannot, by FR-6.11.
+///
+/// The three are kept apart because they have different causes: a crashing
+/// adapter, a silent one, and one whose output is not an envelope are three
+/// different things to go and fix.
+fn unauthoritative(ran: &Ran, envelope: &Path) -> Option<adapter::Unauthoritative> {
+    if ran.status != 0 {
+        Some(adapter::Unauthoritative::Exited(ran.status))
     } else if !envelope.is_file() {
         Some(adapter::Unauthoritative::WroteNothing)
-    } else if merge::read(&envelope, &wrench::ENVELOPE_SCHEMA).is_err() {
+    } else if merge::read(envelope, &wrench::ENVELOPE_SCHEMA).is_err() {
         Some(adapter::Unauthoritative::WroteInvalid)
     } else {
         None
-    };
-
-    // FR-6.1: where the adapter reached an authoritative result, that result is
-    // the verdict and bolt does not second-guess it.
-    match unauthoritative {
-        None => Ok(()),
-        Some(why) => write_envelope(work_dir, false, why.kind(), &why.message(name)),
     }
 }
 
@@ -819,6 +1391,7 @@ fn substitute(
     let Scope {
         locations,
         definitions,
+        ..
     } = scope;
     let joined = paths
         .iter()
@@ -901,6 +1474,7 @@ fn write_manifest(
     let Scope {
         locations,
         definitions,
+        ..
     } = scope;
     let Execution {
         task,

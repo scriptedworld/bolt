@@ -18,15 +18,23 @@ use crate::{Error, Outcome};
 /// no constituent whose failure does not count, because a check nobody wants
 /// enforced is a check not in the jig.
 ///
+/// `reasons` are the run's own, which no constituent can carry: FR-4.13's
+/// passed run limit is a property of the run rather than of any one execution.
+/// FR-8.1's repeatability is unaffected, because it is about the fold being
+/// mechanical over what it is given: the same directory and the same reasons
+/// produce the same file every time.
+///
 /// # Errors
 ///
-/// [`Error::NoConstituents`] when the fold finds none, by FR-8.3a. FR-8.3 on
-/// its own would pass such a run, because every constituent passing holds
-/// vacuously when there are none, and a green result over zero checks is read
-/// as checked and fine.
+/// [`Error::NoConstituents`] when the fold finds none **and the run has no
+/// reason of its own**, by FR-8.3a. FR-8.3 alone would pass such a run, because
+/// every constituent passing holds vacuously when there are none, and a green
+/// result over zero checks is read as checked and fine. A run carrying a reason
+/// is not that case: it reports a failure with the reason for it, which is what
+/// FR-4.14 asks for when a run times out before anything finished.
 ///
 /// [`Error::Io`] when the result cannot be written.
-pub fn merge(output_dir: &Path, base: &Path) -> Result<Outcome, Error> {
+pub fn merge(output_dir: &Path, base: &Path, reasons: &[Value]) -> Result<Outcome, Error> {
     let work = output_dir.join(WORK_DIR);
     let mut entries: Vec<_> = fs::read_dir(&work)
         .map_err(|source| Error::Io {
@@ -43,11 +51,16 @@ pub fn merge(output_dir: &Path, base: &Path) -> Result<Outcome, Error> {
     // verdict, and a directory read order is not stable.
     entries.sort();
 
-    if entries.is_empty() {
+    if entries.is_empty() && reasons.is_empty() {
         return Err(Error::NoConstituents);
     }
 
-    let folded = fold(&entries)?;
+    let mut folded = fold(&entries)?;
+
+    // The run's own reasons first. They are why the constituents stop where they
+    // do, so a reader meets the explanation before the partial evidence it
+    // explains.
+    folded.reasons.splice(..0, reasons.iter().cloned());
     let success = folded.reasons.is_empty();
 
     // FR-8.9 puts the base here. It is the first thing a reader asks of a

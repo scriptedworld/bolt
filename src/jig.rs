@@ -41,6 +41,19 @@ pub struct Jig {
     #[serde(default)]
     pub definitions: Option<serde_json::Value>,
 
+    /// How long the whole run may take, by FR-4.11 and FR-4.11d.
+    ///
+    /// The run's limit sits on the jig because that is the one document
+    /// describing the run as a whole. Not on the command line as well, since two
+    /// places setting one value is the precedence question FR-4.16's layering
+    /// exists to confine to definitions, and nothing has asked for it.
+    ///
+    /// Held as written and read by [`crate::limit::parse`], because FR-4.11e's
+    /// spelling is bolt's rather than the schema's: wrench validates a jig's
+    /// shape and a duration is a string to it.
+    #[serde(default, rename = "time-limit")]
+    pub time_limit: Option<String>,
+
     /// The tasks, in the order the jig declares them.
     ///
     /// FR-4.5 says they execute serially. Whether serial means *in this order*
@@ -127,6 +140,14 @@ pub struct Task {
     /// the default would leave it, because FR-6.2b's name never varies.
     #[serde(rename = "adapter-command")]
     pub adapter_command: Option<String>,
+
+    /// How long this task may take, by FR-4.11 and FR-4.11d.
+    ///
+    /// FR-4.11a makes it cover all of the task's executions taken together, so
+    /// thirty seconds over four hundred paths is thirty seconds for the task.
+    /// FR-4.11f measures it as wall clock from the moment the task starts.
+    #[serde(default, rename = "time-limit")]
+    pub time_limit: Option<String>,
 
     /// The files this task produces that its adapter should read, by FR-6.2c.
     ///
