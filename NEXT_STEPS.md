@@ -504,6 +504,29 @@ to discover it. FR-10.7b already says a caller wanting a parseable refusal in
 every case names one outside the tree, and this is the same advice reached from
 the other direction.
 
+## FR-10.3 is why bolt prints no summary line, and the Go build shows the cost
+
+Not a question. Recorded because the pressure to add one will recur, and the
+argument against it is easy to lose.
+
+The Go build ends a run with a line pairing the overall verdict with the total
+execution count, so three tasks with one failing print `failed: 3 execution(s)`.
+FACT 2026-08-28, reproduced here. A reader takes it as a failure count. The
+passing case reads correctly by accident, because with nothing failing the two
+numbers coincide, which is how it survived.
+
+**The wording is the symptom.** The cause is a command line stating a verdict at
+all. `cli.rs` prints the result path and nothing else, citing FR-10.3: the
+verdict is in the envelope, so what a caller is told is *where to read it* rather
+than what it says. That is already the stronger position and it is the one that
+makes this defect unreachable rather than merely unlikely.
+
+So the note is not "word it carefully" but **do not grow one**. A summary that
+states a verdict duplicates the envelope, and a duplicate is free to disagree
+with it, which is exactly what the Go build did to itself. If a run summary is
+ever wanted for a person at a terminal, it belongs behind a flag that says so,
+and it counts what it says it counts.
+
 ## FR-10.7 has a destructive shape, and the Go bolt is standing on it
 
 Not a question. Recorded because implementing FR-10.7 without this in hand
