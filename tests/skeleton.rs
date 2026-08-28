@@ -1644,6 +1644,270 @@ fn evidence_is_keyed_by_execution_and_carries_args_and_result() {
     );
 }
 
+// ---- requires, and stopping when a jig asks ---------------------------------
+
+// COVERS: FR-3.10, FR-3.10b, FR-3.10d | negative
+/// A jig requiring a tool that is not there refuses before anything executes.
+///
+/// FR-3.10b: an incomplete toolchain is known before half a gate has run rather
+/// than partway through it. FR-3.10d is the same check from the other side, for
+/// a project jig naming a tool the base image lacks.
+///
+/// Asserted on evidence rather than on the status, because a refusal that
+/// happened *after* the first task ran would exit 1 just the same. Nothing may
+/// have executed.
+#[test]
+fn a_jig_requiring_a_missing_tool_refuses_before_executing() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "requires: [\"sh\", \"definitely-not-a-real-tool-8f3a\"]\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+
+    let refusal = bolt::run::run("check", root.path()).expect_err("a missing tool refuses");
+    assert!(
+        matches!(refusal, bolt::Error::RequiresMissing { .. }),
+        "wrong refusal for a missing tool: {refusal:?}",
+    );
+    assert!(
+        refusal
+            .to_string()
+            .contains("definitely-not-a-real-tool-8f3a"),
+        "the reason does not name the tool: {refusal}",
+    );
+    assert!(
+        !refusal.to_string().contains("\"sh\""),
+        "the reason names a tool that is present: {refusal}",
+    );
+
+    let ran = fs::read_dir(root.path())
+        .expect("the base is readable")
+        .filter_map(Result::ok)
+        .any(|entry| {
+            entry
+                .path()
+                .join(bolt::run::WORK_DIR)
+                .join("alpha-1")
+                .exists()
+        });
+    assert!(!ran, "a task executed before the missing tool was found");
+}
+
+// COVERS: FR-3.10a | negative
+/// Every missing entry is named, not the first.
+///
+/// A caller fixing them one at a time pays a round trip per tool, which is the
+/// cost the row exists to remove. FR-3.10a is the consistency this makes
+/// checkable: an adapter no entry covers is found before a run rather than when
+/// the task reaches it, and that only helps if the whole list is resolved.
+#[test]
+fn a_refusal_names_every_missing_tool() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "requires: [\"missing-tool-zeta\", \"sh\", \"missing-tool-alpha\"]\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+
+    let refusal = bolt::run::run("check", root.path()).expect_err("missing tools refuse");
+    let said = refusal.to_string();
+
+    assert!(
+        said.contains("missing-tool-alpha") && said.contains("missing-tool-zeta"),
+        "the reason does not name both missing tools: {said}",
+    );
+    // Sorted, so a jig missing three tools names them the same way every run
+    // and two runs of a gate produce a diffable message.
+    assert!(
+        said.find("missing-tool-alpha") < said.find("missing-tool-zeta"),
+        "the missing tools are not in a stable order: {said}",
+    );
+}
+
+// COVERS: FR-3.10 | positive
+/// A jig whose `requires` are all present runs as before.
+#[test]
+fn a_jig_requiring_only_present_tools_runs() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "requires: [\"sh\"]\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("a satisfied jig runs");
+    assert!(outcome.success, "the run did not pass");
+}
+
+// COVERS: FR-4.8 | positive
+/// A failing task does not stop the run.
+///
+/// FR-4.8 is the default and the reason for it: a run that stops early throws
+/// away the evidence the later tasks would have produced and leaves a reader
+/// unable to tell what else was wrong. Asserted by requiring the task *after*
+/// the failure to have left its own evidence behind.
+#[test]
+fn a_failing_task_does_not_stop_the_run() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        concat!(
+            "  - name: alpha\n    command: \"sh -c 'exit 3'\"\n",
+            "  - name: beta\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    assert!(!outcome.success, "a failing task did not fail the run");
+    assert!(
+        outcome.stopped.is_empty(),
+        "nothing asked to stop, yet something was reported unreached: {:?}",
+        outcome.stopped,
+    );
+    assert!(
+        work(&outcome, "beta-1")
+            .join(bolt::run::OUTPUT_FILE)
+            .is_file(),
+        "the task after the failure did not execute",
+    );
+}
+
+// COVERS: FR-4.9 | positive
+/// A task carrying `short-circuit-failure` stops the run when it fails.
+///
+/// Stopping is what a jig asks for rather than what it gets. The tasks after it
+/// are reported as not reached, so a reader sees what was not attempted rather
+/// than inferring it from what is absent, which is not the same thing: a task
+/// missing from the evidence could equally have skipped an empty selection.
+#[test]
+fn short_circuit_failure_stops_the_run_and_says_what_was_not_reached() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        concat!(
+            "  - name: alpha\n    command: \"sh -c 'exit 3'\"\n    short-circuit-failure: true\n",
+            "  - name: beta\n    command: \"sh -c 'exit 0'\"\n",
+            "  - name: gamma\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    assert!(!outcome.success, "a short-circuited run did not fail");
+    assert_eq!(
+        outcome.stopped,
+        vec!["beta".to_owned(), "gamma".to_owned()],
+        "the tasks not reached are not reported, or not in declaration order",
+    );
+    assert!(
+        !work(&outcome, "beta-1").exists(),
+        "a task after the short-circuit executed anyway",
+    );
+}
+
+// COVERS: FR-4.9 | edge
+/// `short-circuit-failure` on a task that passes stops nothing.
+///
+/// The field asks for stopping *on failure*, so a run where the carrying task
+/// passes is an ordinary run. Worth asserting because reading the field rather
+/// than the verdict would pass every other test here.
+#[test]
+fn short_circuit_failure_stops_nothing_when_the_task_passes() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        concat!(
+            "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n    short-circuit-failure: true\n",
+            "  - name: beta\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    assert!(outcome.success, "the run did not pass");
+    assert!(
+        outcome.stopped.is_empty(),
+        "a passing task stopped the run: {:?}",
+        outcome.stopped,
+    );
+    assert!(
+        work(&outcome, "beta-1")
+            .join(bolt::run::OUTPUT_FILE)
+            .is_file(),
+        "the task after a passing short-circuit did not execute",
+    );
+}
+
+// COVERS: FR-4.10, FR-4.10a, FR-4.10b, FR-3.10c | negative
+/// A command invoking an undeclared tool fails its task, and the run carries on.
+///
+/// FR-3.10c keeps FR-3.10b narrow: checking `requires` up front is a guarantee
+/// about `requires`, not about every way a process fails to launch.
+///
+/// FR-4.10a settles what the reason may say. Once every declared entry is
+/// resolved before anything executes, **a declared tool cannot be the one that
+/// failed to start**, so the reachable case is a command invoking something the
+/// jig never declared and there is no entry to name. The reason carries what the
+/// shell reported instead.
+///
+/// FR-4.10b is the consequence: an under-declared jig is visible only as a task
+/// that failed, which FR-3.10's inventory rule is what closes. Bolt does not
+/// read a command to work out what it invokes.
+#[test]
+fn a_command_that_cannot_start_fails_its_task_and_the_run_carries_on() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        concat!(
+            "  - name: alpha\n    command: \"definitely-not-a-real-tool-9c2b\"\n",
+            "  - name: beta\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+
+    // No `requires`, so nothing is declared and FR-3.10b has nothing to catch.
+    let outcome =
+        bolt::run::run("check", root.path()).expect("this is a failing run, not a refusal");
+
+    assert!(!outcome.success, "a command that cannot start did not fail");
+    assert!(
+        work(&outcome, "beta-1")
+            .join(bolt::run::OUTPUT_FILE)
+            .is_file(),
+        "the run did not carry on past a task that could not start",
+    );
+
+    let envelope = read_validated(
+        &work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE),
+        &wrench::ENVELOPE_SCHEMA,
+    );
+    let reasons = envelope
+        .get("reasons")
+        .and_then(Value::as_array)
+        .expect("a failing execution carries reasons");
+    assert!(
+        !reasons.is_empty(),
+        "the task failed with no reason saying why: {reasons:?}",
+    );
+}
+
 // ---- the output directory ---------------------------------------------------
 
 // COVERS: FR-2.6, FR-2.6a | positive

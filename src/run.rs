@@ -229,6 +229,62 @@ pub fn wrote_a_result(refusal: &Error, base: &Path, output_dir: Option<&Path>) -
     true
 }
 
+/// Resolve every `requires` entry against `PATH`, by FR-3.10b.
+///
+/// An incomplete toolchain is known in the first second rather than partway
+/// through a gate, which is the whole of what this buys. It names **every**
+/// missing entry rather than the first, so a caller fixing them does not pay a
+/// round trip per tool.
+///
+/// FR-3.10c keeps this narrow: it is a guarantee about `requires`, not about
+/// every way a process fails to launch. A command invoking something the jig
+/// never declared still fails its own task by FR-4.10, and FR-4.10a says the
+/// reason names what the shell reported rather than a `requires` entry, because
+/// a declared tool cannot be the one that failed to start.
+///
+/// # Errors
+///
+/// [`Error::RequiresMissing`], naming every entry `PATH` does not resolve.
+fn check_requires(jig: &jig::Jig) -> Result<(), Error> {
+    let mut missing: Vec<String> = jig
+        .requires
+        .iter()
+        .filter(|entry| !on_path(entry))
+        .cloned()
+        .collect();
+
+    if missing.is_empty() {
+        return Ok(());
+    }
+    // Sorted so a jig missing three tools names them the same way every run,
+    // which is what makes the message diffable between two runs of a gate.
+    missing.sort();
+    missing.dedup();
+    Err(Error::RequiresMissing { tools: missing })
+}
+
+/// Whether `PATH` resolves `entry` to something executable.
+///
+/// An entry carrying a separator is a path rather than a name, and is taken as
+/// written: `requires` lists executables a jig invokes, and a command may
+/// invoke one by path.
+fn on_path(entry: &str) -> bool {
+    let candidate = Path::new(entry);
+    if candidate.components().count() > 1 {
+        return executable(candidate);
+    }
+    std::env::var_os("PATH").is_some_and(|path| {
+        std::env::split_paths(&path).any(|directory| executable(&directory.join(entry)))
+    })
+}
+
+/// Whether a path names a file somebody could execute.
+fn executable(path: &Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+
+    fs::metadata(path).is_ok_and(|meta| meta.is_file() && meta.permissions().mode() & 0o111 != 0)
+}
+
 /// The walk, with FR-2.2c's exclusion applied.
 ///
 /// A run never walks its own output directory, whatever it was named and
@@ -323,6 +379,7 @@ fn carry_out(
     // defines what it needs refuses in the first second rather than partway
     // through a gate.
     let commands = validate(&jig, &definitions)?;
+    check_requires(&jig)?;
 
     // Created before the walk. Creating it afterwards made FR-2.2c's exclusion
     // below true by accident, for a directory bolt had not made yet.
@@ -341,15 +398,79 @@ fn carry_out(
         definitions: &definitions,
     };
 
-    let mut executions = 0;
-    for (task, command) in jig.tasks.iter().zip(commands) {
-        executions += run_task(&scope, task, command, &walked)?;
-    }
+    let (executions, stopped) = run_tasks(&scope, &jig, commands, &walked)?;
 
     merge::merge(&output_dir, base).map(|folded| Outcome {
         executions,
+        stopped,
         ..folded
     })
+}
+
+/// Execute a jig's tasks in order, returning how many ran and what did not.
+///
+/// FR-4.5 executes them serially. FR-4.8 is the default and stays it: a failing
+/// task does not stop the run, because stopping throws away the evidence the
+/// tasks after it would have produced and leaves a reader unable to tell what
+/// else was wrong. FR-4.9 is the exception a jig asks for.
+///
+/// The verdict a short-circuit reads is taken back off the envelope the task
+/// just wrote rather than tracked alongside. The envelope is the authoritative
+/// result by FR-6.1, and a second copy in bookkeeping is a second thing that can
+/// disagree with the evidence on disk.
+fn run_tasks(
+    scope: &Scope,
+    jig: &jig::Jig,
+    commands: Vec<&str>,
+    walked: &[PathBuf],
+) -> Result<(usize, Vec<String>), Error> {
+    let mut executions = 0;
+
+    for (index, (task, command)) in jig.tasks.iter().zip(commands).enumerate() {
+        executions += run_task(scope, task, command, walked)?;
+
+        if task.short_circuit_failure && !task_passed(&scope.locations.output_dir, &task.name) {
+            let stopped = jig.tasks[index + 1..]
+                .iter()
+                .map(|later| later.name.clone())
+                .collect();
+            return Ok((executions, stopped));
+        }
+    }
+
+    Ok((executions, Vec::new()))
+}
+
+/// Whether every execution of `task` passed, read back off what it wrote.
+///
+/// FR-4.9's short-circuit needs a verdict, and this takes it from the envelopes
+/// on disk rather than from a boolean carried alongside the run. The envelope is
+/// the authoritative result by FR-6.1, so a second copy in bookkeeping is a
+/// second thing that can disagree with the evidence, and the evidence is what a
+/// reader will have.
+///
+/// A task that produced no envelope at all has not failed: FR-4.4c's allowed
+/// empty selection produces no constituent, and stopping a run on a task that
+/// legitimately found nothing would be the opposite of what that field asks for.
+fn task_passed(output_dir: &Path, task: &str) -> bool {
+    let work = output_dir.join(WORK_DIR);
+    let Ok(entries) = fs::read_dir(&work) else {
+        return true;
+    };
+
+    entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with(&format!("{task}-")))
+        })
+        .all(|path| {
+            merge::read(&path.join(OUTPUT_FILE), &wrench::ENVELOPE_SCHEMA)
+                .ok()
+                .and_then(|envelope| envelope.get("success").and_then(serde_json::Value::as_bool))
+                .unwrap_or(true)
+        })
 }
 
 /// Everything a jig is refused for, checked before any task executes.

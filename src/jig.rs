@@ -23,6 +23,14 @@ pub struct Jig {
     #[serde(default)]
     pub version: Option<String>,
 
+    /// Every executable this jig invokes, by FR-3.10.
+    ///
+    /// The tools its commands run, the adapters its tasks name, any checker it
+    /// calls: the jig's whole inventory rather than a note about unusual tools.
+    /// FR-3.10b resolves every entry before any task executes.
+    #[serde(default)]
+    pub requires: Vec<String>,
+
     /// Default values for the placeholders this jig's commands name, by FR-3.15.
     ///
     /// Optional, and so is any entry in it: a jig leaving a value to its adopter
@@ -91,6 +99,16 @@ pub struct Task {
     /// variable, enforced by the schema rather than here.
     #[serde(default, rename = "allow-empty")]
     pub allow_empty: bool,
+
+    /// Stop the run when this task fails, by FR-4.9.
+    ///
+    /// Defaulting to false, because FR-4.8 is the rule: a failing task does not
+    /// stop the run, since stopping throws away the evidence the tasks after it
+    /// would have produced and leaves a reader unable to tell what else was
+    /// wrong. Stopping is what a jig asks for rather than what it gets, and
+    /// this field is the asking.
+    #[serde(default, rename = "short-circuit-failure")]
+    pub short_circuit_failure: bool,
 }
 
 /// Read the jig named `name` from `config_dir` and validate it.

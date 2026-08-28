@@ -22,4 +22,15 @@ pub struct Outcome {
 
     /// How many executions ran, across every task.
     pub executions: usize,
+
+    /// Tasks a short-circuit kept from running, in declaration order.
+    ///
+    /// FR-4.9. A reader sees what was not attempted rather than inferring it
+    /// from what is absent, which is not the same thing: a task missing from
+    /// the evidence could equally have skipped an empty selection under
+    /// FR-4.4c.
+    ///
+    /// Empty for every run that was not stopped, which FR-4.8 makes the
+    /// ordinary case.
+    pub stopped: Vec<String>,
 }

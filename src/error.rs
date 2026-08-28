@@ -127,6 +127,19 @@ pub enum Error {
         reason: String,
     },
 
+    /// The jig requires executables that are not on `PATH`, by FR-3.10b.
+    ///
+    /// Resolved before any task executes, so an incomplete toolchain is known
+    /// in the first second rather than partway through a gate.
+    ///
+    /// **Every missing entry, not the first.** A caller fixing them one at a
+    /// time pays a round trip per tool, which is the cost the row exists to
+    /// remove.
+    RequiresMissing {
+        /// The entries `PATH` does not resolve, sorted.
+        tools: Vec<String>,
+    },
+
     /// The merge found no constituent to fold, by FR-8.3a.
     ///
     /// FR-8.3 alone would pass such a run, because every constituent passing
@@ -211,6 +224,12 @@ impl fmt::Display for Error {
                 formatter,
                 "the definitions file {} is unreadable: {reason}",
                 path.display()
+            ),
+            Self::RequiresMissing { tools } => write!(
+                formatter,
+                "the jig requires {}, which {} not on PATH",
+                tools.join(", "),
+                if tools.len() == 1 { "is" } else { "are" },
             ),
             Self::NoConstituents => {
                 write!(formatter, "no task produced a result")

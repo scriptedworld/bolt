@@ -70,6 +70,10 @@ pub fn merge(output_dir: &Path, base: &Path) -> Result<Outcome, Error> {
         success,
         output_dir: output_dir.to_path_buf(),
         executions: entries.len(),
+        // The merge folds a finished directory and knows nothing about why a
+        // task is absent from it. FR-4.9's stopped list is the runner's, and
+        // `carry_out` fills it in over this.
+        stopped: Vec::new(),
     })
 }
 
