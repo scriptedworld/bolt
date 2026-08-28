@@ -27,6 +27,18 @@ pub enum Error {
         reason: String,
     },
 
+    /// A task names a jig rather than a command, and nested jigs are unbuilt.
+    ///
+    /// FR-5.x specifies them and `clank/tasks/bolt/runner/50-nested-jigs` is
+    /// where they get built. Refusing by name matters because the alternative
+    /// message is serde's `missing field command`, which reads as a malformed
+    /// jig and invites somebody to add a command to a task that should not have
+    /// one.
+    NestedJigNotBuilt {
+        /// The task naming a jig.
+        task: String,
+    },
+
     /// A task's command names both `{each_path}` and `{all_paths}`.
     ///
     /// FR-4.2 calls that a jig error. Which of the two shapes a task takes is
@@ -69,6 +81,10 @@ impl fmt::Display for Error {
                     path.display()
                 )
             }
+            Self::NestedJigNotBuilt { task } => write!(
+                formatter,
+                "task {task} names a jig; nested jigs are specified and not built yet",
+            ),
             Self::CommandNamesBothPathForms { task } => {
                 write!(formatter, "task {task} names both each_path and all_paths")
             }

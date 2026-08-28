@@ -730,6 +730,33 @@ manifest summary still ending in "Go". silo is chasing it.
 **Leave the orphan in place until that lands.** Deleting it breaks `bolt` for
 everyone and gains nothing while the link still points here.
 
+## The cutover has one ordering constraint, and it is bolt's to hold
+
+**`~/bin/bolt` must not move to the Rust binary before
+`clank/tasks/bolt/runner/50-nested-jigs` has landed.** Raised by the wrench
+session 2026-08-28 and recorded here because sequencing it is bolt's.
+
+`bolt.wrench-quality.yaml` runs `common-quality` and `python-std-quality` at
+`python/` as two jig tasks. The Rust bolt does not implement nested jigs, so
+the day the symlink moves, wrench's gate stops working.
+
+FACT 2026-08-28, measured against wrench's real jig:
+
+    bolt wrench-quality ~/.projects/wrench
+    bolt: task python-common names a jig; nested jigs are specified and
+          not built yet                                          exit 1
+
+**It fails safely, and that is deliberate.** A jig task has no `command`, so
+serde refused it with `missing field command` until this was given its own
+refusal. That message named the symptom, read as a malformed jig, and invited
+somebody to add a command to a task that must not have one. It now names the
+feature and the task.
+
+So the cutover is gated on `runner/50`, which is unstarted and sits behind
+`walking-skeleton/10`. Nothing about that is urgent while the link points at the
+Go binary, and the whole hazard is that moving the link is a one-line change
+somebody could make without knowing this.
+
 ## What a consumer should expect
 
 The Rust bolt reaches the Go one's surface task by task, not at once.

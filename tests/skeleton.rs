@@ -237,6 +237,32 @@ fn a_jig_without_a_version_is_read() {
     assert_eq!(outcome.executions, 1, "the task did not execute");
 }
 
+// COVERS: FR-5.13h, FR-10.5 | negative
+/// A task naming a jig is refused by name, because nested jigs are not built.
+///
+/// The refusal has to say which feature is missing rather than which field is.
+/// Before this, the message was serde's `missing field command`, which reads as
+/// a malformed jig and invites somebody to add a command to a jig task. Found
+/// against wrench's real jig, whose gate has two of them.
+#[test]
+fn a_task_naming_a_jig_is_refused_by_name() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "nested",
+        "  - name: child\n    jig: common-quality\n    in: python\n",
+    );
+
+    let refusal = bolt::run::run("nested", root.path()).expect_err("nested jigs are not built");
+
+    match refusal {
+        bolt::Error::NestedJigNotBuilt { task } => {
+            assert_eq!(task, "child", "the refusal named the wrong task");
+        }
+        other => panic!("wrong refusal for a jig task: {other:?}"),
+    }
+}
+
 // COVERS: FR-2.5, FR-10.7a | negative
 /// A base that is not there is refused, and nothing is created.
 ///

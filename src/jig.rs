@@ -43,7 +43,17 @@ pub struct Task {
     /// `{each_path}` is one execution per matched path, `{all_paths}` is one
     /// execution with the selection substituted, and naming both is a jig
     /// error.
-    pub command: String,
+    ///
+    /// Optional in the type because a JIG task has none: FR-5.13h gives it a
+    /// `jig` field instead. Nested jigs are not built, and a task without a
+    /// command is refused by name rather than by serde, so the reason says
+    /// which feature is missing instead of which field is.
+    #[serde(default)]
+    pub command: Option<String>,
+
+    /// The jig this task runs, for a jig task rather than a command task.
+    #[serde(default)]
+    pub jig: Option<String>,
 
     /// Patterns or literal paths saying which files this task acts on.
     ///

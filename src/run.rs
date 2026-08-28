@@ -88,15 +88,23 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
 
     let jig = jig::read(base, jig)?;
 
-    // FR-4.2's jig error, caught for every task before any of them executes.
+    // Everything a jig can be refused for, checked before any task executes.
     // FR-3.10b makes that the shape: an incomplete jig is known before half a
     // gate has run rather than partway through it.
+    let mut commands = Vec::with_capacity(jig.tasks.len());
     for task in &jig.tasks {
-        if task.command.contains("{each_path}") && task.command.contains("{all_paths}") {
+        let Some(command) = task.command.as_deref() else {
+            return Err(Error::NestedJigNotBuilt {
+                task: task.name.clone(),
+            });
+        };
+        // FR-4.2's jig error.
+        if command.contains("{each_path}") && command.contains("{all_paths}") {
             return Err(Error::CommandNamesBothPathForms {
                 task: task.name.clone(),
             });
         }
+        commands.push(command);
     }
 
     let walked = walk::walk(base)?;
@@ -111,8 +119,8 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
     };
 
     let mut executions = 0;
-    for task in &jig.tasks {
-        executions += run_task(&locations, task, &walked)?;
+    for (task, command) in jig.tasks.iter().zip(commands) {
+        executions += run_task(&locations, task, command, &walked)?;
     }
 
     merge::merge(&output_dir).map(|folded| Outcome {
@@ -122,10 +130,15 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
 }
 
 /// Run one task, returning how many times its command executed.
-fn run_task(locations: &Locations, task: &Task, walked: &[PathBuf]) -> Result<usize, Error> {
+fn run_task(
+    locations: &Locations,
+    task: &Task,
+    command: &str,
+    walked: &[PathBuf],
+) -> Result<usize, Error> {
     let base = locations.base_dir.as_path();
     let output_dir = locations.output_dir.as_path();
-    let wants_paths = consumes_paths(&task.command);
+    let wants_paths = consumes_paths(command);
     let selection = narrow(base, walked, task)?;
 
     if wants_paths && selection.selected.is_empty() {
@@ -134,11 +147,11 @@ fn run_task(locations: &Locations, task: &Task, walked: &[PathBuf]) -> Result<us
         if task.allow_empty {
             return Ok(0);
         }
-        empty_selection(locations, task, &selection)?;
+        empty_selection(locations, task, command, &selection)?;
         return Ok(0);
     }
 
-    let batches = if wants_paths && task.command.contains("{each_path}") {
+    let batches = if wants_paths && command.contains("{each_path}") {
         selection
             .selected
             .iter()
@@ -167,7 +180,7 @@ fn run_task(locations: &Locations, task: &Task, walked: &[PathBuf]) -> Result<us
         let execution = Execution {
             task: &task.name,
             ordinal,
-            command: substitute(&task.command, locations, &work_dir, batch),
+            command: substitute(command, locations, &work_dir, batch),
             work_dir,
         };
         write_manifest(locations, &execution, recorded)?;
@@ -181,11 +194,16 @@ fn run_task(locations: &Locations, task: &Task, walked: &[PathBuf]) -> Result<us
 ///
 /// It has to be a constituent rather than a skip, or FR-8.3 folds a run that
 /// checked nothing into a pass, which is FR-8.3a's argument one level down.
-fn empty_selection(locations: &Locations, task: &Task, selection: &Selection) -> Result<(), Error> {
+fn empty_selection(
+    locations: &Locations,
+    task: &Task,
+    command: &str,
+    selection: &Selection,
+) -> Result<(), Error> {
     let execution = Execution {
         task: &task.name,
         ordinal: 1,
-        command: task.command.clone(),
+        command: command.to_owned(),
         work_dir: locations
             .output_dir
             .join(WORK_DIR)
