@@ -504,9 +504,75 @@ to discover it. FR-10.7b already says a caller wanting a parseable refusal in
 every case names one outside the tree, and this is the same advice reached from
 the other direction.
 
+## FR-10.7 has a destructive shape, and the Go bolt is standing on it
+
+Not a question. Recorded because implementing FR-10.7 without this in hand
+reproduces a defect that already exists next door.
+
+FR-10.7 wants every refusal to write a `result.yaml`. The Rust tree writes none,
+which is the first of the four unfixed findings in `review-stage-5.md`. The
+obvious fix, writing the refusal into the run directory bolt had resolved, is
+the one that breaks.
+
+FACT 2026-08-28, reproduced first attempt against `~/bin/bolt`, the Go build:
+two runs starting inside one second resolve to the same `.bolt-<iso8601>`. The
+second refuses, correctly, with `already holds a run`. It then writes that
+refusal into the colliding directory's `result.yaml`, replacing a completed
+verdict. The `work/*/output.yaml` files survive carrying `kind: nonzero-exit`
+while the top-level document says `kind: bolt-refused`, so the run that ran is
+readable only from the evidence that the merge was supposed to summarise.
+
+Reported by the resume session against palette-print; reproduced here on a
+fixture. `clank/inbox/bolt.go/a-refusal-overwrites-the-run-it-refused/` carries
+the evidence and a `repro.sh`.
+
+**The constraint this puts on the Rust build.** Refusing to use a directory and
+writing a refusal into it have to be separable. The Rust guard at `run.rs:104`
+returns before `create_dir`, so today the ordering is already right and the
+`result.yaml` is simply missing. Keep that ordering when FR-10.7 lands: a
+refusal that names a directory as unusable must not then write to it. The
+collision refusal is the case that proves the general rule, and FR-10.7b's
+advice, that a caller wanting a parseable refusal names `--output-dir` outside
+the tree, is the same answer reached from the other direction again.
+
+There is no test for the collision guard here, for the reason already recorded:
+the fixture needs two runs inside one second. The Go reproduction shows that is
+reachable on the first attempt rather than being a rare race, which weakens the
+argument for leaving it untested.
+
 ## Adapters
 
 11. May an adapter read the repository tree, or only the files it was handed?
+
+### The contract is undocumented, and that has already cost a port
+
+Not a question. Reported by the resume session 2026-08-28 after porting
+toolbox's coverage adapter: there is no written adapter contract anywhere, so it
+was derived by reading the Go build's `internal/adapter/adapter.go` and
+`internal/run/envelope.go`.
+
+What an adapter author needs and had to reverse-engineer: no stdin, locations
+arrive as flags, `--evidence` once per declared file, the adapter writes
+`{work_dir}/output.yaml` itself, that file conforms to wrench's envelope schema,
+and cwd is the base directory. CLAIM, since it is the Go build's contract read
+by someone else and not measured here; the Rust build has only the built-in
+exit-code adapter so far, and `runner/30` is where a second one arrives.
+
+The cost is drift rather than inconvenience: three of toolbox's four adapters
+are on a retired contract and would fail `adapter-wrote-invalid`. A contract
+nobody wrote down cannot be versioned, so nothing told them it had moved.
+
+**Write it when `runner/30` lands**, because that is the task that has to settle
+it anyway, and an undocumented contract with two implementations is what
+produced the drift the first time. It is also the strongest argument yet for
+`/commission`, since there is nowhere in this tree for such a document to go.
+
+The design question underneath it, which is ours and not toolbox's: a task's
+work directory is its own, so a standalone coverage task has no path to the
+profile a sibling wrote. The resume session wired coverage into the `tests` task
+to get around it. **Whether cross-task evidence access is supported is
+unanswered here**, and it should be answered before a jig author designs around
+its absence a second time. Nothing in this document asks it today.
 
 ## Time
 
