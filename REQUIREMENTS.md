@@ -120,7 +120,7 @@ not help with.
 | FR-3.4a | `excluding` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
 | FR-3.4b | `matching` and `excluding` belong to a task that consumes paths. On a command naming neither path variable they are a jig error, caught in validation rather than quietly ignored. Whether a whole-project command should run at all is a question about where the jig is pointed, and FR-4.4 already answers it: a command naming neither variable always executes. | [A] |
 | FR-3.4e | FR-4.4b's guarantee reaches only the tasks bolt selects for. A command handed a directory, whose tool finds its own files, is opaque: bolt cannot know whether it read a thousand files or none, so a tool that silently matched nothing reports a pass and bolt has nothing to notice. Where that matters, the task takes `matching` and a path variable so the selection is bolt's and FR-4.4b applies. | [D] |
-| FR-3.4f | FACT 2026-08-27: 8 of 115 tasks across 28 jigs let bolt select, all of them in one jig. The rest hand their tool a directory, so FR-4.4b protects almost nothing on the day it lands and the evidence FR-9.5's manifest promises is absent for them too. That is the state to move, not a reason against the rule. | [D] |
+| FR-3.4f | FACT 2026-08-27: 3 of 116 tasks across 26 jigs let bolt select, all three in one jig. The rest hand their tool a directory, so FR-4.4b protects three tasks on the day it lands and the evidence FR-9.5's manifest promises is absent for the other 113. That is the state to move, not a reason against the rule. Measured by `.ephemera/count-selection.py`, which counts task blocks; an earlier figure of 8 counted matching lines and triple-counted a task carrying `matching`, `excluding` and a path variable. | [D] |
 | FR-3.4c | The jig format carries comments, and an entry's reasoning sits beside it. Somebody asking why a path is excluded finds the answer where the path is, rather than reconstructing it from git history. | [A/D] |
 | FR-3.4d | A jig is YAML, as an envelope is. One serialisation everywhere: one parser, one schema mechanism, and a jig and a result readable by the same tooling. | [A] |
 | FR-3.5 | Filter patterns are relative to the base directory of the run they are declared in. A jig written for reuse therefore says `**/*.go` and never names the subtree it was dropped into, which is what makes it the same jig at the repository root and at `backend/`. | [A] |
@@ -158,6 +158,8 @@ not help with.
 | FR-4.4b | An empty selection is a failure. The task does not execute, and bolt writes it a work directory, a manifest recording the patterns that matched nothing, and an envelope carrying `success: false` and a reason naming the task and its patterns. It is a constituent like any other, so FR-8.3 folds it into the run's verdict. | [D] |
 | FR-4.4c | `allow-empty` on a task says an empty selection is an acceptable result for it. The task does not execute and produces no constituent, which is what FR-4.4 alone used to mean for every task. A shared jig spanning languages declares it on the tasks that legitimately find nothing in a given project. | [D] |
 | FR-4.4d | `allow-empty` on a command task naming neither path variable is a jig error, caught in validation, for the reason FR-3.4b gives about `matching` and `excluding`: no selection exists, so the field says nothing. | [D] |
+| FR-4.4g | `allow-empty` on a jig task is a jig error too, by FR-4.4a's route: a jig task has no command to name a path variable, so it has no selection of its own and emptiness is its child's business. Refusing a meaningless field is narrower than permitting one, and relaxing it later is additive. | [D] |
+| FR-4.4h | Both refusals are enforced by the jig schema rather than by the runner, so a jig carrying either is rejected at validation before bolt reads a task. FR-1.5 already validates every jig on the way in, and a rule the schema can state is one the runner does not have to restate. | [D] |
 | FR-4.4e | The default is failure because the alternative hides the common defect. A pattern that matches nothing is usually a typo or a moved directory, and under a silent skip it stays green forever. Declaring the exception costs one line in the jig that spans languages, written by whoever knew it spanned them, and it buys a check on every jig written by somebody who did not expect to match nothing. | [D] |
 | FR-4.4f | The exit status is unaffected. Bolt carried the run out, so FR-10.2 applies and it exits 0 with `success: false` in the result. An empty selection is a finding about the jig or the project, not bolt failing to execute. | [D] |
 | FR-4.4a | That is a rule about command tasks. A jig task has no command to name a path variable, by FR-5.13h, so FR-5.15 carries its rule instead: it does not run when its base holds no input paths. The same rule reached differently, and neither of them makes a jig task execute unconditionally. | [A/D] |
@@ -390,6 +392,16 @@ The questions that would settle them are in `NEXT_STEPS.md`.
 | FR-13.8 | The number of bolt runs a user may have live at once is bounded, if that guard is wanted at all. | [?] |
 
 ## Retired
+
+**A new row does not go here. Add it to its numbered section above.** Everything
+after this heading is read as retired until the next `##`, and this is the last
+section, so a row appended to the end of the file is silently retired: the id
+stops being live, every reference to it starts meaning something else, and the
+row looks perfectly normal. Appending is what a person does when adding a
+requirement, which is what makes this worth a warning rather than a note.
+
+The checker fails an id that is both live and retired, so the collision is
+caught. **A row that is only retired is not a collision**, and nothing objects.
 
 A requirement can be retired or superseded. **Its ID is never reused**, because
 reuse silently rewrites what every existing reference to that ID meant and
