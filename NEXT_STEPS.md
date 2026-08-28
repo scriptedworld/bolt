@@ -573,73 +573,78 @@ output. Work needing several steps is one script producing one exit code and one
 output."** The next section is what the resume session ran into and what it
 would take to reopen it.
 
-### FR-4.6 met its forcing example, and the preamble predicted it
+### FR-4.6 was challenged and holds. Nothing forces cross-task evidence
 
-Not a question yet. A decision for our user, because FR-4.6 is `[A]` and neither
-a session here nor a peer gets to reverse one by agreeing with the other.
+Not a question. Recorded so it is not reopened on an example that was withdrawn.
 
-The preamble already records the cost of FR-4.6, and records it as something a
-reader would otherwise rediscover: an intermediate step inside a script produces
-no envelope, no manifest and no work directory, "so §19's worked example loses
-its evidence exactly where it was interesting". **§19's worked example is a
-coverage producer feeding a policy analyzer feeding an adapter.** The resume
-session hit that exact case porting toolbox's coverage adapter on 2026-08-28,
-without having read this file. The prediction landed on the nose, which is worth
-more than the prediction being clever: it means the cost is real and reached by
-ordinary work rather than by contrivance.
+The resume session hit what looked like a forcing case for cross-task evidence
+while porting toolbox's coverage adapter, argued it to me, then **measured it and
+retracted within the hour**. The retraction is the useful part and it is theirs,
+not mine.
 
-Their position, recorded because it is the first field report we have and it
-argues both ways rather than for a change:
+**Entrypoint coverage does not need cross-task access.** FR-4.6 permits it as
+written. Measured by them on palette-print, end to end:
 
-- **Keep the wall.** A task's work directory being its own is what makes each
-  task's verdict independently attributable. Let B read A's evidence and B's
-  verdict silently depends on A's execution, in a format with no `depends-on`
-  to express it and no ordering guarantee to lean on. That is a dependency
-  graph arriving by implication, which is the same reasoning FR-4.6 already
-  rests on.
-- **Coverage was never the cross-task case.** It is a second *reading* of one
-  execution, not a second execution. That is why attaching the adapter to the
-  `tests` task works, and why it needed the exit code: the coverage verdict
-  genuinely depends on whether the run producing the profile passed. Not a
-  workaround they settled for; the dependency is real and internal to one task.
-- **Entrypoint coverage is a genuine second execution.** `go build -cover`, run
-  the binary, and there is a second profile from a different command that must
-  be judged with the first. Hard rule 5 forbids the alternative, which is
-  excluding the file. Under FR-4.6 the honest route is one task doing test,
-  build, run, merge and judge. They call that ugly and say the ugliness is
-  information, which is the right way to hold it.
-- They have **one** forcing example and say so. They would not pay for a
-  dependency graph on one.
+    go test -coverprofile={work_dir}/cover-test.out ./...
+    go build -cover -o {work_dir}/app ./cmd/palette-print
+    GOCOVERDIR={work_dir}/covdata {work_dir}/app --palettes
+    go tool covdata textfmt -i={work_dir}/covdata -o={work_dir}/cover-entry.out
 
-**What is actually blocked, and it is not what they think.** Their preferred fix
-is to let a task name *several* adapters, each contributing reasons into one
-envelope: one execution, one work directory, several readings. That does not
-cross a task boundary and is the cheaper half. But it is not free here either.
-FR-3.2 declares "its adapter", singular, and **FR-6.2b fixes the envelope at
-`output.yaml` with the name never varying**, which is the row FR-13.1 was retired
-into. Several adapters per task collide on that filename by construction. So the
-cheap half is a requirements change too, just a smaller and more local one than
-reopening FR-4.6.
+One command chain, one exit code, one work directory, **two declared evidence
+files, one adapter**. The adapter keys blocks by `(file, span)` and takes
+`max(count)`, so the entry point reads uncovered in the first profile and covered
+in the second, and palette-print goes green with no exclusion. Hard rule 5 is
+satisfied rather than dodged. That is exactly FR-4.6's "one script producing one
+exit code and one output".
 
-The one thing they would rule out in every shape is letting an adapter discover
-files in the output tree, and that is **already FR-6.2c**, for the same reason
-they give.
+So **(b), declared cross-task evidence, has zero examples, not one.** It should
+be costed as speculative rather than as answering a known need.
 
-**The decision, if it is wanted.** Three ways, in increasing cost:
+**What survives, and it is (a).** Several readings of one execution should be
+separately named: test result, coverage, timing. Today a task has one adapter, so
+they fuse into one adapter that has to know about all of them, and their coverage
+adapter is now that shape, reading an exit status it should not care about. This
+crosses no task boundary and needs no dependency graph.
 
-1. Nothing. One task does the whole chain, and the preamble's recorded cost
-   stands as the price. Cheapest, and honest, and it is what today's rows say.
-2. Several adapters per task. Needs FR-3.2 pluralised and FR-6.2b's fixed name
-   reopened. Buys separately named verdicts over one execution and crosses no
-   task boundary.
-3. Declared cross-task evidence: the consuming task names the producing task and
-   the evidence it wants, bolt resolves it and passes it as `--evidence` like
-   any other, refusing at load time when ordering cannot satisfy it. Explicit
-   and visible in the jig rather than discovered. This is a dependency graph and
-   reverses FR-4.6.
+**(a) is still a requirements change, on two rows.** FR-3.2 declares "its
+adapter", singular. **FR-6.2b fixes the envelope at `output.yaml` with the name
+never varying**, the row FR-13.1 was retired into, so several adapters per task
+collide on that filename by construction. Both would have to move.
 
-Two is not a step toward three and does not become three later; they solve
-different problems. Nothing needs deciding before `runner/30`.
+Their instinct to forbid an adapter discovering files in the output tree is
+**already FR-6.2c**, with the same reason.
+
+**I overstated the preamble and they were right to push back.** I wrote that it
+predicted their case by name. The preamble's cost is that an intermediate step
+produces no envelope, manifest or work directory, so a middle stage's **own
+verdict** is lost. The entrypoint chain does not pay that: every artifact is
+declared evidence of the one task and all of it reaches the adapter. §19's worked
+example resembles the entrypoint case superficially and is narrower than the
+preamble's phrasing suggests. **Do not reopen FR-4.6 on the strength of that
+paragraph**, which is what I was heading for.
+
+### Entry points need the two-profile pattern here too, and bolt is one
+
+FACT 2026-08-28: `src/main.rs` is 11 lines and delegates to `bolt::cli::main`,
+and **four tests already invoke the built binary** through a `bolt()` helper
+using `Command::new(env!("CARGO_BIN_EXE_bolt"))`, at `tests/skeleton.rs:55`.
+
+So bolt is in the same position as palette-print: the entry point runs in a
+subprocess during the suite, and its coverage lands in that subprocess rather
+than in the harness's profile. Hard rule 5 says measure it, not exclude it. The
+shape is the Go one: instrument, run the binary, write a second profile, merge by
+taking the covered maximum. Nothing here needs cross-task evidence either.
+
+The resume session reported that this recurs across the estate, five Go repos,
+one Rust, six Python with a milder form. CLAIM, their measurement not mine, and
+**two of its figures are wrong where they touch this tree**: they recorded bolt's
+binary as never invoked, having grepped for `assert_cmd`, `Command::cargo_bin`
+and `escargot` and missed Cargo's built-in `CARGO_BIN_EXE_*`; and bolt's one
+Python entry point is `bin/test-traceability.py`, a **symlink into toolbox**,
+already counted under toolbox. The estate total is inflated by at least that one.
+
+The conclusion is unaffected and is theirs: recurrence argues for **writing the
+entrypoint pattern down once per language**, not for a dependency graph.
 
 ## Time
 
