@@ -558,10 +558,44 @@ collision refusal is the case that proves the general rule, and FR-10.7b's
 advice, that a caller wanting a parseable refusal names `--output-dir` outside
 the tree, is the same answer reached from the other direction again.
 
-There is no test for the collision guard here, for the reason already recorded:
-the fixture needs two runs inside one second. The Go reproduction shows that is
-reachable on the first attempt rather than being a rare race, which weakens the
-argument for leaving it untested.
+**Both are now done, and the collision guard is tested after all.** The fixture
+does not need two runs inside one second, which was the assumption that left it
+untested. The run directory is a function of the base and the clock, so
+`run::output_dir_for` lets a test predict it, create it, put a sentinel result
+in it and call `run`. Deterministic, and a failure to collide fails rather than
+quietly passing.
+
+Verified by mutation rather than by the tests being green. Two mutations, each
+caught by exactly one test and no others: writing the refusal into the resolved
+directory, which is the Go build's shape, fails only
+`a_refusal_does_not_write_into_the_directory_it_refused`; writing no refusal at
+all fails only `a_refusal_writes_a_result`.
+
+### 22. FR-10.7a names one exemption and there are two
+
+**A decision, not a defect.** FR-10.7a exempts FR-2.5's missing base, because
+writing the result would create the thing whose absence is being refused, and
+its wording makes that the only case.
+
+`OutputDirectoryInUse` is a second one and no row names it. The directory
+belongs to a previous run, so writing a refusal into it destroys a completed
+verdict, and writing it anywhere else invents a location no caller was told
+about. `Error::writes_a_result` therefore exempts both, which is bolt being
+conservative where the rows and the code disagree.
+
+Three ways to settle it, and the choice is our user's:
+
+1. Widen FR-10.7a to name both, keeping "exactly one" as the shape of the
+   sentence rather than a count.
+2. Give the collision its own row, since its reason differs: FR-2.5's exemption
+   is about *creating*, this one is about *overwriting*.
+3. Decide bolt should write it somewhere else, which needs saying where and how
+   a caller learns of it. FR-10.7b's `--output-dir` is the closest thing to an
+   answer already written.
+
+Nothing is blocked on this. The code is safe under all three and the tests
+assert the behaviour rather than the row, so settling it changes a document and
+possibly a `COVERS:` mark.
 
 ## Adapters
 

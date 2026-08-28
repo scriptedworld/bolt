@@ -49,6 +49,14 @@ where
         }
         Err(refusal) => {
             eprintln!("bolt: {refusal}");
+            // FR-10.7a. The two refusals that write nothing say so, because
+            // "no result" otherwise reads as a bolt that was killed, which is
+            // exactly what FR-10.7 has a caller conclude from an absent file.
+            // FR-10.7b points a caller wanting one in every case at an output
+            // directory outside the tree.
+            if !refusal.writes_a_result() {
+                eprintln!("bolt: no result was written, because that is the directory in question");
+            }
             ExitCode::from(REFUSED)
         }
     }

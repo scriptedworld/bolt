@@ -86,6 +86,68 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
         return Err(Error::BaseMissing(base.to_path_buf()));
     }
 
+    let output_dir = output_dir_for(base, SystemTime::now());
+
+    // FR-2.6b. The stamp is second-granular, so two runs started in one second
+    // would share a directory and each fold the other's evidence. Reproduced
+    // 2026-08-28: a second jig's result reported a failing task belonging to the
+    // first, and both callers were handed the same conflated file.
+    //
+    // **This returns before anything is written, and that ordering is the
+    // guarantee rather than an implementation detail.** The directory is a
+    // previous run's; a refusal written into it replaces a completed verdict.
+    // `Error::writes_a_result` carries the reasoning and
+    // `a_refusal_does_not_write_into_the_directory_it_refused` holds it.
+    if output_dir.exists() {
+        return Err(Error::OutputDirectoryInUse(output_dir));
+    }
+
+    // Everything past here is bolt alive and in control, so FR-10.7 wants a
+    // result for whatever goes wrong. The refusal is written into the directory
+    // this run owns, which the two checks above have already established is not
+    // somebody else's.
+    carry_out(jig, base, &output_dir).inspect_err(|refusal| write_refusal(&output_dir, refusal))
+}
+
+/// Where a run over `base` starting at `at` writes, by FR-2.6c.
+///
+/// Exposed because the directory name is part of what a caller observes, and a
+/// test that cannot predict it cannot set up the collision FR-2.6b refuses.
+/// FR-2.6's filesystem-safe stamp rather than the strict ISO 8601 form, since
+/// this is a path component.
+#[must_use]
+pub fn output_dir_for(base: &Path, at: SystemTime) -> PathBuf {
+    base.join(format!(".bolt-{}", stamp::iso8601(at)))
+}
+
+/// Write a refusal's `result.yaml`, by FR-10.7, in FR-2.5a's shape.
+///
+/// Best effort by design. A filesystem failure here leaves the message on
+/// stderr as the only record, which is the same state a killed bolt leaves and
+/// is already what FR-10.7 tells a caller to read that way. Returning this
+/// error instead would replace the reason the run was refused with the reason
+/// the note about it could not be written, which is the less useful of the two.
+fn write_refusal(output_dir: &Path, refusal: &Error) {
+    debug_assert!(
+        refusal.writes_a_result(),
+        "a refusal exempt from FR-10.7 reached the writer: {refusal:?}",
+    );
+
+    let result = json!({
+        "success": false,
+        "reasons": [{ "kind": "bolt-refused", "message": refusal.to_string() }],
+    });
+    let _ = create_dir(output_dir);
+    let _ = save(
+        &output_dir.join(RESULT_FILE),
+        &result,
+        &wrench::ENVELOPE_SCHEMA,
+    );
+}
+
+/// Carry the run out, once the output directory is known to be bolt's own.
+fn carry_out(jig: &str, base: &Path, output_dir: &Path) -> Result<Outcome, Error> {
+    let output_dir = output_dir.to_path_buf();
     let jig = jig::read(base, jig)?;
 
     // Everything a jig can be refused for, checked before any task executes.
@@ -94,15 +156,6 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
     let commands = validate(&jig)?;
 
     let walked = walk::walk(base)?;
-    let output_dir = base.join(format!(".bolt-{}", stamp::iso8601(SystemTime::now())));
-
-    // FR-2.6b. The stamp is second-granular, so two runs started in one second
-    // would share a directory and each fold the other's evidence. Reproduced
-    // 2026-08-28: a second jig's result reported a failing task belonging to the
-    // first, and both callers were handed the same conflated file.
-    if output_dir.exists() {
-        return Err(Error::OutputDirectoryInUse(output_dir));
-    }
     create_dir(&output_dir.join(WORK_DIR))?;
 
     let locations = Locations {

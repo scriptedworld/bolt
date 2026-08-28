@@ -19,6 +19,7 @@ use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::SystemTime;
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -1252,4 +1253,168 @@ fn a_merge_finding_no_constituent_fails() {
         refusal.to_string().contains("no task produced a result"),
         "the reason does not say why: {refusal}",
     );
+}
+
+// ---- refusals write a result, and never over somebody else's ----------------
+
+// COVERS: FR-10.7, FR-2.5a | positive
+/// A refusal writes a `result.yaml` in the shape every refusal takes.
+///
+/// FR-10.7 has bolt write one whenever it is alive and in control when it
+/// stops, so a caller finding none knows the process was killed rather than
+/// that the run never started. FR-2.5a fixes the shape: `success: false` and a
+/// reason, then a non-zero exit.
+///
+/// The refusal chosen is an unparseable jig, because it happens once the base
+/// is known to be there and so is not FR-10.7a's exempt case.
+#[test]
+fn a_refusal_writes_a_result() {
+    let root = tree();
+    write(root.path(), &bolt::jig::file_name("broken"), "tasks: [\n");
+
+    let refused = bolt()
+        .arg("broken")
+        .arg(root.path())
+        .output()
+        .expect("bolt runs");
+
+    assert_eq!(
+        refused.status.code(),
+        Some(1),
+        "a refusal exits 1: {}",
+        String::from_utf8_lossy(&refused.stderr),
+    );
+
+    let runs: Vec<_> = fs::read_dir(root.path())
+        .expect("the base is readable")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with(".bolt-"))
+        })
+        .collect();
+    assert_eq!(
+        runs.len(),
+        1,
+        "a refusal writes one run directory: {runs:?}"
+    );
+
+    let result = runs[0].join(bolt::run::RESULT_FILE);
+    assert!(
+        result.is_file(),
+        "a refusal wrote no result.yaml, so a caller cannot tell it from a kill",
+    );
+    assert!(
+        !verdict(&result, &wrench::ENVELOPE_SCHEMA),
+        "a refusal's result says success: false",
+    );
+
+    let envelope = read_validated(&result, &wrench::ENVELOPE_SCHEMA);
+    let reasons = envelope
+        .get("reasons")
+        .and_then(Value::as_array)
+        .expect("a refusal carries reasons");
+    assert_eq!(reasons.len(), 1, "one refusal is one reason: {reasons:?}");
+    assert_eq!(
+        reasons[0].get("kind").and_then(Value::as_str),
+        Some("bolt-refused"),
+        "a refusal's reason names its kind: {reasons:?}",
+    );
+    assert!(
+        reasons[0]
+            .get("message")
+            .and_then(Value::as_str)
+            .is_some_and(|message| message.contains("unreadable")),
+        "the reason does not say what was refused: {reasons:?}",
+    );
+}
+
+// COVERS: FR-10.7a | edge
+/// The refusal that writes nothing is the base not being there, and it says so.
+///
+/// FR-10.7a: the default output directory sits inside the base, so writing the
+/// result would create the very thing whose absence is being refused. Bolt says
+/// on stderr that it wrote none. FR-10.7b points a caller wanting a parseable
+/// refusal in every case at `--output-dir`, which is `runner/10`.
+#[test]
+fn the_missing_base_refusal_writes_nothing_and_says_so() {
+    let root = tree();
+    let absent = root.path().join("not-there");
+
+    let refused = bolt()
+        .arg("check")
+        .arg(&absent)
+        .output()
+        .expect("bolt runs");
+
+    assert_eq!(refused.status.code(), Some(1), "a missing base is refused");
+    assert!(
+        !absent.exists(),
+        "refusing a missing base created it, which is what the refusal was about",
+    );
+
+    let stderr = String::from_utf8_lossy(&refused.stderr);
+    assert!(
+        stderr.contains("not there"),
+        "stderr does not say why: {stderr}",
+    );
+    assert!(
+        stderr.contains("no result was written"),
+        "stderr does not say that no result was written: {stderr}",
+    );
+}
+
+// COVERS: FR-10.7, FR-2.6b | regression
+/// Refusing a directory as unusable does not write into it.
+///
+/// **This is the guarantee FR-10.7 can be satisfied without, which is why it is
+/// asserted rather than described.** The Go build writes a conformant refusal
+/// into the run directory it resolved, and because the stamp is second-granular
+/// two runs starting in one second resolve to the same one: the second refuses,
+/// correctly, and its refusal replaces the first's completed verdict while the
+/// per-task evidence still says `nonzero-exit`. Reproduced 2026-08-28, filed
+/// with a `repro.sh` at
+/// `clank/inbox/bolt.go/a-refusal-overwrites-the-run-it-refused/`.
+///
+/// A refactor satisfying FR-10.7 by writing the refusal into the resolved
+/// directory passes every other test in this file.
+///
+/// Deterministic without landing two runs inside one second: the run directory
+/// is a function of the base and the clock, so the collision is set up by
+/// predicting it. The retry covers a second boundary falling between predicting
+/// and running, and a failure to collide is a failure rather than a pass, since
+/// a test that quietly skips its own case is worse than no test.
+#[test]
+fn a_refusal_does_not_write_into_the_directory_it_refused() {
+    let root = tree();
+    let sentinel = "success: true\n";
+
+    for attempt in 0..20 {
+        let predicted = bolt::run::output_dir_for(root.path(), SystemTime::now());
+        fs::create_dir_all(&predicted).expect("the colliding run directory");
+        let result = predicted.join(bolt::run::RESULT_FILE);
+        fs::write(&result, sentinel).expect("the previous run's verdict");
+
+        let refusal = bolt::run::run("check", root.path());
+
+        match refusal {
+            Err(bolt::Error::OutputDirectoryInUse(path)) => {
+                assert_eq!(path, predicted, "the refusal names the wrong directory");
+                assert_eq!(
+                    fs::read_to_string(&result).expect("the previous verdict survives"),
+                    sentinel,
+                    "the refusal overwrote the verdict of the run it refused to share",
+                );
+                return;
+            }
+            // The clock crossed a second, so this run resolved elsewhere and
+            // the case was not exercised. Clear up and try again.
+            other => {
+                assert!(other.is_err(), "a directory holding a run must be refused");
+                fs::remove_dir_all(&predicted).expect("the fixture is removable");
+                assert!(attempt < 19, "never landed inside one second in 20 tries");
+            }
+        }
+    }
 }
