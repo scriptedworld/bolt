@@ -1185,7 +1185,7 @@ fn the_merge_folds_every_envelope_repeatably() {
     let result = outcome.output_dir.join(bolt::run::RESULT_FILE);
     let first = fs::read(&result).expect("a run has a result");
 
-    bolt::merge::merge(&outcome.output_dir).expect("a finished directory refolds");
+    bolt::merge::merge(&outcome.output_dir, root.path()).expect("a finished directory refolds");
 
     assert_eq!(
         first,
@@ -1243,7 +1243,8 @@ fn a_merge_finding_no_constituent_fails() {
     let empty = tree();
     fs::create_dir(empty.path().join(bolt::run::WORK_DIR)).expect("an empty work directory");
 
-    let refusal = bolt::merge::merge(empty.path()).expect_err("no constituent is a failure");
+    let refusal =
+        bolt::merge::merge(empty.path(), empty.path()).expect_err("no constituent is a failure");
 
     assert!(
         matches!(refusal, bolt::Error::NoConstituents),
@@ -1310,15 +1311,16 @@ fn a_refusal_writes_a_result() {
         "a refusal's result says success: false",
     );
 
-    assert_refusal_shape(&result);
+    assert_refusal_shape(&result, "unreadable");
 }
 
 /// FR-2.5a's shape, asserted where a refusal wrote a result.
 ///
-/// One reason, kind `bolt-refused`, and a message saying what was refused. A
-/// helper rather than a fourth copy, since three tests want the same three
-/// assertions and only differ in which refusal produced the file.
-fn assert_refusal_shape(result: &Path) {
+/// One reason, kind `bolt-refused`, and a message carrying `says`. A helper
+/// rather than a copy per caller, since several tests want the same three
+/// assertions and differ only in which refusal produced the file and therefore
+/// in what its message should mention.
+fn assert_refusal_shape(result: &Path, says: &str) {
     let envelope = read_validated(result, &wrench::ENVELOPE_SCHEMA);
     let reasons = envelope
         .get("reasons")
@@ -1335,7 +1337,7 @@ fn assert_refusal_shape(result: &Path) {
         reasons[0]
             .get("message")
             .and_then(Value::as_str)
-            .is_some_and(|message| message.contains("unreadable")),
+            .is_some_and(|message| message.contains(says)),
         "the reason does not say what was refused: {reasons:?}",
     );
 }
@@ -1642,11 +1644,359 @@ fn evidence_is_keyed_by_execution_and_carries_args_and_result() {
     );
 }
 
+// ---- the output directory ---------------------------------------------------
+
+// COVERS: FR-2.6, FR-2.6a | positive
+/// `--output-dir` names where a run writes, and is created with its parents.
+///
+/// FR-2.6a: a graph node's `.ephemera/` may not exist yet, and making the caller
+/// create it first buys nothing. Asserted two levels deep, so a single
+/// `create_dir` would fail where `create_dir_all` succeeds.
+#[test]
+fn a_named_output_directory_is_created_with_its_parents() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+    let named = root.path().join("build").join("qa");
+
+    let outcome = run_into("check", root.path(), &named).expect("the run completes");
+
+    assert_eq!(
+        outcome.output_dir, named,
+        "the run did not write where it was told",
+    );
+    assert!(
+        named.join(bolt::run::RESULT_FILE).is_file(),
+        "no result in the named directory",
+    );
+    assert!(
+        !fs::read_dir(root.path())
+            .expect("the base is readable")
+            .filter_map(Result::ok)
+            .any(|entry| entry.file_name().to_string_lossy().starts_with(".bolt-")),
+        "a named output directory did not stop the default one being written",
+    );
+}
+
+// COVERS: FR-2.6c, FR-2.6d | positive
+/// Given no `--output-dir`, a run writes `.bolt-<iso8601>` at its base.
+///
+/// FR-2.6d wants the filesystem-safe spelling: hyphens where the strict form
+/// has colons. A directory name is a path on every platform, and the strict
+/// form's colons are legal here and hostile to a Windows checkout.
+#[test]
+fn the_default_output_directory_is_a_filesystem_safe_stamp_at_the_base() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+    let name = outcome
+        .output_dir
+        .file_name()
+        .expect("the run directory has a name")
+        .to_string_lossy()
+        .into_owned();
+
+    assert!(
+        name.starts_with(".bolt-"),
+        "the default run directory is not named for bolt: {name}",
+    );
+    assert!(
+        !name.contains(':'),
+        "the stamp carries colons, which are hostile to a Windows checkout: {name}",
+    );
+    assert_eq!(
+        outcome.output_dir.parent(),
+        Some(
+            fs::canonicalize(root.path())
+                .expect("the base resolves")
+                .as_path()
+        ),
+        "the default run directory is not at the base",
+    );
+}
+
+// COVERS: FR-2.6b | negative
+/// A named output directory that already holds a run is refused.
+///
+/// FR-2.6b: writing into one interleaves two runs' evidence, and FR-2.2c's
+/// exclusion cannot recognise a directory it did not name. Removing it is the
+/// caller's decision, so bolt refuses rather than clearing it.
+///
+/// An existing but **empty** directory is not one that holds a run, which is
+/// what FR-2.6a describes rather than what FR-2.6b refuses.
+#[test]
+fn a_named_output_directory_holding_a_run_is_refused() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+    let named = root.path().join("qa");
+    fs::create_dir(&named).expect("an empty directory the caller made");
+
+    run_into("check", root.path(), &named).expect("an empty named directory is not in use");
+
+    let refusal =
+        run_into("check", root.path(), &named).expect_err("a second run into it is refused");
+    assert!(
+        matches!(refusal, bolt::Error::OutputDirectoryInUse(_)),
+        "wrong refusal for a directory already holding a run: {refusal:?}",
+    );
+}
+
+// COVERS: FR-2.2c | property
+/// A run never walks its own output directory, whatever it was named.
+///
+/// Knowable because the run created it. The default `.bolt-<iso8601>` is hidden
+/// and would be skipped anyway, so this names one that is not: `evidence/` sits
+/// in the base, is not hidden, and is not in any `.gitignore`.
+///
+/// Asserted through the manifest's selection rather than through the exit
+/// status, because a task that matched its own evidence would still pass.
+#[test]
+fn a_run_does_not_walk_its_own_output_directory() {
+    let root = tree();
+    write(root.path(), "a.txt", "content");
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0' {all_paths}\"\n    matching: [\"**/*\"]\n",
+    );
+    // Populated before the run, so the walk would find it if nothing excluded
+    // it. Without this the directory does not exist when the walk happens and
+    // the exclusion is true by accident, which is how this test first passed
+    // against an implementation that did not exclude anything.
+    let named = root.path().join("evidence");
+    write(
+        root.path(),
+        "evidence/stale.txt",
+        "a previous run's leavings",
+    );
+
+    let outcome = run_into("check", root.path(), &named).expect("the run completes");
+    let manifest = read_validated(
+        &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
+        &wrench::MANIFEST_SCHEMA,
+    );
+    let matched: Vec<String> = manifest
+        .get("selection")
+        .and_then(|selection| selection.get("matched"))
+        .and_then(Value::as_array)
+        .expect("a path-consuming task records what it matched")
+        .iter()
+        .filter_map(|path| path.as_str().map(str::to_owned))
+        .collect();
+
+    assert!(
+        !matched.iter().any(|path| path.contains("evidence")),
+        "the run walked into its own output directory: {matched:?}",
+    );
+    assert!(
+        matched.iter().any(|path| path.ends_with("a.txt")),
+        "the exclusion took the rest of the tree with it: {matched:?}",
+    );
+}
+
+// COVERS: FR-8.9 | positive
+/// `result.yaml` records the base the run was pointed at.
+///
+/// FR-8.9: it is the first thing a reader asks of a result, and FR-9.5c's
+/// per-execution manifests answer it only for somebody already inside the run
+/// directory. That matters most when the run directory is somewhere else
+/// entirely, which `--output-dir` makes ordinary.
+#[test]
+fn the_result_records_the_base_the_run_was_pointed_at() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+    let elsewhere = tree();
+    let named = elsewhere.path().join("qa");
+
+    let outcome = run_into("check", root.path(), &named).expect("the run completes");
+    let result = read_validated(
+        &outcome.output_dir.join(bolt::run::RESULT_FILE),
+        &wrench::ENVELOPE_SCHEMA,
+    );
+
+    let recorded = result
+        .get("metadata")
+        .and_then(|metadata| metadata.get("base"))
+        .and_then(Value::as_str)
+        .expect("the result records its base");
+    assert_eq!(
+        Path::new(recorded),
+        fs::canonicalize(root.path()).expect("the base resolves"),
+        "the result names the wrong base",
+    );
+}
+
+// COVERS: FR-10.7b, FR-10.3, FR-10.4 | edge
+/// Naming an output directory outside the tree gets a result for every refusal.
+///
+/// FR-10.7a exempts the missing base only while the result would land inside
+/// it. FR-10.7b is the way out: a caller wanting a parseable refusal in every
+/// case names a directory outside the tree being checked, which a graph node
+/// already does by FR-2.6a's `.ephemera/`.
+///
+/// So this is the same refusal as
+/// `the_missing_base_refusal_writes_nothing_and_says_so`, with the one thing
+/// changed that the row says changes it.
+#[test]
+fn a_named_directory_outside_the_base_gets_a_result_for_a_missing_base() {
+    let root = tree();
+    let absent = root.path().join("not-there");
+    let elsewhere = tree();
+    let named = elsewhere.path().join("qa");
+
+    let refusal = run_into("check", &absent, &named).expect_err("a missing base is refused");
+    assert!(
+        matches!(refusal, bolt::Error::BaseMissing(_)),
+        "wrong refusal for a missing base: {refusal:?}",
+    );
+    assert!(
+        !absent.exists(),
+        "refusing a missing base created it, which is what the refusal was about",
+    );
+
+    let result = named.join(bolt::run::RESULT_FILE);
+    assert!(
+        result.is_file(),
+        "FR-10.7b's way out wrote no result, so there is no way out",
+    );
+    // FR-10.3 and FR-10.4: the verdict is in the envelope and the status says
+    // only whether bolt could run, so a refusal reads false here and 1 there.
+    assert!(
+        !verdict(&result, &wrench::ENVELOPE_SCHEMA),
+        "a refusal's result says success: false",
+    );
+    assert_refusal_shape(&result, "not there");
+}
+
+// COVERS: FR-10.6 | edge
+/// A bolt killed by a signal dies of the signal rather than choosing a status.
+///
+/// FR-10.6 is the one case where bolt does not pick its own exit status: the
+/// shell's convention is 128 plus the signal number, and it is the shell that
+/// applies it. So what bolt owes is to **not** intercept the signal and exit a
+/// number of its own, which is what this asserts.
+///
+/// The row is about what a shell sees, so a test calling the entry point in
+/// process cannot reach it: a signal delivered to the test harness kills the
+/// harness. This spawns the real binary on a jig that blocks, signals it, and
+/// reads the wait status.
+///
+/// `status.code()` is `None` for a signalled process and `signal()` carries the
+/// number. Asserting `code() == Some(143)` would be wrong and would pass only
+/// against a bolt that had caught the signal, which is the defect.
+#[test]
+fn a_bolt_killed_by_a_signal_dies_of_the_signal() {
+    use std::os::unix::process::ExitStatusExt;
+
+    let root = tree();
+    write_jig(
+        root.path(),
+        "slow",
+        "  - name: blocks\n    command: \"sh -c 'sleep 30'\"\n",
+    );
+
+    let mut child = bolt()
+        .arg("slow")
+        .arg(root.path())
+        .spawn()
+        .expect("bolt starts");
+
+    // Wait for the command to be running rather than sleeping a fixed time: the
+    // work directory appears once the task has started, so polling for it makes
+    // the test wait exactly as long as it needs to.
+    // A timeout here would leave the rest of the test signalling a bolt that had
+    // not started its command, which still dies of the signal and would pass for
+    // the wrong reason.
+    assert!(
+        wait_for_execution(root.path(), "blocks-1"),
+        "bolt never reached the blocking task, so the signal proves nothing",
+    );
+
+    let killed = Command::new("kill")
+        .arg("-TERM")
+        .arg(child.id().to_string())
+        .status()
+        .expect("kill runs");
+    assert!(killed.success(), "could not signal bolt");
+
+    let status = child.wait().expect("bolt is reaped");
+
+    assert_eq!(
+        status.code(),
+        None,
+        "bolt chose an exit status where the signal should have carried it",
+    );
+    assert_eq!(
+        status.signal(),
+        Some(15),
+        "bolt did not die of the signal it was sent",
+    );
+}
+
 // ---- the three-layer definitions mapping -----------------------------------
 
 /// Write `bolt.<name>.definitions.yaml` into `root`, the config directory.
 fn write_definitions(root: &Path, name: &str, body: &str) {
     write(root, &bolt::definitions::file_name(name), body);
+}
+
+/// A run naming a definitions file, for the tests that are about the layers.
+fn run_with(jig: &str, base: &Path, definitions: &str) -> Result<bolt::Outcome, bolt::Error> {
+    bolt::run::invoke(&bolt::run::Invocation {
+        jig,
+        base,
+        definitions: Some(definitions),
+        output_dir: None,
+    })
+}
+
+/// Wait until `entry`'s work directory appears under a run at `base`.
+///
+/// Polls rather than sleeping a fixed time, so a test waits exactly as long as
+/// it needs to. Returns whether it appeared, so a caller can fail rather than
+/// carry on against a run that never started.
+fn wait_for_execution(base: &Path, entry: &str) -> bool {
+    let began = std::time::Instant::now();
+    while began.elapsed() < std::time::Duration::from_secs(10) {
+        let started = fs::read_dir(base)
+            .expect("the base is readable")
+            .filter_map(Result::ok)
+            .any(|run| {
+                run.file_name().to_string_lossy().starts_with(".bolt-")
+                    && run.path().join(bolt::run::WORK_DIR).join(entry).exists()
+            });
+        if started {
+            return true;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    false
+}
+
+/// A run naming an output directory, for the tests that are about FR-2.6.
+fn run_into(jig: &str, base: &Path, output_dir: &Path) -> Result<bolt::Outcome, bolt::Error> {
+    bolt::run::invoke(&bolt::run::Invocation {
+        jig,
+        base,
+        definitions: None,
+        output_dir: Some(output_dir),
+    })
 }
 
 // COVERS: FR-3.15, FR-4.16 | positive
@@ -1708,8 +2058,7 @@ fn a_definitions_file_replaces_only_the_keys_it_names() {
     );
     write_definitions(root.path(), "override", "deny: clippy::all\n");
 
-    let outcome =
-        bolt::run::run_with("check", root.path(), Some("override")).expect("the run completes");
+    let outcome = run_with("check", root.path(), "override").expect("the run completes");
     let manifest = read_validated(
         &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
         &wrench::MANIFEST_SCHEMA,
@@ -1753,8 +2102,7 @@ fn the_manifest_records_which_layer_supplied_each_value() {
     );
     write_definitions(root.path(), "override", "deny: clippy::all\n");
 
-    let outcome =
-        bolt::run::run_with("check", root.path(), Some("override")).expect("the run completes");
+    let outcome = run_with("check", root.path(), "override").expect("the run completes");
     let manifest = read_validated(
         &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
         &wrench::MANIFEST_SCHEMA,
@@ -1822,7 +2170,7 @@ fn a_definition_naming_a_reserved_variable_is_refused() {
         "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
     );
     write_definitions(from_file.path(), "bad", "each_path: nonsense\n");
-    let refusal = bolt::run::run_with("check", from_file.path(), Some("bad"))
+    let refusal = run_with("check", from_file.path(), "bad")
         .expect_err("a file redefining a path variable refuses");
     assert!(
         matches!(refusal, bolt::Error::ReservedDefinition { .. }),
@@ -1919,8 +2267,8 @@ fn a_definitions_file_that_will_not_validate_is_refused() {
     // Nested, where the schema allows one level of scalars.
     write_definitions(root.path(), "bad", "deny:\n  nested: warnings\n");
 
-    let refusal = bolt::run::run_with("check", root.path(), Some("bad"))
-        .expect_err("an invalid definitions file refuses");
+    let refusal =
+        run_with("check", root.path(), "bad").expect_err("an invalid definitions file refuses");
     assert!(
         matches!(refusal, bolt::Error::DefinitionsUnreadable { .. }),
         "wrong refusal for an invalid definitions file: {refusal:?}",
@@ -1932,7 +2280,7 @@ fn a_definitions_file_that_will_not_validate_is_refused() {
         "check",
         "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
     );
-    let refusal = bolt::run::run_with("check", absent.path(), Some("missing"))
+    let refusal = run_with("check", absent.path(), "missing")
         .expect_err("a named file that is not there refuses");
     assert!(
         matches!(refusal, bolt::Error::DefinitionsUnreadable { .. }),

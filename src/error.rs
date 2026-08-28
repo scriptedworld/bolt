@@ -140,24 +140,28 @@ impl Error {
     ///
     /// FR-10.7 has bolt write one whenever it is alive and in control when it
     /// stops, so a caller finding none knows the process was killed. FR-10.7a
-    /// exempts two, and both are about the directory the result would go in.
+    /// exempts refusals about the directory the result would go in, and
+    /// **whether that exemption applies depends on where the directory is, not
+    /// on which refusal it was.**
     ///
-    /// [`Self::BaseMissing`]: the default output directory sits inside the
-    /// base, so writing a result would create the very thing whose absence is
-    /// being refused.
-    ///
-    /// [`Self::OutputDirectoryInUse`]: the directory is a previous run's, so
-    /// writing a refusal into it replaces a completed verdict with
-    /// `kind: bolt-refused` while the per-task evidence still says otherwise.
-    /// The Go build does exactly that, reproduced 2026-08-28 and filed at
+    /// [`Self::OutputDirectoryInUse`] is the one that never writes, whatever
+    /// the caller named. The directory holds a previous run, so writing a
+    /// refusal into it replaces a completed verdict with `kind: bolt-refused`
+    /// while the per-task evidence still says otherwise. The Go build does
+    /// exactly that, reproduced 2026-08-28 and filed at
     /// `clank/inbox/bolt.go/a-refusal-overwrites-the-run-it-refused/`. Writing
     /// it anywhere else would invent a location no caller was told about.
     ///
-    /// FR-10.7b is the way out of both: a caller wanting a parseable refusal in
-    /// every case names an output directory outside the tree being checked.
+    /// [`Self::BaseMissing`] is the one that depends: with the default output
+    /// directory it writes nothing, because that directory sits inside the base
+    /// and writing there would create the thing whose absence is being refused.
+    /// With `--output-dir` naming somewhere outside the base it writes a result
+    /// like any other refusal, which is exactly what FR-10.7b tells a caller
+    /// wanting a parseable refusal in every case to do. [`crate::run::invoke`]
+    /// makes that call, since it is the only place that knows both paths.
     #[must_use]
-    pub fn writes_a_result(&self) -> bool {
-        !matches!(self, Self::BaseMissing(_) | Self::OutputDirectoryInUse(_))
+    pub fn never_writes_a_result(&self) -> bool {
+        matches!(self, Self::OutputDirectoryInUse(_))
     }
 }
 

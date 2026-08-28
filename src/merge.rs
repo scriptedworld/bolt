@@ -26,7 +26,7 @@ use crate::{Error, Outcome};
 /// as checked and fine.
 ///
 /// [`Error::Io`] when the result cannot be written.
-pub fn merge(output_dir: &Path) -> Result<Outcome, Error> {
+pub fn merge(output_dir: &Path, base: &Path) -> Result<Outcome, Error> {
     let work = output_dir.join(WORK_DIR);
     let mut entries: Vec<_> = fs::read_dir(&work)
         .map_err(|source| Error::Io {
@@ -50,9 +50,15 @@ pub fn merge(output_dir: &Path) -> Result<Outcome, Error> {
     let folded = fold(&entries)?;
     let success = folded.reasons.is_empty();
 
+    // FR-8.9 puts the base here. It is the first thing a reader asks of a
+    // result, and FR-9.5c's per-execution manifests answer it only for somebody
+    // already inside the run directory.
     let mut result = json!({
         "success": success,
-        "metadata": { "evidence": Value::Object(folded.evidence) },
+        "metadata": {
+            "base": base.display().to_string(),
+            "evidence": Value::Object(folded.evidence),
+        },
     });
     if !success {
         result["reasons"] = Value::Array(folded.reasons);

@@ -93,25 +93,53 @@ struct Locations {
 /// [`Error::CommandNamesBothPathForms`] when a command names both path forms by
 /// FR-4.2, and [`Error::Io`] when the run cannot record what it did.
 pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
-    run_with(jig, base, None)
+    invoke(&Invocation {
+        jig,
+        base,
+        definitions: None,
+        output_dir: None,
+    })
 }
 
-/// Run the jig named `jig` over `base`, with an optional definitions file.
+/// Everything an invocation names.
 ///
-/// FR-4.16a names one as `--definitions <name>`, read from the config directory
-/// as `bolt.<name>.definitions.yaml`. FR-4.16b allows at most one to an
-/// invocation and calls none the ordinary case, since a jig whose defaults cover
-/// its placeholders runs without one.
+/// Two positionals and the rest optional, by FR-2.1a: which jig and where is a
+/// complete invocation, and everything here beyond those two has a default that
+/// makes naming it unnecessary.
+pub struct Invocation<'a> {
+    /// Which jig, by FR-3.9. A name, never a path.
+    pub jig: &'a str,
+    /// Where, and the run's base.
+    pub base: &'a Path,
+    /// The definitions file named by FR-4.16a, if one was.
+    pub definitions: Option<&'a str>,
+    /// Where evidence goes, by FR-2.6. `None` is `.bolt-<iso8601>` at the base.
+    pub output_dir: Option<&'a Path>,
+}
+
+/// Carry out an invocation.
 ///
 /// # Errors
 ///
-/// Everything [`run`] returns, plus [`Error::ReservedDefinition`] by FR-4.19 and
-/// [`Error::DefinitionsUnreadable`] by FR-4.20.
-pub fn run_with(jig: &str, base: &Path, definitions: Option<&str>) -> Result<Outcome, Error> {
-    // FR-2.5 first, and before FR-2.6c's output directory, which sits at the
-    // base and would create it.
+/// Everything [`run`] returns, plus [`Error::ReservedDefinition`] by FR-4.19,
+/// [`Error::DefinitionsUnreadable`] by FR-4.20, and [`Error::OutputDirectoryInUse`]
+/// by FR-2.6b for a named directory that already holds a run.
+pub fn invoke(invocation: &Invocation) -> Result<Outcome, Error> {
+    let Invocation {
+        jig,
+        base,
+        definitions,
+        output_dir,
+    } = invocation;
+
+    // One stamp for the whole invocation. Taking it twice would let a second
+    // boundary fall between them and put a refusal somewhere the run would not
+    // have written.
+    let started = SystemTime::now();
+    let named = *output_dir;
+
     if !base.is_dir() {
-        return Err(Error::BaseMissing(base.to_path_buf()));
+        return Err(base_missing(base, named));
     }
 
     // FR-2.4, and this is the only place it has to happen. Every path bolt
@@ -127,19 +155,17 @@ pub fn run_with(jig: &str, base: &Path, definitions: Option<&str>) -> Result<Out
         reason: source.to_string(),
     })?;
 
-    let output_dir = output_dir_for(base, SystemTime::now());
+    // FR-2.4 reaches the output directory too, and it has to happen after the
+    // base is canonical: the default is derived from the base, and a named one
+    // is resolved against the working directory like any path on a command
+    // line. `.bolt-<iso8601>` at a relative base would otherwise be recorded as
+    // `./.bolt-…`, which is the defect FR-2.4 exists to prevent one level up.
+    let output_dir = named.map_or_else(|| output_dir_for(base, started), absolute);
 
-    // FR-2.6b. The stamp is second-granular, so two runs started in one second
-    // would share a directory and each fold the other's evidence. Reproduced
-    // 2026-08-28: a second jig's result reported a failing task belonging to the
-    // first, and both callers were handed the same conflated file.
-    //
-    // **This returns before anything is written, and that ordering is the
-    // guarantee rather than an implementation detail.** The directory is a
-    // previous run's; a refusal written into it replaces a completed verdict.
-    // `Error::writes_a_result` carries the reasoning and
-    // `a_refusal_does_not_write_into_the_directory_it_refused` holds it.
-    if output_dir.exists() {
+    // FR-2.6b, for a named directory as much as for the default. **This returns
+    // before anything is written, and that ordering is the guarantee rather
+    // than an implementation detail**; `holds_a_run` carries why.
+    if holds_a_run(&output_dir) {
         return Err(Error::OutputDirectoryInUse(output_dir));
     }
 
@@ -147,8 +173,97 @@ pub fn run_with(jig: &str, base: &Path, definitions: Option<&str>) -> Result<Out
     // result for whatever goes wrong. The refusal is written into the directory
     // this run owns, which the two checks above have already established is not
     // somebody else's.
-    carry_out(jig, base, &output_dir, definitions)
+    carry_out(jig, base, &output_dir, *definitions)
         .inspect_err(|refusal| write_refusal(&output_dir, refusal))
+}
+
+/// FR-2.5's refusal, with FR-10.7a's exemption applied to it.
+///
+/// The exemption is about the **directory**, not the error. The default output
+/// directory sits inside the base, so writing there would create the thing whose
+/// absence is being refused. One named outside it has no such problem, which is
+/// exactly what FR-10.7b tells a caller who wants a parseable refusal in every
+/// case to do.
+fn base_missing(base: &Path, named: Option<&Path>) -> Error {
+    let refusal = Error::BaseMissing(base.to_path_buf());
+    if wrote_a_result(&refusal, base, named) {
+        // Only reachable with a named directory outside the base, so there is
+        // one to write to and no default to derive from a base that is not
+        // there.
+        if let Some(path) = named {
+            write_refusal(&absolute(path), &refusal);
+        }
+    }
+    refusal
+}
+
+/// A path made absolute without touching the filesystem, by FR-2.4.
+///
+/// `canonicalize` is wrong here: an output directory need not exist yet, since
+/// FR-2.6a has bolt create it. This resolves against the working directory and
+/// leaves symlinks alone, which is what a path on a command line means.
+fn absolute(path: &Path) -> PathBuf {
+    std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// Whether a refusal leaves a `result.yaml` behind.
+///
+/// Stated once and consulted twice: [`invoke`] to decide whether to write one,
+/// and the command line to decide whether to tell a caller that none was
+/// written. Those two answers disagreeing is how "no result" comes to mean two
+/// different things, and FR-10.7 has a caller read an absent result as a bolt
+/// that was killed.
+///
+/// `output_dir` is what the caller named, not what a run resolved, so `None`
+/// means the FR-2.6c default at the base.
+#[must_use]
+pub fn wrote_a_result(refusal: &Error, base: &Path, output_dir: Option<&Path>) -> bool {
+    if refusal.never_writes_a_result() {
+        return false;
+    }
+    // FR-10.7a and FR-10.7b together: the missing base is exempt only while the
+    // result would land inside it.
+    if matches!(refusal, Error::BaseMissing(_)) {
+        return output_dir.is_some_and(|named| !named.starts_with(base));
+    }
+    true
+}
+
+/// The walk, with FR-2.2c's exclusion applied.
+///
+/// A run never walks its own output directory, whatever it was named and
+/// whatever `.gitignore` says, which is knowable because the run created it.
+/// The default `.bolt-<iso8601>` is hidden and `ignore` would skip it anyway; a
+/// named `build/qa` is not, so the exclusion is explicit rather than inherited
+/// from a default that happens to cover one case.
+///
+/// Another run's output directory is not recognisable by name, which is why
+/// FR-2.6b refuses one that already holds a run rather than pretending this can
+/// spot it.
+fn walk_excluding(base: &Path, output_dir: &Path) -> Result<Vec<PathBuf>, Error> {
+    Ok(walk::walk(base)?
+        .into_iter()
+        .filter(|path| !path.starts_with(output_dir))
+        .collect())
+}
+
+/// Whether a directory already holds a run, by FR-2.6b.
+///
+/// A directory bolt would create is not one that holds a run, and FR-2.6a has
+/// `--output-dir` created if it is not there. So the question is whether there
+/// is a result or a work directory in it rather than whether the path exists: a
+/// caller pointing two runs at an existing empty `build/qa` is doing what
+/// FR-2.6a describes, not what FR-2.6b refuses.
+///
+/// **Refusing here rather than writing is the whole guarantee.** Writing into
+/// one interleaves two runs' evidence, and the default stamp is second-granular
+/// so two runs started in one second resolve to the same directory. Reproduced
+/// 2026-08-28 against the Go build: a second jig's refusal replaced the first's
+/// completed verdict while its per-task evidence still said otherwise.
+/// `a_refusal_does_not_write_into_the_directory_it_refused` holds it, and
+/// removing the directory is the caller's decision rather than bolt's.
+fn holds_a_run(output_dir: &Path) -> bool {
+    output_dir.join(RESULT_FILE).exists() || output_dir.join(WORK_DIR).exists()
 }
 
 /// Where a run over `base` starting at `at` writes, by FR-2.6c.
@@ -171,7 +286,7 @@ pub fn output_dir_for(base: &Path, at: SystemTime) -> PathBuf {
 /// the note about it could not be written, which is the less useful of the two.
 fn write_refusal(output_dir: &Path, refusal: &Error) {
     debug_assert!(
-        refusal.writes_a_result(),
+        !refusal.never_writes_a_result(),
         "a refusal exempt from FR-10.7 reached the writer: {refusal:?}",
     );
 
@@ -209,8 +324,11 @@ fn carry_out(
     // through a gate.
     let commands = validate(&jig, &definitions)?;
 
-    let walked = walk::walk(base)?;
+    // Created before the walk. Creating it afterwards made FR-2.2c's exclusion
+    // below true by accident, for a directory bolt had not made yet.
     create_dir(&output_dir.join(WORK_DIR))?;
+
+    let walked = walk_excluding(base, &output_dir)?;
 
     let locations = Locations {
         project_root: base.to_path_buf(),
@@ -228,7 +346,7 @@ fn carry_out(
         executions += run_task(&scope, task, command, &walked)?;
     }
 
-    merge::merge(&output_dir).map(|folded| Outcome {
+    merge::merge(&output_dir, base).map(|folded| Outcome {
         executions,
         ..folded
     })
