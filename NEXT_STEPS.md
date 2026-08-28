@@ -390,6 +390,52 @@ rests on, and it does not change with the language.
     are defensible and neither is free, which is worth knowing before question 10
     is settled on its own merits.
 
+## Promoting the Rust jig to toolbox, and what it owes first
+
+Chosen by our user 2026-08-27, heard first-hand by the wrench session and routed
+here by silo. wrench's Rust pack is the waiting consumer: three packs, and the
+Rust one gated by `cargo test` and nothing else.
+
+**The split is already written in the jig's own header**, so promotion is closer
+to deleting the common tasks and handing the rest over than to a redesign:
+
+    common-quality     traceability, suppressions, complexity
+    rust-std-quality   format, lint, build, tests, coverage, vuln, licences
+
+**It has been run against one repository, so its assumptions are bolt-shaped
+until somebody checks.** Audited 2026-08-27 against that question. Two were
+defects here and are fixed; two are decisions a shared jig has to take and are
+not mine alone.
+
+**Fixed: the complexity task graded 16% of the tree.** It read `src`, so it
+never saw the test suite. Measured: `lizard src` is 148 nloc in 12 functions,
+`lizard .` is 912 in 52. Tests carry no exemption from complexity, and this
+surfaced only once bolt had tests, which is the same root cause as toolbox's
+bandit excluding `tests` in a repository with no pytest suite. **An exclusion
+written where the excluded thing does not exist is invisible until an adopter
+has one**, and that is the failure mode most likely to repeat on promotion.
+
+**Fixed: `requires` under-declared three tools.** It named `cargo`, which says
+nothing about `cargo-llvm-cov`, `cargo-audit` or `cargo-deny`, each a separate
+binary. Three tasks could fail halfway through a run on a machine missing them,
+which is what FR-3.10's up-front check exists to prevent.
+
+**Open: `cargo deny check` needs a `deny.toml` and nothing declares it.**
+`requires` names tools, not files, so an adopter without one meets a confusing
+failure from a task that looks like it should work anywhere. A shared jig either
+ships a default policy, or the adopter owes a file that nothing tells them
+about. bolt's own policy took two failures to get right and is not obviously the
+one another project wants.
+
+**Open: coverage is measured and enforced nowhere.** The `tests` task writes
+`coverage.lcov` and declares it as evidence, and nothing reads it. No threshold
+exists anywhere in the jig, so the task passes exactly when the suite passes and
+the profile is decoration. The standard says coverage is judged per file, and
+hard rule 5 says a coverage failure is never settled by excluding the file, so
+what is missing is the number and the thing that reads it. A shared Rust jig has
+to answer that, and the answer belongs with whoever owns the standard rather
+than with the first adopter.
+
 ## A caller that finds its output directory by timestamp is wrong
 
 Not a question. Recorded from skid's withdrawn finding, because the same mistake

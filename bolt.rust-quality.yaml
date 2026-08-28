@@ -62,6 +62,13 @@ requires:
   - rustfmt
   - lizard
   - python3
+  # A cargo subcommand is a separate binary and `cargo` being present says
+  # nothing about it. Naming only `cargo` let three tasks fail halfway through a
+  # run on a machine missing them, which is exactly what checking `requires` up
+  # front exists to prevent.
+  - cargo-llvm-cov
+  - cargo-audit
+  - cargo-deny
 
 definitions:
   requirements: REQUIREMENTS.md
@@ -130,6 +137,19 @@ tasks:
 
   # Cyclomatic complexity, function length and parameter count. The thresholds
   # are toolbox's common jig's: 15, 60 lines, 5 parameters.
+  # READS THE WHOLE TREE, NOT `src`. Tests are held to the same bar as the code
+  # and carry no exemption from length, duplication or complexity. Measured
+  # 2026-08-27: `lizard src` sees 148 nloc in 12 functions and `lizard .` sees
+  # 912 in 52, so pointing this at `src` graded 16% of the tree and never read
+  # the test suite at all.
+  #
+  # It surfaced only once bolt had tests, which is the same root cause as
+  # toolbox's bandit excluding `tests` and never noticing in a repository with
+  # no pytest suite. An exclusion written where the excluded thing does not
+  # exist is invisible until an adopter has one.
+  #
+  # No exclusions needed: lizard skips hidden directories, so `.ephemera`, the
+  # `.bolt-*` run directories and `target` are already out.
   - name: complexity
     description: no function over complexity 15, 5 parameters or 60 lines
-    command: lizard --CCN 15 --length 60 --arguments 5 --warnings_only src
+    command: lizard --CCN 15 --length 60 --arguments 5 --warnings_only .
