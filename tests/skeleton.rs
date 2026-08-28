@@ -1487,3 +1487,147 @@ fn the_merge_carries_its_constituents_reasons() {
         "a passing constituent contributed a reason: {messages:?}",
     );
 }
+
+// ---- paths, and what the merge says a result rests on ----------------------
+
+// COVERS: FR-2.4 | positive
+/// Paths are resolved to absolute before anything runs.
+///
+/// Driven through the built binary with a **relative** base, because that is
+/// the case the row is about and the one an in-process call cannot reach: a
+/// test passing `root.path()` hands bolt an absolute path already and would
+/// pass against an implementation that resolves nothing.
+///
+/// `bolt gate .` recorded `"base_dir": {"value": "."}` in every manifest and
+/// substituted relative paths into command lines. `strip_prefix` survives that,
+/// so nothing failed; every recorded path was simply wrong for a reader not
+/// standing where bolt stood.
+#[test]
+fn paths_are_resolved_to_absolute_before_anything_runs() {
+    let root = tree();
+    write(root.path(), "a.txt", "content");
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0' {each_path}\"\n    matching: [\"**/*.txt\"]\n",
+    );
+
+    let outcome = bolt()
+        .arg("check")
+        .arg(".")
+        .current_dir(root.path())
+        .output()
+        .expect("bolt runs");
+    assert_eq!(
+        outcome.status.code(),
+        Some(0),
+        "a relative base is a complete invocation: {}",
+        String::from_utf8_lossy(&outcome.stderr),
+    );
+
+    let run = fs::read_dir(root.path())
+        .expect("the base is readable")
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with(".bolt-"))
+        })
+        .expect("a run directory");
+
+    let manifest = read_validated(
+        &run.join(bolt::run::WORK_DIR)
+            .join("alpha-1")
+            .join(bolt::run::MANIFEST_FILE),
+        &wrench::MANIFEST_SCHEMA,
+    );
+    let variables = manifest
+        .get("variables")
+        .and_then(Value::as_object)
+        .expect("a manifest records its variables");
+
+    for name in [
+        "project_root",
+        "base_dir",
+        "config_dir",
+        "work_dir",
+        "output_dir",
+    ] {
+        let value = variables
+            .get(name)
+            .and_then(|entry| entry.get("value"))
+            .and_then(Value::as_str)
+            .unwrap_or_else(|| panic!("{name} is not in the manifest"));
+        assert!(
+            Path::new(value).is_absolute(),
+            "{name} was recorded relative, as {value:?}",
+        );
+    }
+}
+
+// COVERS: FR-8.2, FR-8.2a, FR-8.8 | positive
+/// Evidence is a mapping keyed by execution, each entry carrying args and result.
+///
+/// FR-8.2 wants the merge to rewrite `evidence` from a list of paths into a
+/// mapping whose entries each carry that task's args and the filepath of its own
+/// result. Bolt wrote bare strings, so `args` was absent entirely.
+///
+/// FR-8.2a settles where each half comes from and neither is the envelope: the
+/// key from the work directory name, the args from that execution's manifest.
+/// That keeps FR-6.2's adapter contract narrow, since an adapter never has to
+/// know what task it was run for.
+///
+/// FR-8.8 makes `args` the argv **as executed, after substitution**, so the
+/// merged file says what ran rather than what was written. Asserted by putting a
+/// path variable in the command and requiring the substituted filename to appear.
+///
+/// **The envelope schema does not constrain `metadata.evidence`**, so nothing
+/// catches the shape on the way out and this test is the only check.
+#[test]
+fn evidence_is_keyed_by_execution_and_carries_args_and_result() {
+    let root = tree();
+    write(root.path(), "a.txt", "content");
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0' {each_path}\"\n    matching: [\"**/*.txt\"]\n",
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+    let merged = read_validated(
+        &outcome.output_dir.join(bolt::run::RESULT_FILE),
+        &wrench::ENVELOPE_SCHEMA,
+    );
+
+    let evidence = merged
+        .get("metadata")
+        .and_then(|metadata| metadata.get("evidence"))
+        .and_then(Value::as_object)
+        .expect("evidence is a mapping, not a list of paths");
+
+    let entry = evidence
+        .get("alpha-1")
+        .unwrap_or_else(|| panic!("no entry keyed by the work directory: {evidence:?}"));
+
+    let result = entry
+        .get("result")
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| panic!("the entry carries no result filepath: {entry:?}"));
+    assert!(
+        Path::new(result).is_file(),
+        "the result filepath does not name a file that exists: {result:?}",
+    );
+
+    let args = entry
+        .get("args")
+        .and_then(Value::as_str)
+        .unwrap_or_else(|| panic!("the entry carries no args: {entry:?}"));
+    assert!(
+        args.contains("a.txt"),
+        "args is not the argv as executed; the path variable is unsubstituted: {args:?}",
+    );
+    assert!(
+        !args.contains("{each_path}"),
+        "args is what was written rather than what ran: {args:?}",
+    );
+}

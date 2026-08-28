@@ -5,7 +5,7 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use crate::run::{OUTPUT_FILE, RESULT_FILE, WORK_DIR};
+use crate::run::{MANIFEST_FILE, OUTPUT_FILE, RESULT_FILE, WORK_DIR};
 use crate::{Error, Outcome};
 
 /// Fold every `work/*/output.yaml` under `output_dir` into one `result.yaml`.
@@ -112,10 +112,64 @@ fn fold(entries: &[std::path::PathBuf]) -> Result<Folded, Error> {
             reasons.extend(carried(&envelope, &name));
         }
 
-        evidence.insert(name, json!(entry.join(OUTPUT_FILE).display().to_string()));
+        evidence.insert(name, reference(entry));
     }
 
     Ok(Folded { evidence, reasons })
+}
+
+/// One execution's entry in FR-8.2's evidence mapping.
+///
+/// FR-8.2 wants a mapping keyed by task rather than a list of paths, each entry
+/// carrying that task's args and the filepath of its own result. FR-8.2a settles
+/// where each half comes from and **neither is the envelope**: the key from the
+/// work directory name, which FR-3.3 prefixes with the task, and the args from
+/// that execution's manifest, which FR-9.5c already records. That keeps FR-6.2's
+/// adapter contract as narrow as it is, since an adapter never has to know what
+/// task it was run for.
+///
+/// FR-8.8 makes `args` the argv **as executed, after substitution**, so the
+/// merged file says what ran rather than what was written. The manifest's
+/// `command` is exactly that.
+///
+/// A work directory with no readable manifest still gets an entry, carrying its
+/// result and no args. Losing the whole merge over it would discard every other
+/// constituent's evidence to report a missing field in one of them.
+fn reference(entry: &Path) -> Value {
+    let result = entry.join(OUTPUT_FILE).display().to_string();
+    let args = load_manifest(&entry.join(MANIFEST_FILE))
+        .ok()
+        .and_then(|manifest| {
+            manifest
+                .get("command")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        });
+
+    match args {
+        Some(args) => json!({ "args": args, "result": result }),
+        None => json!({ "result": result }),
+    }
+}
+
+/// Read an execution's manifest through wrench, validating it on the way in.
+fn load_manifest(path: &Path) -> Result<Value, Error> {
+    read(path, &wrench::MANIFEST_SCHEMA)
+}
+
+/// Read a structured file through wrench, by FR-1.12, validating it on the way in.
+fn read(path: &Path, schema: &dyn wrench::Schema) -> Result<Value, Error> {
+    let io = |reason: String| Error::Io {
+        path: path.to_path_buf(),
+        reason,
+    };
+    wrench::load_formatted_file(
+        path.to_str().ok_or_else(|| io("not utf-8".to_owned()))?,
+        schema,
+        &wrench::YamlCodec,
+        &wrench::LocalFileIo,
+    )
+    .map_err(|source| io(source.to_string()))
 }
 
 /// One failing constituent's reasons, as the merged result should carry them.
@@ -142,15 +196,5 @@ fn carried(envelope: &Value, name: &str) -> Vec<Value> {
 
 /// Read an envelope through wrench, by FR-1.12, validating it on the way in.
 fn load(path: &Path) -> Result<Value, Error> {
-    let io = |reason: String| Error::Io {
-        path: path.to_path_buf(),
-        reason,
-    };
-    wrench::load_formatted_file(
-        path.to_str().ok_or_else(|| io("not utf-8".to_owned()))?,
-        &wrench::ENVELOPE_SCHEMA,
-        &wrench::YamlCodec,
-        &wrench::LocalFileIo,
-    )
-    .map_err(|source| io(source.to_string()))
+    read(path, &wrench::ENVELOPE_SCHEMA)
 }

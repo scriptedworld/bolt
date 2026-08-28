@@ -86,6 +86,19 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
         return Err(Error::BaseMissing(base.to_path_buf()));
     }
 
+    // FR-2.4, and this is the only place it has to happen. Every path bolt
+    // records or substitutes descends from the base, so resolving it once here
+    // resolves all of them, and `bolt gate .` stops recording `"value": "."` in
+    // manifests that a reader standing somewhere else cannot use.
+    //
+    // FR-4.17b keeps this away from definitions: nothing distinguishes
+    // `../REQUIREMENTS.md` from `100`, so a definition's value is left alone and
+    // reaches its command as written.
+    let base = &fs::canonicalize(base).map_err(|source| Error::Io {
+        path: base.to_path_buf(),
+        reason: source.to_string(),
+    })?;
+
     let output_dir = output_dir_for(base, SystemTime::now());
 
     // FR-2.6b. The stamp is second-granular, so two runs started in one second
