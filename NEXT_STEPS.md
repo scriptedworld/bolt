@@ -567,12 +567,79 @@ it anyway, and an undocumented contract with two implementations is what
 produced the drift the first time. It is also the strongest argument yet for
 `/commission`, since there is nowhere in this tree for such a document to go.
 
-The design question underneath it, which is ours and not toolbox's: a task's
-work directory is its own, so a standalone coverage task has no path to the
-profile a sibling wrote. The resume session wired coverage into the `tests` task
-to get around it. **Whether cross-task evidence access is supported is
-unanswered here**, and it should be answered before a jig author designs around
-its absence a second time. Nothing in this document asks it today.
+The design question underneath it is answered already, and I said otherwise here
+before checking. **FR-4.6 is settled and `[A]`: "No task consumes another task's
+output. Work needing several steps is one script producing one exit code and one
+output."** The next section is what the resume session ran into and what it
+would take to reopen it.
+
+### FR-4.6 met its forcing example, and the preamble predicted it
+
+Not a question yet. A decision for our user, because FR-4.6 is `[A]` and neither
+a session here nor a peer gets to reverse one by agreeing with the other.
+
+The preamble already records the cost of FR-4.6, and records it as something a
+reader would otherwise rediscover: an intermediate step inside a script produces
+no envelope, no manifest and no work directory, "so §19's worked example loses
+its evidence exactly where it was interesting". **§19's worked example is a
+coverage producer feeding a policy analyzer feeding an adapter.** The resume
+session hit that exact case porting toolbox's coverage adapter on 2026-08-28,
+without having read this file. The prediction landed on the nose, which is worth
+more than the prediction being clever: it means the cost is real and reached by
+ordinary work rather than by contrivance.
+
+Their position, recorded because it is the first field report we have and it
+argues both ways rather than for a change:
+
+- **Keep the wall.** A task's work directory being its own is what makes each
+  task's verdict independently attributable. Let B read A's evidence and B's
+  verdict silently depends on A's execution, in a format with no `depends-on`
+  to express it and no ordering guarantee to lean on. That is a dependency
+  graph arriving by implication, which is the same reasoning FR-4.6 already
+  rests on.
+- **Coverage was never the cross-task case.** It is a second *reading* of one
+  execution, not a second execution. That is why attaching the adapter to the
+  `tests` task works, and why it needed the exit code: the coverage verdict
+  genuinely depends on whether the run producing the profile passed. Not a
+  workaround they settled for; the dependency is real and internal to one task.
+- **Entrypoint coverage is a genuine second execution.** `go build -cover`, run
+  the binary, and there is a second profile from a different command that must
+  be judged with the first. Hard rule 5 forbids the alternative, which is
+  excluding the file. Under FR-4.6 the honest route is one task doing test,
+  build, run, merge and judge. They call that ugly and say the ugliness is
+  information, which is the right way to hold it.
+- They have **one** forcing example and say so. They would not pay for a
+  dependency graph on one.
+
+**What is actually blocked, and it is not what they think.** Their preferred fix
+is to let a task name *several* adapters, each contributing reasons into one
+envelope: one execution, one work directory, several readings. That does not
+cross a task boundary and is the cheaper half. But it is not free here either.
+FR-3.2 declares "its adapter", singular, and **FR-6.2b fixes the envelope at
+`output.yaml` with the name never varying**, which is the row FR-13.1 was retired
+into. Several adapters per task collide on that filename by construction. So the
+cheap half is a requirements change too, just a smaller and more local one than
+reopening FR-4.6.
+
+The one thing they would rule out in every shape is letting an adapter discover
+files in the output tree, and that is **already FR-6.2c**, for the same reason
+they give.
+
+**The decision, if it is wanted.** Three ways, in increasing cost:
+
+1. Nothing. One task does the whole chain, and the preamble's recorded cost
+   stands as the price. Cheapest, and honest, and it is what today's rows say.
+2. Several adapters per task. Needs FR-3.2 pluralised and FR-6.2b's fixed name
+   reopened. Buys separately named verdicts over one execution and crosses no
+   task boundary.
+3. Declared cross-task evidence: the consuming task names the producing task and
+   the evidence it wants, bolt resolves it and passes it as `--evidence` like
+   any other, refusing at load time when ordering cannot satisfy it. Explicit
+   and visible in the jig rather than discovered. This is a dependency graph and
+   reverses FR-4.6.
+
+Two is not a step toward three and does not become three later; they solve
+different problems. Nothing needs deciding before `runner/30`.
 
 ## Time
 
