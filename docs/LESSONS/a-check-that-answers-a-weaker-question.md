@@ -127,6 +127,40 @@ because the duplicates were duplicates. A wrong number that supports a right
 conclusion is the hardest kind to notice, and the only defence is that somebody
 asks.
 
+## A sibling shape: the answer was right and expired
+
+**Kept out of the table on purpose.** Every row above is a check that never
+looked at the thing. This one looked, correctly, and the world moved.
+
+Measured by the wrench session 2026-08-29, who bracketed their own error rather
+than explaining it:
+
+    wrench 519cfd4 committed        08:17:00
+    their find ran                  between then and 08:19:35
+    "bolt and wrench, two projects" 08:19:35
+    silo's result.yaml written      08:19:58
+
+**178 seconds.** Their instrument was right — epoch comparison against the
+symlink's mtime, not a clock time — and the claim was true when written and false
+when read. "Who has run since X" is a question about a moving target.
+
+**I attributed my own instrument error to them and that was wrong.** Mine was
+`%TH:%TM` answering *when in the day* instead of *which day*, which is an
+ordinary member of the table above and is fixed by changing the instrument.
+Theirs cannot be fixed that way, because nothing was wrong with the instrument.
+
+**The remedies are different, which is why they are separate sections.**
+
+An instrument error is fixed by a better instrument. **A perishable answer is
+fixed by publishing the time of the reading**, not only the threshold it was
+measured against. A command and a cutover timestamp let a reader re-run it; a
+command, a threshold and *no reading time* let a correct measurement become a
+wrong claim with nothing having gone wrong.
+
+So: **when the question is "since when", record when you looked.** And prefer
+handing on the command over handing on its output, because a command re-runs and
+a number does not.
+
 ## The one that generalises furthest
 
 **Running the wrong binary is re-running the claim.** The check does not fail,
