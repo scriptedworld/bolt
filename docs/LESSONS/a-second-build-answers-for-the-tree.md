@@ -24,8 +24,7 @@ message from before the change, so it reported that composition was unbuilt.
 is a wrong answer arriving with all the authority of a measurement.
 
 wrench hit the release binary first and would have quoted the old message back
-as a finding. They checked which binary they were holding, which is what turned
-it from a wrong report into this note.
+as a finding.
 
 ## Why it is worse than a stale document
 
@@ -33,8 +32,37 @@ A stale document is read as prose and weighed. **A binary is run, and its output
 is evidence.** The whole discipline here is to measure rather than believe, so an
 artifact that answers wrongly defeats the check that was supposed to catch it.
 
+**Running the wrong binary IS re-running the claim.** The check does not fail;
+it does not fire at all, because from the inside it is indistinguishable from
+the check passing. That is what makes it worse than stale prose, which at least
+still looks like something to be verified.
+
 It is the same shape as the Go build issuing false greens from a `+dirty` tree:
 the thing that looks like the tool is not the tool the tree describes.
+
+## What actually caught it, corrected by the session that did it
+
+The first version of this file said wrench checked which binary they were
+holding. **That is not what happened, and their account is the one to keep**,
+given first-hand 2026-08-28:
+
+> I ran `target/release` first because it was the obvious one to reach for, got
+> the old message, and only tried `target/debug` because the wording did not
+> match what you had quoted. Your message was the control.
+
+So the mechanism was not measuring. It was **measuring and having something to
+disagree with**. Either alone fails here: a message with no measurement is one
+unverified claim, and a measurement with no second source returns whatever the
+artifact says and reports it as fact.
+
+That is the converse of the estate's rule that neither your own search nor an
+agreeing peer is a check. Here a *disagreeing* peer was the whole mechanism, and
+the disagreement was visible only because both sides had quoted the exact output
+rather than summarising it.
+
+**So quote the bytes.** "The refusal names the field" and "task child carries
+the retired jig field" are the same claim, and only the second can be noticed to
+differ from what the other side is holding.
 
 ## What to do
 
