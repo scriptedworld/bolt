@@ -37,6 +37,11 @@ it does not fire at all, because from the inside it is indistinguishable from
 the check passing. That is what makes it worse than stale prose, which at least
 still looks like something to be verified.
 
+This is one instance of a class with nine members across the estate, collected
+in `a-check-that-answers-a-weaker-question.md`. It is the sharpest of them,
+because the artefact answering is the same *kind* of thing as the artefact that
+should have answered.
+
 It is the same shape as the Go build issuing false greens from a `+dirty` tree:
 the thing that looks like the tool is not the tool the tree describes.
 
