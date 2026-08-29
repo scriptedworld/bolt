@@ -114,6 +114,12 @@ project's whole observable surface in the order the requirements state it.
 
     cargo build && ./target/debug/bolt rust-quality .
 
+**`cargo build` first, and `target/debug` always.** The gate rebuilds the binary
+it then runs, so the debug build cannot lag what is committed. A hand-built
+`target/release` can and did: 2026-08-28 one sat five hours behind `HEAD` and
+answered that a landed change was unbuilt.
+`docs/LESSONS/a-second-build-answers-for-the-tree.md`.
+
 Eight tasks: format, lint, build, tests with coverage, vulnerabilities,
 licences, complexity, traceability.
 
