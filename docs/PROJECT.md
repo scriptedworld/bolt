@@ -141,30 +141,54 @@ Bolt runs its own gate through its own binary, which is NFR-12.1 and is what
 `runner/60` finishes. It does **not** yet run through `~/bin/bolt`: that symlink
 resolves to the Go build, and every other project in the estate gates through it.
 
-**Moving the symlink is blocked on one file and one decision**, as of
-2026-08-29.
+**Moving the symlink is down to one decision**, as of 2026-08-29.
 
-Of 35 jig files in the estate, exactly one was written against the retired
-nesting mechanism: `wrench/bolt.wrench-quality.yaml`, with two `jig:` tasks.
-This bolt refuses those by name and says what replaced them, by FR-5.22.
+### The estate has seven jigs, not thirty-five
 
-**The adapter they convert to now exists**: `toolbox/adapters/common/bolt-result.py`
-at toolbox `e89e7d0`, verified on a composed run where the same failing child
-folds `success: false` with the adapter and `success: true` without it. So the
-conversion is unblocked and is wrench's.
+`find` over the estate returns 35 paths matching `bolt.*.yaml`. **Twenty-two are
+symlinks** placed by `link-jigs`, and six of the rest are `.definitions.yaml`
+files, which are not jigs. Distinct jigs:
 
-**The decision is where a built Rust binary gets installed.** `~/bin/bolt` was
-renamed at dotfiles `1e1041d` so that `bolt` and `bolt.go` both name the Go
-build today and the cutover is one symlink. What it points at is untracked and
-always has been, in both trees, so the question is an install path rather than a
-choice between a committed binary and an artefact.
+    10x  toolbox/bolt.common-quality.yaml        shared, symlinked
+     9x  toolbox/bolt.secrets.yaml               shared, symlinked
+     4x  toolbox/bolt.go-std-quality.yaml        shared, symlinked
+     3x  toolbox/bolt.python-std-quality.yaml    shared, symlinked
+     1x  wrench/bolt.wrench-quality.yaml
+     1x  bolt.go/bolt.go-quality.yaml
+     1x  bolt/bolt.rust-quality.yaml
 
-**Nothing that works today stops working after the cutover.** Across all 35 jigs
-the task keys in use are `description`, `command`, `evidence`, `adapter`,
-`matching`, `excluding`, and the four retired ones in wrench's file alone; this
-bolt supports every other key nothing uses. And the Go build refuses flags
-written after the positionals where this one accepts them anywhere, so the
-accepted-argument set only widens.
+**Resolve before counting.** `find … -exec readlink -f {} \; | sort -u`. Counting
+paths answers how many places a jig is reachable from, which is a different
+question and four times the number.
+
+### Compatibility, measured over the seven
+
+Task keys in use: `command`, `description`, `evidence`, `matching`, `adapter`,
+`excluding`. **Nothing else.** No jig uses `short-circuit-failure`, `time-limit`,
+`optional` or `adapter-command`, so this bolt is a superset of what is in
+service. The Go build also refuses flags written after the positionals where this
+one accepts them anywhere, so the accepted-argument set only widens.
+
+### Both code blockers are gone
+
+`toolbox/adapters/common/bolt-result.py` landed at toolbox `e89e7d0`, and wrench
+converted their two `jig:` tasks to composed command tasks at wrench `8a1b9dd`.
+**Verified end to end**: this bolt runs `wrench-quality` through to 19 work
+directories with no refusal, and the composed tasks carry an adapter verdict
+rather than bolt's exit status.
+
+**A composed task resolves `bolt` through `PATH`**, so until the symlink moves
+the parent can be this build and the child the Go one. That happened in the
+verification above, and it is why a composed child's refusal message may not be
+this tree's: `the directory X is not there` is ours, `X is not a directory to run
+over` is the Go build's.
+
+### What is left is where a built binary gets installed
+
+`~/bin/bolt` was renamed at dotfiles `1e1041d` so that `bolt` and `bolt.go` both
+name the Go build today and the cutover is one symlink. What it points at is
+untracked and always has been, in both trees, so this is an install path rather
+than a choice between a committed binary and an artefact.
 
 `bin/test-traceability.py` is a symlink into toolbox, so that task's verdict
 moves when toolbox moves.

@@ -7,7 +7,7 @@ gets investigated and this does not. From inside the session running it, a check
 that could not see the thing and a check that saw nothing wrong are the same
 observation.
 
-## Ten instances, 2026-08-28 and 2026-08-29, across four repositories
+## Eleven instances, 2026-08-28 and 2026-08-29, across four repositories
 
 They are collected because the shape is only obvious with several beside each
 other. Any one of them reads as an ordinary bug.
@@ -23,9 +23,10 @@ other. Any one of them reads as an ordinary bug.
 | two runs into one directory | do two *refusals* differ |
 | `grep -rn … src/` | how many in `src/` |
 | `ls -la bolt.go/bin/` | is there a file, not is it tracked |
+| `find … -name 'bolt.*.yaml' \| wc -l` | how many paths, not how many files |
 | a status line's staleness flag | is the flag set, on a line nobody printed |
 
-Five are this tree's, four are wrench's, one is a coordinator's. Nobody in the
+Six are this tree's, four are wrench's, one is a coordinator's. Nobody in the
 estate is better at this than anybody else, which is the argument for the
 remedies rather than for care.
 
@@ -93,6 +94,30 @@ directory listing instead. So the remedies above are necessary and not
 sufficient, and this is the one they were missing: **check whether you already
 wrote it down.** A file you own is the cheapest second source there is, and the
 one you are least likely to consult.
+
+## An eleventh, and our user caught this one
+
+"35 jigs in the estate" was quoted three times, into two repositories, as the
+size of the cutover's compatibility surface. Our user asked whether it was
+thirty-five jigs or the same four or five symlinked repeatedly.
+
+    35 paths     22 symlinks, 13 real files, 6 of those are .definitions.yaml
+     7 jigs      four of them toolbox's, symlinked 26 times between them
+
+`find | wc -l` answers **how many places a jig is reachable from**. I wanted how
+many jigs there are. `link-jigs` symlinking shared jigs into every adopter is
+documented in this very tree, in the section of `PROJECT.md` about anvil, so
+this is the second time in a day that a fact I had written down lost to an
+inference from a listing.
+
+**The remedy is one flag.** `find … -exec readlink -f {} \; | sort -u`. Resolve
+before counting, whenever a tree is known to contain links.
+
+**The conclusion survived and the number did not**, which is the tell for this
+whole class: the key set over seven jigs is the same as over thirty-five,
+because the duplicates were duplicates. A wrong number that supports a right
+conclusion is the hardest kind to notice, and the only defence is that somebody
+asks.
 
 ## The one that generalises furthest
 
