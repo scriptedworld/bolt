@@ -167,6 +167,17 @@ them and not the estate's shape. The rest of its durable reasoning is in the tas
 records under `clank/tasks/bolt/`, where the test plans carry more about why the
 tests are what they are than this tree does.
 
+**`REQUIREMENTS.md` is a single file and the estate's standard is now a
+directory**, one file per requirement under `docs/REQUIREMENTS/<category>/`. Bolt
+has not migrated and **cannot yet**: it has 17 retired rows and where a retired
+id lives under the directory layout is an open estate question. Recorded as
+`clank/tasks/bolt/commission/10-requirements-becomes-a-directory.blocked`, which
+carries the row-diff proof the move would need.
+
+**`Cargo.lock` is gitignored**, which is the convention for a library and the
+opposite of the convention for a binary. Bolt ships a binary. Nobody has said
+whether that was deliberate, so it is recorded rather than changed.
+
 There is no `docs/SPEC.md`. Bolt arguably needs one, since it has interfaces
 other projects build against: the jig format is wrench's schema, but the adapter
 contract and the evidence layout are bolt's own and are currently described in

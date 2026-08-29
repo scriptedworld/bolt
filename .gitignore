@@ -10,10 +10,12 @@ START_HERE.md
 # last one's evidence, and only THIS run's output is excluded structurally.
 .bolt-*
 
-# The built binary. Nothing in this tree builds one any more: the Go
-# implementation moved to the bolt.go repository, and the Rust one is not
-# written yet. The file is ignored so a binary left here from before the split
-# is not committed by accident.
+# A binary in bin/. Cargo builds to target/ and nothing here puts one in bin/,
+# so this catches a stray left by hand or by an older layout. One was: a 6MB Go
+# binary from before the split, deleted 2026-08-28.
+#
+# `~/bin/bolt` does NOT resolve here. It points at bolt.go, and several sibling
+# documents still say otherwise; filed to dotfiles.
 /bin/bolt
 target/
 Cargo.lock
