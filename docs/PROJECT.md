@@ -19,8 +19,20 @@ that does not have to change.
 
     toolbox   the jigs bolt runs, and the checkers and adapters they name
     wrench    reads and writes every structured file, and owns the schemas
-    bolt      runs the jig and records what happened
-    anvil     unbuilt: what turns a run into something a person acts on
+    bolt      runs the jig, records what happened, and folds one result
+    anvil     standardised Dockerfile-based development environments
+
+**The fold is bolt's, by name, in the architecture.** `silo/docs/ARCHITECTURE.md`
+line 79 has `BOLT fold -> result envelope`, and §22 states it as a property of a
+run rather than of nesting: one `result.yaml` at the top of the output
+directory, "singular, because a run has exactly one result, folded from the
+results of its tasks".
+
+That matters when somebody asks whether bolt needs to nest, because the fold is
+the one capability a loop of separate invocations cannot supply, and there is no
+other component to hand it to. Anvil is dev images and nothing like a result
+aggregator; §25 is one sentence and a diagram of Go, Python and TypeScript
+environments.
 
 Bolt reads and writes nothing structured itself. Every jig, manifest, envelope
 and definitions file goes through wrench, which validates it against the shipped
