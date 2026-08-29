@@ -168,6 +168,19 @@ silently absent from the denominator, and the citation resolved to `FR-10`,
 reported as an id `REQUIREMENTS.md` does not define. Only the second half is
 loud. Where a letter is taken, take the next number.
 
+**So count the rows against the denominator, because a row the checker cannot
+see is not reported as missing.** That is the general form and the suffix is one
+instance of it: any row the grammar rejects is absent from a run that says
+nothing is wrong. Two numbers, and they must reconcile:
+
+    awk '/^## Retired/{r=1} !r && /^\| *(FR|NFR)-[0-9.a-z]+ \|/{n++} END{print n}' REQUIREMENTS.md
+    tail -1 .ephemera/qa/work/traceability-1/stdout
+
+**Live rows must equal the denominator plus the exempt count.** Measured
+2026-08-29: 247 live, `140 of 244 … 3 open and exempt`, and 244 + 3 = 247. When
+it was wrong it was 245 against 240 + 3, and nothing in the gate's output said
+so.
+
 **Every test cites the requirement it discharges**, directly above it:
 
     // COVERS: FR-4.11a, FR-4.11b | property
