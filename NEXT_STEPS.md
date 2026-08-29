@@ -588,6 +588,30 @@ and it counts what it says it counts.
 Not a question. Recorded because implementing FR-10.7 without this in hand
 reproduces a defect that already exists next door.
 
+**Settled 2026-08-29 by our user, and this is what protects it.** The two
+refusals FR-10.7a exempts write no result on purpose:
+
+> I'm fine with stating that writing to a folder with a pre-existing result.yaml
+> can/should instantly return exit-code 1 and stop. The user can clean up first
+> if they want to rely on the same name over and over ... and for our use cases
+> where bolt is exitting the situation, I am fine with stderr getting that
+> reason.
+
+So it is a rule rather than a gap, and **a later session "completing" FR-10.7 by
+making those cases write a result would reintroduce the overwrite below.** The
+exemption is the feature. Stderr is the channel for a bolt that declined to
+start, and the exit status is 1.
+
+**Confirmed live by the wrench session, 2026-08-29, by checksum**, which is the
+measurement this note previously only predicted:
+
+    run 1   "success": true    sha 4a24d4d8fc6e
+    run 2   "success": false   sha bf88e7f0978d   the refusal, overwriting it
+
+By checksum and not by mtime, because both writes land inside one second and an
+mtime comparison reports "unchanged". Their first attempt did exactly that and
+was wrong.
+
 FR-10.7 wants every refusal to write a `result.yaml`. The Rust tree writes none,
 which is the first of the four unfixed findings in `review-stage-5.md`. The
 obvious fix, writing the refusal into the run directory bolt had resolved, is
@@ -765,6 +789,25 @@ limit measures, which is wall clock from the task's start, is FR-4.11f; how a
 limit is spelled, which is a decimal and `s`, `m` or `h`, is FR-4.11e.
 
 ## The output directory
+
+40. **Does the default run directory carry a process id?**
+    `.bolt-<iso8601>-<pid>` rather than `.bolt-<iso8601>`. Raised by our user
+    2026-08-29 and **marked `maybe` by them, so it is not taken**; recorded with
+    the case for it so taking it is a decision rather than a rediscovery.
+
+    The collision is measured, not hypothetical: `.bolt-<iso8601>` is
+    second-granular, so two runs starting inside one second resolve to the same
+    directory, and FR-2.6b refuses the second. One bolt process carries out one
+    run, so a pid makes the default unique without a clock of finer resolution.
+
+    What it costs: `.bolt-*` globs still match, but anything naming a run
+    directory by reconstructing the stamp stops working, and
+    `run::output_dir_for` is what the collision tests use to predict it. Both
+    are inside this tree.
+
+    **It does not remove FR-2.6b or FR-10.7c.** A caller naming `--output-dir`
+    twice still collides, which is the case our user answered with "the user can
+    clean up first", so the refusal stays whatever the default is called.
 
 16. Is a task skipped for an empty selection recorded in `result.yaml`?
     FR-8.3a closes the case where every task skips, since a merge finding no

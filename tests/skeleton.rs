@@ -4381,9 +4381,16 @@ fn refusals_that_need_different_fixes_carry_different_kinds() {
     );
 }
 
-// COVERS: FR-10.9c | edge
+// COVERS: FR-10.9c, FR-10.7c | edge
 /// A reused output directory writes no kind, and the file already there is not
 /// its refusal.
+///
+/// FR-10.7c makes that the rule rather than a gap: a bolt declining to start
+/// returns 1 with its reason on stderr, because it has nothing to report about
+/// a tree it did not read and the file it would write to is somebody else's.
+/// **A change making this case write a result would reintroduce the overwrite**
+/// the Go build performs, measured by checksum on 2026-08-29, so this test is
+/// what such a change has to get past.
 ///
 /// **This is the limit on reading a refusal's kind, and it reads as the opposite
 /// of what it is.** FR-2.6b returns before writing, because the directory holds
