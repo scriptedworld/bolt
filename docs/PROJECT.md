@@ -127,8 +127,16 @@ under test the binary doing the testing.
 
 `./target/debug/bolt` is still right while iterating, and `cargo test` is the
 faster loop. The distinction to hold is that **only the installed binary gates**.
-`docs/LESSONS/a-second-build-answers-for-the-tree.md` is this hazard at one
-session's scale; here the whole estate is downstream.
+
+Check it rather than remembering it, and note this is a byte comparison because
+`mtime` says which file is newer and not whether they are the same program:
+
+    cargo build --release && cmp -s target/release/bolt bin/bolt \
+        && echo current || echo STALE
+
+`docs/LESSONS/the-installed-binary-gates-everything.md` carries it in full, and
+`a-second-build-answers-for-the-tree.md` is the same hazard at one session's
+scale before the estate was downstream of it.
 
 Eight tasks: format, lint, build, tests with coverage, vulnerabilities,
 licences, complexity, traceability.
@@ -213,10 +221,9 @@ running anybody's suite. All seven accepted and produced work directories:
 
     cargo build --release && cp target/release/bolt bin/bolt
 
-**Nothing rebuilds it for you.** A stale `bin/bolt` answers as of when it was
-built, and the whole estate is downstream of it rather than one session.
-`docs/LESSONS/a-second-build-answers-for-the-tree.md` is that lesson at the
-smaller scale, and this is the version with consequences.
+**Nothing rebuilds it for you**, and a stale one reports green rather than
+failing, over every project rather than one session.
+`docs/LESSONS/the-installed-binary-gates-everything.md`.
 
 Reverting is one command, and worth knowing before it is needed:
 
