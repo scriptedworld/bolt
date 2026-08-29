@@ -10,12 +10,18 @@ START_HERE.md
 # last one's evidence, and only THIS run's output is excluded structurally.
 .bolt-*
 
-# A binary in bin/. Cargo builds to target/ and nothing here puts one in bin/,
-# so this catches a stray left by hand or by an older layout. One was: a 6MB Go
-# binary from before the split, deleted 2026-08-28.
+# The installed binary. `~/bin/bolt` resolves HERE as of 2026-08-29, so this is
+# what every gate in the estate runs.
 #
-# `~/bin/bolt` does NOT resolve here. It points at bolt.go, and several sibling
-# documents still say otherwise; filed to dotfiles.
+# Ignored rather than committed, which is what bolt.go did before it: a built
+# artefact is not source, and committing 6MB per rebuild would make the history
+# the binary's rather than the code's. Install it with
+#
+#     cargo build --release && cp target/release/bolt bin/bolt
+#
+# and note that nothing rebuilds it for you. A stale `bin/bolt` answers as of
+# when it was built, which is `docs/LESSONS/a-second-build-answers-for-the-tree.md`
+# with the whole estate downstream instead of one session.
 /bin/bolt
 target/
 Cargo.lock

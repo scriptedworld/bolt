@@ -81,10 +81,10 @@ voids that and cannot be undone.** The rule is unchanged by the language and it
 does not expire.
 
 `~/.projects/bolt.go` is a different thing and is not sealed: it is the Go build,
-still running every gate in the estate, kept until this replaces it. Reading it
-is fine and its task discharges are worth reading before rebuilding a piece.
-What is sealed is the *archived* tree, which is where the provenance question
-lives.
+which ran every gate in the estate until 2026-08-29 and now runs none. It stays
+reachable as `bolt.go` on `PATH` so a comparison is one command. Reading it is
+fine and its task discharges are worth reading before rebuilding a piece. What is
+sealed is the *archived* tree, which is where the provenance question lives.
 
 ## Layout
 
@@ -112,36 +112,51 @@ project's whole observable surface in the order the requirements state it.
 
 ## The gate
 
-    cargo build && ./target/debug/bolt rust-quality .
+    cargo build --release && cp target/release/bolt bin/bolt && bolt rust-quality .
 
-**`cargo build` first, and `target/debug` always.** The gate rebuilds the binary
-it then runs, so the debug build cannot lag what is committed. A hand-built
-`target/release` can and did: 2026-08-28 one sat five hours behind `HEAD` and
-answered that a landed change was unbuilt.
-`docs/LESSONS/a-second-build-answers-for-the-tree.md`.
+**Install before gating, and that is not optional now that bolt is self-hosted.**
+Since the cutover `bolt` is this tree's installed binary, so `bolt rust-quality .`
+runs **the last binary installed** over the **current** source.
+
+The tasks it runs are `cargo build`, `cargo clippy`, `cargo llvm-cov` and the
+rest, which all read the working tree, so the verdict is about the source and is
+honest. **What it cannot catch is a regression in the runner itself**: break
+execution, adapters or the fold, do not reinstall, and the gate runs on the old
+binary and passes. The three-command line above closes it by making the binary
+under test the binary doing the testing.
+
+`./target/debug/bolt` is still right while iterating, and `cargo test` is the
+faster loop. The distinction to hold is that **only the installed binary gates**.
+`docs/LESSONS/a-second-build-answers-for-the-tree.md` is this hazard at one
+session's scale; here the whole estate is downstream.
 
 Eight tasks: format, lint, build, tests with coverage, vulnerabilities,
 licences, complexity, traceability.
 
 **Seven pass. `traceability` fails, deliberately, and should not be made green.**
 It requires every test to cite a requirement and every cited requirement to
-exist. It reports 131 of 234 covered as of 2026-08-28. The uncovered rows are
+exist. It reports 141 of 245 covered as of 2026-08-29. The uncovered rows are
 specified and unbuilt, and marking them `[?]` to turn the gate green would
 misreport what is settled. **The number going up is the progress signal**; it was
-79 four tasks ago.
+79 six tasks ago.
 
 Re-measure rather than believing that figure:
 
-    ./target/debug/bolt rust-quality . --output-dir .ephemera/qa
+    bolt rust-quality . --output-dir .ephemera/qa
     tail -1 .ephemera/qa/work/traceability-1/stdout
 
 ### Adopter status
 
-Bolt runs its own gate through its own binary, which is NFR-12.1 and is what
-`runner/60` finishes. It does **not** yet run through `~/bin/bolt`: that symlink
-resolves to the Go build, and every other project in the estate gates through it.
+**Bolt gates itself through `~/bin/bolt`, and so does the estate**, since
+2026-08-29. That is NFR-12.1 discharged at full strength rather than through a
+path in `target/`: `bolt rust-quality .` runs the installed binary, so the tool
+under test and the tool doing the testing are the same file every other project
+uses.
 
-**Moving the symlink is down to one decision**, as of 2026-08-29.
+The trap that comes with it is in `docs/LESSONS/a-check-that-answers-a-weaker-question.md`
+under trap 1: this suite is now reachable from a gate that exports `BOLT_DEPTH`
+into it, so a test creating a nested run is a level deeper here than under
+`cargo test`.
 
 ### The estate has seven jigs, not thirty-five
 
@@ -183,12 +198,29 @@ verification above, and it is why a composed child's refusal message may not be
 this tree's: `the directory X is not there` is ours, `X is not a directory to run
 over` is the Go build's.
 
-### What is left is where a built binary gets installed
+### The cutover is done, 2026-08-29
 
-`~/bin/bolt` was renamed at dotfiles `1e1041d` so that `bolt` and `bolt.go` both
-name the Go build today and the cutover is one symlink. What it points at is
-untracked and always has been, in both trees, so this is an install path rather
-than a choice between a committed binary and an artefact.
+    ~/bin/bolt     -> ../../bolt/bin/bolt        this tree, release build
+    ~/bin/bolt.go  -> ../../bolt.go/bin/bolt.go  still reachable by name
+
+**Every distinct jig in the estate was run through it first**, against an empty
+directory so that each one's validation and `requires` were exercised without
+running anybody's suite. All seven accepted and produced work directories:
+`common-quality` 3 tasks, `secrets` 2, `go-std-quality` 7, `python-std-quality`
+10, `wrench-quality` 19, `go-quality` 7, `rust-quality` 8. No refusals.
+
+**The binary is installed, not committed**, which is what bolt.go did before it:
+
+    cargo build --release && cp target/release/bolt bin/bolt
+
+**Nothing rebuilds it for you.** A stale `bin/bolt` answers as of when it was
+built, and the whole estate is downstream of it rather than one session.
+`docs/LESSONS/a-second-build-answers-for-the-tree.md` is that lesson at the
+smaller scale, and this is the version with consequences.
+
+Reverting is one command, and worth knowing before it is needed:
+
+    ln -sfn ../../bolt.go/bin/bolt.go ~/.projects/dotfiles/bin/bolt
 
 `bin/test-traceability.py` is a symlink into toolbox, so that task's verdict
 moves when toolbox moves.
