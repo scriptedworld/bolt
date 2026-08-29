@@ -859,6 +859,42 @@ about quality, and the adapter is what makes a verdict travel between runs.
 that pairing, and dropping the adapter from its jig makes it fail with *the
 child failed and the parent folded a pass*.
 
+**FR-10.8 gives the shell the other half**, 2026-08-29. `--result-to-exitcode`
+makes the exit code `0 if success else 1`, off unless named, so a Justfile
+recipe can chain bolt calls after all. The two are not alternatives: the flag
+lets a shell compose invocations, the adapter lets a jig compose them, and a
+task inside a jig still needs the adapter because bolt's default is unchanged.
+
+## Two exit outcomes and not three, settled 2026-08-29
+
+Not a question. Recorded because it was built the wrong way twice, once in
+wrench's prototype and once here, and the wrong version is the persuasive one.
+
+The tempting design allocates a third code for "no verdict" and puts
+`kind: bolt-refused` in it: bolt declined to run, so no check ran, so nothing
+was found wrong, and calling that a failing gate tells a pipeline the gate broke
+when it never started. That reasoning is wrong at two levels.
+
+**It overrules an authoritative field with its neighbour.** wrench's
+`envelope.schema.json` describes `success` as "the authoritative verdict". Bolt
+decided `false`. A consumer reading `kind` to promote that to "no answer" is the
+drift wrench exists to prevent.
+
+**And there is no third state to represent.** Our user's reasoning, 2026-08-29,
+which is stronger than the schema argument because it does not depend on the
+schema:
+
+> each task set, if they were optional ... if all were optional ... that's not
+> no result, that's a success because nothing failed. If any were non-optional,
+> then those failed because they didn't run ... either way ... that's a result.
+
+A task set always resolves. So a path reaching the flag with no envelope in hand
+is a defect to close, not an outcome to design around.
+
+**It ties this to the `allow-empty` rename.** FR-4.4c's field is what decides
+which of the two an empty task is, so what that field is called and what this
+flag returns are one question asked twice.
+
 ## Bounds and guards
 
 26. Is the ancestry cross-check worth building? It closes `unset BOLT_DEPTH`,

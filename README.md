@@ -151,9 +151,16 @@ not know which of its commands is bolt.
       adapter: bolt-result
 
 The adapter is what carries the verdict. Bolt exits 0 whenever it carried a run
-out, whatever the tools concluded, so `bolt a && bolt b` is green with every
-check failing; the verdict lives in the envelope and the adapter is how it
-travels between runs.
+out, whatever the tools concluded, so the verdict lives in the envelope and the
+adapter is how it travels between runs.
+
+**`--result-to-exitcode` opts out of that**, for a shell that needs to compose:
+
+    bolt --result-to-exitcode gate . && bolt --result-to-exitcode other .
+
+The rule is `0 if success else 1` and it has no cases; a refusal is 1 like any
+other failure, because a refusal is a verdict bolt reached. Off unless named, so
+every caller written against the default is unaffected.
 
 Its own gate reports eight tasks, seven passing. The eighth is traceability,
 which requires every test to cite a requirement and every cited requirement to

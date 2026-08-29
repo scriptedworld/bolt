@@ -193,7 +193,18 @@ than the threshold. `complexity` has failed on every task since
   was a schema-checkable grant, which FR-5.21 records as given up, leaving
   FR-5.7's depth ceiling as the guard.
 - The exit status says whether bolt could carry out the run, never whether the
-  tools passed. The verdict is in the envelope.
+  tools passed. The verdict is in the envelope. **`--result-to-exitcode` opts
+  out**, making the exit code `0 if success else 1`, because a Justfile recipe
+  chaining bolt calls cannot short-circuit otherwise. Off unless named, so
+  nothing already written changes meaning.
+- **Two exit outcomes under that flag, not three.** A refusal is 1, like any
+  other failure. It writes `bolt-refused` with `success: false`, and `success`
+  is what wrench's envelope schema calls the authoritative verdict, so reading
+  `kind` to promote it to "no verdict" would overrule an authoritative field
+  with its neighbour. The deeper reason is that a task set always resolves: an
+  optional task matching nothing is satisfied, a required one that never ran has
+  failed, and neither is an absent verdict. Built the other way first, in
+  wrench's prototype and then here, and corrected by our user.
 - A failing task does not stop the run; a jig asks for the opposite with
   `short-circuit-failure`.
 - A run refuses rather than writing into a directory that already holds one.

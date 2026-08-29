@@ -4136,3 +4136,175 @@ fn a_refusal_prints_where_it_recorded_itself() {
         "the path printed does not exist",
     );
 }
+
+/// A tree with one jig whose single task exits with `code`.
+///
+/// The three exit-status tests want a run that passed, a run that failed, and a
+/// refusal, differing in nothing else. Sharing the fixture is what makes the
+/// comparison between them mean something.
+fn exiting_tree(code: u8) -> TempDir {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "verdict",
+        &format!("  - name: only\n    command: \"sh -c 'exit {code}'\"\n"),
+    );
+    root
+}
+
+// COVERS: FR-10.8, FR-10.8b, FR-10.8e | positive
+/// The envelope becomes the exit code only when the flag asks, and the result
+/// line is printed either way.
+///
+/// FR-10.8's default is the whole of its safety: every caller written against
+/// FR-10.1 sees what it always saw, so nothing already in the estate changes
+/// meaning on the day this lands. **Asserted as a pair on one failing run**,
+/// because a test of the flag alone would pass against a bolt that had simply
+/// changed its default.
+///
+/// FR-10.8e is the other half: the flag changes one number. The run still writes
+/// its result and still names it on stdout, so a caller gets the verdict and
+/// where to read it from the same invocation.
+#[test]
+fn the_envelope_becomes_the_exit_code_only_when_asked() {
+    let root = exiting_tree(1);
+
+    let without = bolt()
+        .arg("verdict")
+        .arg(root.path())
+        .arg("--output-dir")
+        .arg(root.path().join("a"))
+        .output()
+        .expect("bolt runs");
+    assert_eq!(
+        without.status.code(),
+        Some(0),
+        "FR-10.1's default moved: a run bolt carried out did not exit 0",
+    );
+
+    let with = bolt()
+        .arg("--result-to-exitcode")
+        .arg("verdict")
+        .arg(root.path())
+        .arg("--output-dir")
+        .arg(root.path().join("b"))
+        .output()
+        .expect("bolt runs");
+    assert_eq!(
+        with.status.code(),
+        Some(1),
+        "the flag did not carry the envelope's failure to the exit code",
+    );
+
+    // FR-10.8e: the line is unchanged, so both readings come from one run.
+    let printed = String::from_utf8_lossy(&with.stdout);
+    let result = Path::new(printed.trim());
+    assert_eq!(
+        result,
+        root.path().join("b").join("result.yaml"),
+        "the flag changed what is printed as well as the status",
+    );
+    let envelope = fs::read_to_string(result).expect("the result");
+    assert!(
+        envelope.contains("\"success\": false"),
+        "the exit code and the envelope disagree: {envelope}",
+    );
+}
+
+// COVERS: FR-10.8b | positive
+/// A passing run under the flag is 0, which is the half that makes 1 mean
+/// something.
+///
+/// Same jig, same flag, one digit different in the task's command. Without this
+/// a bolt that returned 1 under the flag whatever happened would pass the
+/// failing test, and "the envelope decides" would be indistinguishable from "the
+/// flag means failure".
+#[test]
+fn a_passing_run_under_the_flag_is_zero() {
+    let root = exiting_tree(0);
+
+    let ran = bolt()
+        .arg("--result-to-exitcode")
+        .arg("verdict")
+        .arg(root.path())
+        .arg("--output-dir")
+        .arg(root.path().join("out"))
+        .output()
+        .expect("bolt runs");
+
+    assert_eq!(
+        ran.status.code(),
+        Some(0),
+        "a passing envelope did not exit 0 under the flag",
+    );
+}
+
+// COVERS: FR-10.8c, FR-10.8d | negative
+/// A refusal under the flag is 1, the same as without it, because a refusal is
+/// a verdict.
+///
+/// **This is the row a later reader is most likely to undo**, and the wrong
+/// answer is the attractive one. Bolt writes `kind: bolt-refused` alongside
+/// `success: false`, so reading the kind and reporting "no check ran, so nothing
+/// was found wrong" as a third status looks like extra care. It is not: the
+/// envelope schema calls `success` the authoritative verdict, and overruling it
+/// with a neighbouring field is exactly the drift wrench exists to prevent.
+///
+/// **The deeper reason there is no third status is that there is no third
+/// state.** A task set always resolves. A task that matched nothing and was
+/// declared optional is satisfied; a required one that never ran has failed.
+/// Neither is an absent verdict, so nothing is being collapsed.
+///
+/// This was built the wrong way first, in wrench's prototype and then here,
+/// and corrected by our user. Kept as a test rather than a comment because the
+/// reasoning that produced the wrong version is genuinely persuasive.
+///
+/// **Asserted as a pair on one refusal**, flag and no flag, which is what makes
+/// it a claim about the flag rather than about refusals: the numbers being equal
+/// is the assertion.
+#[test]
+fn a_refusal_under_the_flag_is_still_one() {
+    let root = tree();
+    write_jig(root.path(), "retired", "  - name: child\n    jig: inner\n");
+
+    let plain = bolt()
+        .arg("retired")
+        .arg(root.path())
+        .arg("--output-dir")
+        .arg(root.path().join("a"))
+        .output()
+        .expect("bolt runs");
+    assert_eq!(
+        plain.status.code(),
+        Some(1),
+        "a refusal without the flag is FR-10.5's 1",
+    );
+
+    let flagged = bolt()
+        .arg("--result-to-exitcode")
+        .arg("retired")
+        .arg(root.path())
+        .arg("--output-dir")
+        .arg(root.path().join("b"))
+        .output()
+        .expect("bolt runs");
+    assert_eq!(
+        flagged.status.code(),
+        plain.status.code(),
+        "the flag invented a status for a refusal instead of reporting its verdict",
+    );
+    assert_eq!(
+        flagged.status.code(),
+        Some(1),
+        "a refusal under the flag did not report the envelope's failure",
+    );
+
+    // The refusal still wrote and still named its result, so a caller reads why
+    // from the same place as any other run.
+    let printed = String::from_utf8_lossy(&flagged.stdout);
+    let envelope = fs::read_to_string(Path::new(printed.trim())).expect("the result");
+    assert!(
+        envelope.contains("bolt-refused"),
+        "the result does not say bolt refused: {envelope}",
+    );
+}
