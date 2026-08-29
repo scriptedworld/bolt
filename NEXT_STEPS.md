@@ -788,6 +788,38 @@ Two more were not on this list and had to be answered to build it. What a task's
 limit measures, which is wall clock from the task's start, is FR-4.11f; how a
 limit is spelled, which is a decimal and `s`, `m` or `h`, is FR-4.11e.
 
+## Reasons
+
+41. **Should `evidence-missing` carry the exit status it supersedes?**
+    Found by the skid session across a Go and Rust baseline, generalised by
+    dispatch from the source, confirmed here.
+
+        Go     nonzero-exit      tests exited 4
+        Rust   evidence-missing  tests declared coverage.xml and did not write it
+
+    The evidence check in `src/run.rs` returns before the exit-code path, so
+    whenever both apply the status is dropped. Systematic, not incidental.
+
+    **The case for changing it.** A `pytest` exit of 4 is a usage error and is
+    diagnostically distinct from 1. It is usually *why* the artefact is missing:
+    the tool never ran. Naming only the missing file sends a reader to their
+    coverage configuration when the command line is what is wrong, so the status
+    is the cause and the absent artefact is the symptom.
+
+    **The case against.** Naming the artefact is the more actionable reason for
+    most tools, and it is the one FR-6.14 exists to give. Carrying both means
+    either two reasons for one task, or a status in a message where a consumer
+    cannot read it without English.
+
+    **FR-6.3 constrains the shape**: bolt reaches no verdict of its own from an
+    exit code and does not record it in the envelope, so a third kind carrying
+    the status would need that row revisited. Putting it in the
+    `evidence-missing` message does not.
+
+    **Not changed on the day of the cutover**, deliberately. It alters what every
+    gate in the estate prints and eight projects have not re-run yet. Our user's
+    to weigh, and cheap either way.
+
 ## The output directory
 
 40. **Does the default run directory carry a process id?**

@@ -232,6 +232,56 @@ Reverting is one command, and worth knowing before it is needed:
 `bin/test-traceability.py` is a symlink into toolbox, so that task's verdict
 moves when toolbox moves.
 
+## Telling a refusal from a verdict, by the reason's `kind`
+
+Three sessions asked this on 2026-08-29 and none could answer it without reading
+the source, so it belongs here. **The vocabularies are disjoint**, and which one
+a `kind` comes from is the whole discrimination.
+
+**Bolt could not run.** Sixteen, a closed set, all in `src/error.rs`, and each is
+`Error::kind()`:
+
+    base-missing            duplicate-task-name    no-constituents
+    both-path-forms         io-failed              output-directory-in-use
+    definitions-unreadable  jig-task-retired       requires-missing
+    depth-exceeded          jig-unreadable         reserved-definition
+                            malformed-time-limit   task-without-command
+                            unknown-placeholder    unsafe-task-name
+
+**Bolt ran and judged.** Four, and bolt writes these itself rather than taking
+them from a tool:
+
+    empty-selection     FR-4.4b, the task matched nothing and was not optional
+    evidence-missing    FR-6.14, a declared file was not produced
+    nonzero-exit        FR-6.9, the generic exit-code adapter's verdict
+    constituent-failed  the fold, in `src/merge.rs`
+
+**An adapter said so.** Open set, and not bolt's to enumerate: an adapter writes
+whatever `kind` its format warrants, `findings` and `child-failed` among them.
+FR-6.1 makes the adapter's result the verdict and bolt does not second-guess it.
+
+**So "is the kind in `error.rs`" answers it**, and the practical form for a
+reader without the source is the sixteen above. Anything else is a run that
+happened.
+
+### `evidence-missing` supersedes `nonzero-exit`, and drops the status
+
+Measured by the skid session across a Go and Rust baseline, generalised by
+dispatch from the source, confirmed here at `src/run.rs`:
+
+    Go     nonzero-exit      tests exited 4
+    Rust   evidence-missing  tests declared coverage.xml and did not write it
+
+The evidence check returns before the exit-code path, so **whenever both apply
+the status is lost.** That is systematic and not incidental.
+
+**It is the more actionable reason and it drops the more diagnostic fact.** A
+`pytest` exit of 4 is a usage error and means something different from 1, and it
+is usually *why* the coverage file is absent: the tool never ran. Reporting only
+the symptom sends a reader to their coverage configuration when the command line
+is what is wrong. Recorded as a question in `NEXT_STEPS.md` rather than changed,
+because it alters what every gate in the estate prints.
+
 ## Conventions particular to this repository
 
 **Substitution is a single left-to-right pass, and that is a security property.**
