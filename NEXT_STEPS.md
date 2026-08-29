@@ -1097,3 +1097,25 @@ without reading either entry.
   subcommand that did not check `requires`. There is no `plan` in this
   specification. Whether `requires` is checked before anything runs is
   settled by FR-3.10b, reached from the architecture rather than from the entry.
+
+A third describes the Go build, which does exist, and was rejected because the
+defect cannot occur here.
+
+- **`the-summary-line-counts-every-execution-as-failed`**, filed from skid,
+  measured three times on two jigs in two repositories, with an A/B from wrench
+  showing the same gate printing `failed: 23` and `passed: 23` over one
+  unchanged execution total. The Go build labels the execution total with the
+  run's verdict, so the number never counts what its label says.
+
+  Rejected rather than acted on: `cli.rs` prints the result path and nothing
+  else, by FR-10.3, so there is no count here to be wrong. FACT 2026-08-28,
+  measured on this tree: a run with one of eight tasks failing wrote
+  `success: false` and printed one line, the path. The reasoning that keeps it
+  that way is above, under *FR-10.3 is why bolt prints no summary line*, and the
+  A/B is the sharper evidence for it than anything reached here.
+
+  **What survives the entry** is its suggestion, held as a candidate against
+  FR-10.3 rather than as a row: if a summary is ever wanted behind a flag, it
+  names the failed executions instead of counting them. The names are in hand
+  when the fold runs, and a name is something a reader acts on where a count
+  sends them to the envelope anyway.
