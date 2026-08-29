@@ -534,7 +534,7 @@ fn write_refusal(output_dir: &Path, refusal: &Error) {
     let _ = save(
         &output_dir.join(RESULT_FILE),
         &result,
-        &wrench::ENVELOPE_SCHEMA,
+        &wrench::schemas::ENVELOPE,
     );
 }
 
@@ -784,7 +784,7 @@ fn task_passed(output_dir: &Path, task: &str) -> bool {
                 .is_some_and(|name| name.to_string_lossy().starts_with(&format!("{task}-")))
         })
         .all(|path| {
-            merge::read(&path.join(OUTPUT_FILE), &wrench::ENVELOPE_SCHEMA)
+            merge::read(&path.join(OUTPUT_FILE), &wrench::schemas::ENVELOPE)
                 .ok()
                 .and_then(|envelope| envelope.get("success").and_then(serde_json::Value::as_bool))
                 .unwrap_or(true)
@@ -1043,7 +1043,7 @@ fn timed_out(execution: &Execution, expired: Expired, unattempted: usize) -> Res
         "kind": limit::KIND,
         "message": expired.message(execution.task, unattempted),
     })];
-    if let Ok(envelope) = merge::read(&path, &wrench::ENVELOPE_SCHEMA) {
+    if let Ok(envelope) = merge::read(&path, &wrench::schemas::ENVELOPE) {
         reasons.extend(
             envelope
                 .get("reasons")
@@ -1056,7 +1056,7 @@ fn timed_out(execution: &Execution, expired: Expired, unattempted: usize) -> Res
     save(
         &path,
         &json!({ "success": false, "reasons": reasons }),
-        &wrench::ENVELOPE_SCHEMA,
+        &wrench::schemas::ENVELOPE,
     )
 }
 
@@ -1476,7 +1476,7 @@ fn unauthoritative(ran: &Ran, envelope: &Path) -> Option<adapter::Unauthoritativ
         Some(adapter::Unauthoritative::Exited(ran.status))
     } else if !envelope.is_file() {
         Some(adapter::Unauthoritative::WroteNothing)
-    } else if merge::read(envelope, &wrench::ENVELOPE_SCHEMA).is_err() {
+    } else if merge::read(envelope, &wrench::schemas::ENVELOPE).is_err() {
         Some(adapter::Unauthoritative::WroteInvalid)
     } else {
         None
@@ -1632,7 +1632,7 @@ fn write_manifest(
     save(
         &work_dir.join(MANIFEST_FILE),
         &manifest,
-        &wrench::MANIFEST_SCHEMA,
+        &wrench::schemas::MANIFEST,
     )
 }
 
@@ -1683,7 +1683,7 @@ fn write_envelope(work_dir: &Path, success: bool, kind: &str, message: &str) -> 
     save(
         &work_dir.join(OUTPUT_FILE),
         &envelope,
-        &wrench::ENVELOPE_SCHEMA,
+        &wrench::schemas::ENVELOPE,
     )
 }
 

@@ -134,7 +134,7 @@ fn an_invocation_is_a_jig_name_and_a_directory() {
 
     let result = runs[0].path().join(bolt::run::RESULT_FILE);
     assert!(
-        verdict(&result, &wrench::ENVELOPE_SCHEMA),
+        verdict(&result, &wrench::schemas::ENVELOPE),
         "a jig whose only task passes produces a passing result",
     );
 }
@@ -767,7 +767,7 @@ fn a_path_consuming_task_with_an_empty_selection_fails() {
         "an empty selection produced no constituent, so nothing folds into the verdict",
     );
     assert!(
-        !verdict(&envelope, &wrench::ENVELOPE_SCHEMA),
+        !verdict(&envelope, &wrench::schemas::ENVELOPE),
         "the constituent for an empty selection reports success",
     );
 }
@@ -1035,7 +1035,7 @@ fn the_manifest_records_what_was_selected_and_removed() {
     let outcome = bolt::run::run("manifested", root.path()).expect("the run completes");
     let manifest = read_validated(
         &work(&outcome, "check-1").join(bolt::run::MANIFEST_FILE),
-        &wrench::MANIFEST_SCHEMA,
+        &wrench::schemas::MANIFEST,
     );
 
     // `selection.matched` and `selection.excluded` are wrench's names for the
@@ -1120,7 +1120,7 @@ fn a_task_naming_no_path_variable_claims_no_paths() {
     let outcome = bolt::run::run("whole", root.path()).expect("the run completes");
     let manifest = read_validated(
         &work(&outcome, "everything-1").join(bolt::run::MANIFEST_FILE),
-        &wrench::MANIFEST_SCHEMA,
+        &wrench::schemas::MANIFEST,
     );
 
     // wrench's schema says `selection` is "present for a task that consumes
@@ -1158,14 +1158,14 @@ fn a_task_naming_no_adapter_gets_the_exit_code_one() {
     assert!(
         verdict(
             &work(&outcome, "zero-1").join(bolt::run::OUTPUT_FILE),
-            &wrench::ENVELOPE_SCHEMA
+            &wrench::schemas::ENVELOPE
         ),
         "a zero exit did not report success",
     );
     assert!(
         !verdict(
             &work(&outcome, "nonzero-1").join(bolt::run::OUTPUT_FILE),
-            &wrench::ENVELOPE_SCHEMA
+            &wrench::schemas::ENVELOPE
         ),
         "a non-zero exit did not report failure",
     );
@@ -1318,7 +1318,7 @@ fn a_refusal_writes_a_result() {
         "a refusal wrote no result.yaml, so a caller cannot tell it from a kill",
     );
     assert!(
-        !verdict(&result, &wrench::ENVELOPE_SCHEMA),
+        !verdict(&result, &wrench::schemas::ENVELOPE),
         "a refusal's result says success: false",
     );
 
@@ -1337,7 +1337,7 @@ fn a_refusal_writes_a_result() {
 /// same string whatever produced the file and could not have noticed two
 /// situations sharing one name.
 fn assert_refusal_shape(result: &Path, kind: &str, says: &str) {
-    let envelope = read_validated(result, &wrench::ENVELOPE_SCHEMA);
+    let envelope = read_validated(result, &wrench::schemas::ENVELOPE);
     let reasons = envelope
         .get("reasons")
         .and_then(Value::as_array)
@@ -1477,7 +1477,7 @@ fn the_merge_carries_its_constituents_reasons() {
     assert!(!outcome.success, "a failing constituent fails the run");
 
     let result = outcome.output_dir.join(bolt::run::RESULT_FILE);
-    let merged = read_validated(&result, &wrench::ENVELOPE_SCHEMA);
+    let merged = read_validated(&result, &wrench::schemas::ENVELOPE);
     let reasons = merged
         .get("reasons")
         .and_then(Value::as_array)
@@ -1567,7 +1567,7 @@ fn paths_are_resolved_to_absolute_before_anything_runs() {
         &run.join(bolt::run::WORK_DIR)
             .join("alpha-1")
             .join(bolt::run::MANIFEST_FILE),
-        &wrench::MANIFEST_SCHEMA,
+        &wrench::schemas::MANIFEST,
     );
     let variables = manifest
         .get("variables")
@@ -1624,7 +1624,7 @@ fn evidence_is_keyed_by_execution_and_carries_args_and_result() {
     let outcome = bolt::run::run("check", root.path()).expect("the run completes");
     let merged = read_validated(
         &outcome.output_dir.join(bolt::run::RESULT_FILE),
-        &wrench::ENVELOPE_SCHEMA,
+        &wrench::schemas::ENVELOPE,
     );
 
     let evidence = merged
@@ -1718,7 +1718,7 @@ fn an_adapters_verdict_is_the_verdict() {
     );
     let envelope = read_validated(
         &work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE),
-        &wrench::ENVELOPE_SCHEMA,
+        &wrench::schemas::ENVELOPE,
     );
     let reasons = envelope
         .get("reasons")
@@ -1884,7 +1884,7 @@ fn each_broken_adapter_case_has_its_own_kind() {
 
         let envelope = read_validated(
             &work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE),
-            &wrench::ENVELOPE_SCHEMA,
+            &wrench::schemas::ENVELOPE,
         );
         let kind = envelope
             .get("reasons")
@@ -1931,7 +1931,7 @@ fn a_silent_adapter_does_not_inherit_an_envelope_it_did_not_write() {
     );
     let kind = read_validated(
         &work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE),
-        &wrench::ENVELOPE_SCHEMA,
+        &wrench::schemas::ENVELOPE,
     )
     .get("reasons")
     .and_then(Value::as_array)
@@ -1972,7 +1972,7 @@ fn declared_evidence_that_was_not_produced_fails_the_task() {
 
     let envelope = read_validated(
         &work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE),
-        &wrench::ENVELOPE_SCHEMA,
+        &wrench::schemas::ENVELOPE,
     );
     let message = envelope
         .get("reasons")
@@ -2049,7 +2049,7 @@ fn a_task_that_could_not_execute_is_distinguishable_in_the_merged_result() {
     let outcome = bolt::run::run("check", root.path()).expect("the run completes");
     let merged = read_validated(
         &outcome.output_dir.join(bolt::run::RESULT_FILE),
-        &wrench::ENVELOPE_SCHEMA,
+        &wrench::schemas::ENVELOPE,
     );
     let kinds: Vec<&str> = merged
         .get("reasons")
@@ -2325,7 +2325,7 @@ fn a_command_that_cannot_start_fails_its_task_and_the_run_carries_on() {
 
     let envelope = read_validated(
         &work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE),
-        &wrench::ENVELOPE_SCHEMA,
+        &wrench::schemas::ENVELOPE,
     );
     let reasons = envelope
         .get("reasons")
@@ -2478,7 +2478,7 @@ fn a_run_does_not_walk_its_own_output_directory() {
     let outcome = run_into("check", root.path(), &named).expect("the run completes");
     let manifest = read_validated(
         &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
-        &wrench::MANIFEST_SCHEMA,
+        &wrench::schemas::MANIFEST,
     );
     let matched: Vec<String> = manifest
         .get("selection")
@@ -2520,7 +2520,7 @@ fn the_result_records_the_base_the_run_was_pointed_at() {
     let outcome = run_into("check", root.path(), &named).expect("the run completes");
     let result = read_validated(
         &outcome.output_dir.join(bolt::run::RESULT_FILE),
-        &wrench::ENVELOPE_SCHEMA,
+        &wrench::schemas::ENVELOPE,
     );
 
     let recorded = result
@@ -2571,7 +2571,7 @@ fn a_named_directory_outside_the_base_gets_a_result_for_a_missing_base() {
     // FR-10.3 and FR-10.4: the verdict is in the envelope and the status says
     // only whether bolt could run, so a refusal reads false here and 1 there.
     assert!(
-        !verdict(&result, &wrench::ENVELOPE_SCHEMA),
+        !verdict(&result, &wrench::schemas::ENVELOPE),
         "a refusal's result says success: false",
     );
     assert_refusal_shape(&result, "base-missing", "not there");
@@ -2722,7 +2722,7 @@ fn a_jigs_definitions_block_supplies_its_placeholders() {
     let outcome = bolt::run::run("check", root.path()).expect("the run completes");
     let manifest = read_validated(
         &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
-        &wrench::MANIFEST_SCHEMA,
+        &wrench::schemas::MANIFEST,
     );
 
     let command = manifest
@@ -2758,7 +2758,7 @@ fn a_definitions_file_replaces_only_the_keys_it_names() {
     let outcome = run_with("check", root.path(), "override").expect("the run completes");
     let manifest = read_validated(
         &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
-        &wrench::MANIFEST_SCHEMA,
+        &wrench::schemas::MANIFEST,
     );
     let command = manifest
         .get("command")
@@ -2802,7 +2802,7 @@ fn the_manifest_records_which_layer_supplied_each_value() {
     let outcome = run_with("check", root.path(), "override").expect("the run completes");
     let manifest = read_validated(
         &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
-        &wrench::MANIFEST_SCHEMA,
+        &wrench::schemas::MANIFEST,
     );
     let variables = manifest
         .get("variables")
@@ -2931,7 +2931,7 @@ fn a_definition_value_is_a_literal_and_is_not_re_expanded() {
 
     let manifest = read_validated(
         &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
-        &wrench::MANIFEST_SCHEMA,
+        &wrench::schemas::MANIFEST,
     );
     let command = manifest
         .get("command")
@@ -3050,7 +3050,7 @@ fn write_limited_jig(root: &Path, name: &str, limit: &str, tasks: &str) {
 /// already asserted that it is one. FR-4.12d is that property, and this is where
 /// most of the tests below happen to check it.
 fn reasons_in(path: &Path) -> Vec<(String, String)> {
-    read_validated(path, &wrench::ENVELOPE_SCHEMA)
+    read_validated(path, &wrench::schemas::ENVELOPE)
         .get("reasons")
         .and_then(Value::as_array)
         .map(|reasons| {
@@ -3344,7 +3344,10 @@ fn a_slow_task_fails_and_the_run_carries_on() {
         outcome.stopped,
     );
     assert!(
-        verdict(&envelope_of(&outcome, "after-1"), &wrench::ENVELOPE_SCHEMA),
+        verdict(
+            &envelope_of(&outcome, "after-1"),
+            &wrench::schemas::ENVELOPE
+        ),
         "the task after the slow one did not pass",
     );
 
@@ -3388,7 +3391,7 @@ fn the_runs_limit_catching_an_adapter_leaves_bolt_to_write_the_envelope() {
         "FR-4.12d: the killed adapter left no envelope and bolt wrote none",
     );
     assert!(
-        !verdict(&envelope, &wrench::ENVELOPE_SCHEMA),
+        !verdict(&envelope, &wrench::schemas::ENVELOPE),
         "a timed-out execution reported success",
     );
     let carried = reasons_in(&envelope);
@@ -3439,7 +3442,7 @@ fn a_run_that_times_out_writes_a_result_carrying_what_completed() {
         "FR-4.13: the result does not say the run passed its limit: {carried:?}",
     );
 
-    let keys: Vec<String> = read_validated(&result, &wrench::ENVELOPE_SCHEMA)
+    let keys: Vec<String> = read_validated(&result, &wrench::schemas::ENVELOPE)
         .get("metadata")
         .and_then(|metadata| metadata.get("evidence"))
         .and_then(Value::as_object)
@@ -3450,7 +3453,10 @@ fn a_run_that_times_out_writes_a_result_carrying_what_completed() {
         "FR-4.14a: what completed before the limit is missing from the result: {keys:?}",
     );
     assert!(
-        verdict(&envelope_of(&outcome, "first-1"), &wrench::ENVELOPE_SCHEMA),
+        verdict(
+            &envelope_of(&outcome, "first-1"),
+            &wrench::schemas::ENVELOPE
+        ),
         "the completed task's own verdict did not survive the timeout",
     );
 }
@@ -3707,7 +3713,7 @@ fn every_timed_out_execution_has_a_valid_envelope() {
         let envelope = envelope_of(&outcome, entry);
         assert!(envelope.is_file(), "{entry} left no envelope");
         assert!(
-            !verdict(&envelope, &wrench::ENVELOPE_SCHEMA),
+            !verdict(&envelope, &wrench::schemas::ENVELOPE),
             "{entry} timed out and reported success",
         );
         let carried = reasons_in(&envelope);
@@ -3808,7 +3814,7 @@ fn bolt_inside_bolt_is_stopped_at_the_ceiling() {
     assert!(
         !verdict(
             &three.join(bolt::run::RESULT_FILE),
-            &wrench::ENVELOPE_SCHEMA
+            &wrench::schemas::ENVELOPE
         ),
         "the run that invoked the refused one did not fail",
     );

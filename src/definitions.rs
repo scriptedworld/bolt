@@ -100,7 +100,7 @@ impl Definitions {
         if let Some(name) = file {
             let path = config_dir.join(file_name(name));
             let loaded =
-                crate::merge::read(&path, &wrench::DEFINITIONS_SCHEMA).map_err(|source| {
+                crate::merge::read(&path, &wrench::schemas::DEFINITIONS).map_err(|source| {
                     Error::DefinitionsUnreadable {
                         path: path.clone(),
                         reason: source.to_string(),

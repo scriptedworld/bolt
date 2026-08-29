@@ -207,7 +207,7 @@ pub fn read(config_dir: &Path, name: &str) -> Result<Jig, Error> {
     let value = wrench::load_formatted_file(
         path.to_str()
             .ok_or_else(|| unreadable("the path is not utf-8".to_owned()))?,
-        &wrench::JIG_SCHEMA,
+        &wrench::schemas::JIG,
         &wrench::YamlCodec,
         &wrench::LocalFileIo,
     )

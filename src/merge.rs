@@ -77,7 +77,7 @@ pub fn merge(output_dir: &Path, base: &Path, reasons: &[Value]) -> Result<Outcom
         result["reasons"] = Value::Array(folded.reasons);
     }
     let path = output_dir.join(RESULT_FILE);
-    crate::run::save(&path, &result, &wrench::ENVELOPE_SCHEMA)?;
+    crate::run::save(&path, &result, &wrench::schemas::ENVELOPE)?;
 
     Ok(Outcome {
         success,
@@ -177,7 +177,7 @@ fn reference(entry: &Path) -> Value {
 
 /// Read an execution's manifest through wrench, validating it on the way in.
 fn load_manifest(path: &Path) -> Result<Value, Error> {
-    read(path, &wrench::MANIFEST_SCHEMA)
+    read(path, &wrench::schemas::MANIFEST)
 }
 
 /// Read a structured file through wrench, by FR-1.12, validating it on the way in.
@@ -219,5 +219,5 @@ fn carried(envelope: &Value, name: &str) -> Vec<Value> {
 
 /// Read an envelope through wrench, by FR-1.12, validating it on the way in.
 fn load(path: &Path) -> Result<Value, Error> {
-    read(path, &wrench::ENVELOPE_SCHEMA)
+    read(path, &wrench::schemas::ENVELOPE)
 }
