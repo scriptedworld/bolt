@@ -20,7 +20,33 @@ that does not have to change.
     toolbox   the jigs bolt runs, and the checkers and adapters they name
     wrench    reads and writes every structured file, and owns the schemas
     bolt      runs the jig, records what happened, and folds one result
-    anvil     standardised Dockerfile-based development environments
+    anvil     the portable execution environments a jig runs inside
+
+### Anvil is where bolt runs, and `requires` is its manifest
+
+Anvil is Docker-based, and the images carry the toolchain, bolt itself, the
+common quality tooling and its configuration. **They are execution environments
+rather than places a person works**: the point is that the tooling a jig needs is
+present and the same everywhere.
+
+**The coupling to bolt is `requires:`, and it is tighter than it looks.** From
+`silo/docs/ARCHITECTURE.md` §25:
+
+> The package list is not maintained beside the jig; it derives from it. An
+> image installs exactly what the `requires:` fields in toolbox's jigs declare,
+> so the image manifest is the jig, not a second list to drift from it.
+
+So FR-3.10's rule that a jig declares **every** executable it invokes is not
+only an up-front check for a missing tool. **It is what an image is built
+from.** An under-declared jig runs locally, where the tool happens to be on
+`PATH`, and produces an image without it.
+
+That raises the stakes on FR-3.10b and FR-3.10d, and it is why FR-3.10's
+inventory is a whole-jig obligation rather than a note about unusual tools.
+
+The same tooling arrives two ways on purpose: locally `link-jigs` symlinks it
+out of toolbox, and in an image it is already present from the anvil layer
+beneath.
 
 **The fold is bolt's, by name, in the architecture.** `silo/docs/ARCHITECTURE.md`
 line 79 has `BOLT fold -> result envelope`, and §22 states it as a property of a
