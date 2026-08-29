@@ -30,6 +30,14 @@ Six are this tree's, four are wrench's, one is a coordinator's. Nobody in the
 estate is better at this than anybody else, which is the argument for the
 remedies rather than for care.
 
+**Five of eleven are not bolt's, so this file is not a bolt lesson**, and where
+it should live is filed at
+`clank/inbox/silo/a-cross-repository-lesson-collection-lives-in-one-project/`.
+A copy in wrench drifted to six instances before either of us noticed, in
+`docs/LESSONS/`, which is the last directory anyone would search for a stale
+copy. **If you are reading a version of this that says fewer than eleven, it is
+not the one being maintained.**
+
 ## Why the name is the trap
 
 Every one of these is a **correct answer to a real question**. `tail` did
