@@ -526,7 +526,9 @@ fn write_refusal(output_dir: &Path, refusal: &Error) {
 
     let result = json!({
         "success": false,
-        "reasons": [{ "kind": "bolt-refused", "message": refusal.to_string() }],
+        // FR-10.9. The kind says which sort of refusal this was, so a consumer
+        // tells a missing base from an unreadable jig without reading English.
+        "reasons": [{ "kind": refusal.kind(), "message": refusal.to_string() }],
     });
     let _ = create_dir(output_dir);
     let _ = save(

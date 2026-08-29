@@ -160,6 +160,14 @@ name on the command line. Measured: a file named ``p{all_paths};id #`` executed
 other half. The test is
 `a_filename_containing_a_template_token_is_not_re_expanded`.
 
+**A requirement id takes at most one letter of suffix.** `FR-10.8a` is an id and
+`FR-10.8ca` is not: the checker's grammar is `(?:FR|NFR)-\d+(?:\.\d+)?[a-z]?`, so
+a two-letter suffix **fails to match as a row at all** and, in a `COVERS:` mark,
+degrades to whatever prefix does match. Measured 2026-08-29: two such rows were
+silently absent from the denominator, and the citation resolved to `FR-10`,
+reported as an id `REQUIREMENTS.md` does not define. Only the second half is
+loud. Where a letter is taken, take the next number.
+
 **Every test cites the requirement it discharges**, directly above it:
 
     // COVERS: FR-4.11a, FR-4.11b | property
@@ -197,14 +205,20 @@ than the threshold. `complexity` has failed on every task since
   out**, making the exit code `0 if success else 1`, because a Justfile recipe
   chaining bolt calls cannot short-circuit otherwise. Off unless named, so
   nothing already written changes meaning.
-- **Two exit outcomes under that flag, not three.** A refusal is 1, like any
-  other failure. It writes `bolt-refused` with `success: false`, and `success`
-  is what wrench's envelope schema calls the authoritative verdict, so reading
-  `kind` to promote it to "no verdict" would overrule an authoritative field
-  with its neighbour. The deeper reason is that a task set always resolves: an
-  optional task matching nothing is satisfied, a required one that never ran has
-  failed, and neither is an absent verdict. Built the other way first, in
-  wrench's prototype and then here, and corrected by our user.
+- **Two exit outcomes under that flag, not three, and no engine codes.** A
+  refusal is 1, like any other failure, and `success` is what wrench's envelope
+  schema calls the authoritative verdict, so reading `kind` to promote a refusal
+  to "no verdict" would overrule an authoritative field with its neighbour. The
+  deeper reason is that a task set always resolves: an optional task matching
+  nothing is satisfied, a required one that never ran has failed, and neither is
+  an absent verdict. Built two other ways first, a no-verdict code and then a
+  code per remedy, and corrected both times by our user.
+- **Discrimination between refusals lives in the envelope's `kind`, not in the
+  exit status.** Every refusal names its own, so a base that is not there is
+  `base-missing` where a task carrying a retired field is `jig-task-retired`.
+  They all said `bolt-refused` until 2026-08-29, which is one name across
+  sixteen situations with sixteen different fixes. The exit status has the
+  verdict to carry, and a consumer reads the envelope anyway.
 - A failing task does not stop the run; a jig asks for the opposite with
   `short-circuit-failure`.
 - A run refuses rather than writing into a directory that already holds one.

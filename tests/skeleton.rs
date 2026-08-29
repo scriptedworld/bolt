@@ -1322,16 +1322,21 @@ fn a_refusal_writes_a_result() {
         "a refusal's result says success: false",
     );
 
-    assert_refusal_shape(&result, "unreadable");
+    assert_refusal_shape(&result, "jig-unreadable", "unreadable");
 }
 
 /// FR-2.5a's shape, asserted where a refusal wrote a result.
 ///
-/// One reason, kind `bolt-refused`, and a message carrying `says`. A helper
-/// rather than a copy per caller, since several tests want the same three
-/// assertions and differ only in which refusal produced the file and therefore
-/// in what its message should mention.
-fn assert_refusal_shape(result: &Path, says: &str) {
+/// One reason, the `kind` this sort of refusal carries by FR-10.9, and a message
+/// carrying `says`. A helper rather than a copy per caller, since several tests
+/// want the same three assertions and differ only in which refusal produced the
+/// file and therefore in what it should say.
+///
+/// **`kind` is a parameter rather than a constant**, which is the point of
+/// FR-10.9: it was `bolt-refused` for every refusal, so this helper asserted the
+/// same string whatever produced the file and could not have noticed two
+/// situations sharing one name.
+fn assert_refusal_shape(result: &Path, kind: &str, says: &str) {
     let envelope = read_validated(result, &wrench::ENVELOPE_SCHEMA);
     let reasons = envelope
         .get("reasons")
@@ -1341,7 +1346,7 @@ fn assert_refusal_shape(result: &Path, says: &str) {
     assert_eq!(reasons.len(), 1, "one refusal is one reason: {reasons:?}");
     assert_eq!(
         reasons[0].get("kind").and_then(Value::as_str),
-        Some("bolt-refused"),
+        Some(kind),
         "a refusal's reason names its kind: {reasons:?}",
     );
     assert!(
@@ -2569,7 +2574,7 @@ fn a_named_directory_outside_the_base_gets_a_result_for_a_missing_base() {
         !verdict(&result, &wrench::ENVELOPE_SCHEMA),
         "a refusal's result says success: false",
     );
-    assert_refusal_shape(&result, "not there");
+    assert_refusal_shape(&result, "base-missing", "not there");
 }
 
 // COVERS: FR-10.6 | edge
@@ -3769,7 +3774,7 @@ fn bolt_inside_bolt_is_stopped_at_the_ceiling() {
     assert!(
         carried
             .iter()
-            .any(|(kind, message)| kind == "bolt-refused" && message.contains("limit is 2")),
+            .any(|(kind, message)| kind == "depth-exceeded" && message.contains("limit is 2")),
         "FR-5.8: the refused run's reason does not name the limit: {carried:?}",
     );
     assert!(
@@ -4304,7 +4309,119 @@ fn a_refusal_under_the_flag_is_still_one() {
     let printed = String::from_utf8_lossy(&flagged.stdout);
     let envelope = fs::read_to_string(Path::new(printed.trim())).expect("the result");
     assert!(
-        envelope.contains("bolt-refused"),
+        envelope.contains("jig-task-retired"),
         "the result does not say bolt refused: {envelope}",
+    );
+}
+
+// COVERS: FR-10.9, FR-10.9a, FR-10.9b | property
+/// Four refusals with four different fixes carry four different kinds.
+///
+/// **The claim is that they differ, so the test is that they differ**, not that
+/// each equals a string. Every one of these carried `bolt-refused` before
+/// FR-10.9, so a per-refusal assertion would have passed against the defect for
+/// three of the four while looking thorough. Collecting them and counting the
+/// distinct values is what could not.
+///
+/// FR-10.9a: each is validated against wrench's envelope schema on the way out,
+/// which is what makes the open vocabulary usable. A closed list would have made
+/// this change a schema change in another repository.
+#[test]
+fn refusals_that_need_different_fixes_carry_different_kinds() {
+    let root = tree();
+    write(root.path(), "a.txt", "content");
+    write_jig(root.path(), "retired", "  - name: child\n    jig: inner\n");
+    write_jig(
+        root.path(),
+        "twice",
+        "  - name: same\n    command: \"true\"\n  - name: same\n    command: \"true\"\n",
+    );
+    write(
+        root.path(),
+        &bolt::jig::file_name("broken"),
+        "version: nope\n",
+    );
+
+    let mut seen = Vec::new();
+    for (jig, base) in [
+        ("retired", root.path().to_path_buf()),
+        ("twice", root.path().to_path_buf()),
+        ("broken", root.path().to_path_buf()),
+        // FR-2.5's missing base, which needs an output directory outside it by
+        // FR-10.7a for a result to exist at all.
+        ("retired", root.path().join("absent")),
+    ] {
+        let out = root.path().join(format!("out-{}-{}", jig, seen.len()));
+        let refused = bolt::run::invoke(&bolt::run::Invocation {
+            jig,
+            base: &base,
+            definitions: None,
+            output_dir: Some(&out),
+            config_dir: Some(root.path()),
+        })
+        .expect_err("each of these is a refusal");
+
+        let result = refused.result.expect("each of these wrote a result");
+        let reasons = reasons_in(&result);
+        assert_eq!(reasons.len(), 1, "one refusal is one reason: {reasons:?}");
+        seen.push(reasons[0].0.clone());
+    }
+
+    let mut distinct = seen.clone();
+    distinct.sort();
+    distinct.dedup();
+    assert_eq!(
+        distinct.len(),
+        seen.len(),
+        "refusals needing different fixes shared a kind: {seen:?}",
+    );
+    assert!(
+        !seen.contains(&"bolt-refused".to_owned()),
+        "the one-kind-for-everything value survived: {seen:?}",
+    );
+}
+
+// COVERS: FR-10.9c | edge
+/// A reused output directory writes no kind, and the file already there is not
+/// its refusal.
+///
+/// **This is the limit on reading a refusal's kind, and it reads as the opposite
+/// of what it is.** FR-2.6b returns before writing, because the directory holds
+/// a completed run and a refusal put there would replace a verdict. So a caller
+/// testing whether a `result.yaml` exists gets `true` about **the previous
+/// run**, and one reading its `success` gets that run's answer.
+///
+/// Asserted the way it would actually mislead: the file is present, and it says
+/// the earlier run passed.
+#[test]
+fn a_reused_output_directory_leaves_the_earlier_result_alone() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "fine",
+        "  - name: only\n    command: \"true\"\n",
+    );
+    let out = root.path().join("out");
+
+    let first = run_into("fine", root.path(), &out).expect("the first run completes");
+    assert!(first.success, "the first run was supposed to pass");
+
+    let refused = bolt::run::invoke(&bolt::run::Invocation {
+        jig: "fine",
+        base: root.path(),
+        definitions: None,
+        output_dir: Some(&out),
+        config_dir: None,
+    })
+    .expect_err("a directory holding a run is refused");
+
+    assert!(
+        refused.result.is_none(),
+        "the refusal claimed to have written a result into an occupied directory",
+    );
+    let standing = reasons_in(&out.join(bolt::run::RESULT_FILE));
+    assert!(
+        standing.is_empty(),
+        "the earlier run's result was overwritten by the refusal: {standing:?}",
     );
 }

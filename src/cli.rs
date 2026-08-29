@@ -186,10 +186,12 @@ where
 /// worth giving here rather than leaving them to find the row.
 ///
 /// **FR-10.8's flag is not a parameter here, and that is the row rather than an
-/// omission.** FR-10.8c makes a refusal a verdict bolt reached, so
-/// `bolt-refused` with `success: false` is 1 whether or not the caller asked
-/// for the envelope to decide. Reading `kind` to call it "no verdict" would
-/// overrule an authoritative field with its neighbour.
+/// omission.** FR-10.8c makes a refusal a verdict bolt reached, so `success:
+/// false` is 1 whether or not the caller asked for the envelope to decide.
+/// Reading the reason's `kind` to call it "no verdict" would overrule an
+/// authoritative field with its neighbour. FR-10.9 puts that `kind` to its
+/// proper use instead: it says which refusal this was, for a consumer reading
+/// the envelope rather than the status.
 fn report_refusal(refusal: &crate::Refusal) -> ExitCode {
     eprintln!("bolt: {}", refusal.error);
     if let Some(result) = &refusal.result {

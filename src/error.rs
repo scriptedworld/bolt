@@ -190,6 +190,46 @@ pub enum Error {
 }
 
 impl Error {
+    /// What sort of refusal this is, for the `kind` of the reason it writes.
+    ///
+    /// FR-10.9. **One kind for every refusal was the defect**: a reused output
+    /// directory, a base that is not there, a jig that will not parse and a task
+    /// carrying a retired field are four situations with four different fixes,
+    /// and a consumer that can tell them apart will.
+    ///
+    /// FR-10.9a is why this vocabulary is bolt's alone. wrench's envelope schema
+    /// takes any non-empty string and says why it does not enumerate them: "a
+    /// closed list would make a schema change the price of a new kind of
+    /// failure". So a new refusal adds a name here and nothing anywhere else.
+    ///
+    /// FR-10.9b is why there is no wildcard arm. A refusal added without a kind
+    /// does not compile, where one inheriting a neighbour's would quietly make a
+    /// consumer's match wrong.
+    #[must_use]
+    pub const fn kind(&self) -> &'static str {
+        match self {
+            Self::BaseMissing(_) => "base-missing",
+            Self::JigUnreadable { .. } => "jig-unreadable",
+            Self::DefinitionsUnreadable { .. } => "definitions-unreadable",
+            Self::TaskNamesAJig { .. } => "jig-task-retired",
+            Self::TaskNamesNoCommand { .. } => "task-without-command",
+            Self::UnknownPlaceholder { .. } => "unknown-placeholder",
+            Self::DuplicateTaskName { .. } => "duplicate-task-name",
+            Self::UnsafeTaskName { .. } => "unsafe-task-name",
+            Self::CommandNamesBothPathForms { .. } => "both-path-forms",
+            Self::ReservedDefinition { .. } => "reserved-definition",
+            Self::MalformedTimeLimit { .. } => "malformed-time-limit",
+            Self::RequiresMissing { .. } => "requires-missing",
+            Self::DepthExceeded { .. } => "depth-exceeded",
+            Self::NoConstituents => "no-constituents",
+            Self::Io { .. } => "io-failed",
+            // FR-10.9c. Named for completeness and never written: FR-2.6b
+            // returns before anything is written, because the directory holds a
+            // completed run and a refusal put there replaces a verdict.
+            Self::OutputDirectoryInUse(_) => "output-directory-in-use",
+        }
+    }
+
     /// Whether a refusal of this kind leaves a `result.yaml` behind.
     ///
     /// FR-10.7 has bolt write one whenever it is alive and in control when it
