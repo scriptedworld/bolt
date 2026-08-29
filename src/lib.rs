@@ -24,4 +24,4 @@ mod error;
 mod stamp;
 
 pub use error::Error;
-pub use outcome::Outcome;
+pub use outcome::{Outcome, Refusal};

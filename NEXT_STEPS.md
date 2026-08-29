@@ -791,29 +791,73 @@ limit is spelled, which is a decimal and `s`, `m` or `h`, is FR-4.11e.
     directory-only invocation cannot express that. Does the overlay run the
     whole project on every commit, or does something have to give?
 
-## Nested jigs
+## Composition
 
-22. Is there a shorthand for naming one jig at many bases? Nine Go subprojects
-    is nine jig tasks each needing its own name, and a list form would say it
-    once. Against that, a written-out task per instance is what makes the
-    project jig readable as an inventory of what is in the tree.
-23. ~~Does the whole-jig override survive separate location variables?~~ (It
-    cited FR-5.12, which is one jig at many bases. The override is FR-5.14.)
-    **Answered by this question's own reasoning, as FR-5.14 to FR-5.14d.** It
-    was right that `{project_root}` covers the per-path case and that only a
-    tool which must *stand* at the root is left over, so that is all
-    `needs-repository-root` does: the working directory moves and the base does
-    not. Nothing surrenders its base, so the cut against FR-5.10 does not
-    arise.
+**Nesting is retired, 2026-08-28.** A task never names a jig; it names `bolt` on
+a command line and an adapter reads the result path bolt printed. FR-5.18 to
+FR-5.22 carry it, twenty-six rows are in the retired table, and the argument is
+below under *Why composition is a command line*.
 
-    **Built the other way first, which is why FR-5.14c carries a measurement.**
-    Overriding the base let a child read outside the grant its caller wrote,
-    and this question was sitting beside the row saying so.
+22. ~~Is there a shorthand for naming one jig at many bases?~~ **Moot.** Nine
+    subprojects are nine command tasks, and a shorthand for repeating a command
+    line is a jig-format question for wrench rather than a runner question for
+    bolt.
+23. ~~Does the whole-jig override survive separate location variables?~~
+    **Reopened as question 39.** It was answered as FR-5.14 to FR-5.14d, which
+    stand a jig's commands at the repository root while its base stays narrowed.
+    Under composition there is no narrowed base for them to differ from, so the
+    rows are vacuous unless the project root is propagated. See question 39.
 24. Is a cycle detected by name, or only by depth exhaustion? A jig stack in
     the environment would name the cycle; a counter can only report a number.
     **Only depth today**, by FR-5.7. `bolt.recursive.yaml` naming itself is
     stopped at 4 with a reason naming the limit and not the cycle.
+
+    **This matters more than it did.** FR-5.21 makes the ceiling the only guard
+    on composition, where FR-5.13 used to make containment schema-checkable.
 25. Can a jig be referenced by version, or is it always whatever is on disk?
+39. **Does a child inherit the project root?** Today `{project_root}` is set
+    from the run's base, so a composed `bolt inner sub/` has both pointing at
+    `sub/` and `{project_root}` can never differ from `{base_dir}`.
+
+    Propagating it, as `BOLT_DEPTH` is propagated, would keep `{project_root}`
+    meaning what it says and let one definitions file serve subprojects at
+    different depths: `{project_root}/docs/REQUIREMENTS` rather than
+    `../docs/REQUIREMENTS`, which encodes the subproject's depth in a file meant
+    to be shared. It would also keep FR-5.14's `needs-repository-root` alive.
+
+    Against it: every invocation being told where to stand and nothing else is
+    the simpler rule, and FR-4.17b already blesses a relative reach upward.
+
+    **`clank/tasks/bolt/runner/50d` waits on this.** Its five rows are vacuous
+    under the first answer and buildable under the second.
+
+## Why composition is a command line
+
+Not a question. Settled 2026-08-28 and recorded because the argument for nesting
+is the one that will be re-derived.
+
+A jig task was a second mechanism: a task kind, five fields, its own inheritance
+rules, its own emptiness rule, its own containment act. Every one of those had a
+command-line spelling already, and the only capability the second mechanism
+added was that the parent's grant was **schema-checkable**, which FR-5.13i
+claimed and FR-5.21 now records as the thing given up.
+
+What decided it is that bolt is a tool a jig runs. A jig that can run `gofmt`
+can run `bolt`, and a runner that knows which of those it is holding has a
+special case where it had a general rule.
+
+**The fold is not lost, which is what the argument for nesting rested on.** It
+travels through the adapter contract: bolt prints where its result is by
+FR-10.3, the adapter reads it, and the merge folds an ordinary constituent.
+
+**What the shell's `&&` cannot do, and this can.** FR-10.1 has bolt exit 0
+whenever it carried the run out, so `bolt a && bolt b` is green with every tool
+failing. FACT 2026-08-28: a run whose only task exited 1 exited 0 and wrote
+`success: false`. A Justfile chaining invocations therefore answers nothing
+about quality, and the adapter is what makes a verdict travel between runs.
+`bolt_composes_as_a_command_and_the_childs_verdict_folds_in` asserts exactly
+that pairing, and dropping the adapter from its jig makes it fail with *the
+child failed and the parent folded a pass*.
 
 ## Bounds and guards
 

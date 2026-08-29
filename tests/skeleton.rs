@@ -238,38 +238,40 @@ fn a_jig_without_a_version_is_read() {
     assert_eq!(outcome.executions, 1, "the task did not execute");
 }
 
-// COVERS: FR-10.5 | negative
-/// A task naming a jig is refused by name, because nested jigs are not built.
+// COVERS: FR-5.22, FR-10.5 | negative
+/// A task carrying the retired `jig` field is refused by name, and told what
+/// replaced it.
 ///
-/// **This cited FR-5.13h and discharged none of it.** That row is about path
-/// variables having nothing to resolve against in a jig task's field, and this
-/// test names no field and no variable. The citation made the row read as
-/// covered from the day it was written, which is the failure a traceability
-/// gate cannot catch: it checks that a cited row exists, not that the test
-/// touches it. `a_path_variable_in_a_jig_tasks_field_is_a_jig_error` covers it
-/// now.
+/// **The message is the whole point of the row.** Serde's `missing field
+/// command` reads as a malformed task and invites somebody to add a command to
+/// one that already meant to run a jig, which is the wrong repair. FR-5.18
+/// makes the right one a command line, so the refusal spells it.
 ///
-/// The refusal has to say which feature is missing rather than which field is.
-/// Before this, the message was serde's `missing field command`, which reads as
-/// a malformed jig and invites somebody to add a command to a jig task. Found
-/// against wrench's real jig, whose gate has two of them.
+/// **Asserted on the text and not only on the variant**, because a reader
+/// meeting this has a jig written against a mechanism that no longer exists and
+/// the variant name reaches nobody. Found against wrench's real jig, whose gate
+/// has two of these.
 #[test]
-fn a_task_naming_a_jig_is_refused_by_name() {
+fn a_task_carrying_the_retired_jig_field_is_refused_by_name() {
     let root = tree();
     write_jig(
         root.path(),
         "nested",
-        "  - name: child\n    jig: common-quality\n    in: python\n",
+        "  - name: child\n    jig: common-quality\n",
     );
 
-    let refusal = bolt::run::run("nested", root.path()).expect_err("nested jigs are not built");
+    let refusal = bolt::run::run("nested", root.path()).expect_err("the jig field is retired");
 
-    match refusal {
-        bolt::Error::NestedJigNotBuilt { task } => {
-            assert_eq!(task, "child", "the refusal named the wrong task");
-        }
-        other => panic!("wrong refusal for a jig task: {other:?}"),
-    }
+    let bolt::Error::TaskNamesAJig { task } = &refusal else {
+        panic!("wrong refusal for a task naming a jig: {refusal:?}");
+    };
+    assert_eq!(task, "child", "the refusal named the wrong task");
+
+    let said = refusal.to_string();
+    assert!(
+        said.contains("retired") && said.contains("bolt <jig> <directory>"),
+        "the refusal did not say what replaced the field: {said}",
+    );
 }
 
 // COVERS: FR-4.3, FR-2.3 | regression
@@ -2651,6 +2653,7 @@ fn run_with(jig: &str, base: &Path, definitions: &str) -> Result<bolt::Outcome, 
         output_dir: None,
         config_dir: None,
     })
+    .map_err(bolt::Error::from)
 }
 
 /// Wait until `entry`'s work directory appears under a run at `base`.
@@ -2685,6 +2688,7 @@ fn run_into(jig: &str, base: &Path, output_dir: &Path) -> Result<bolt::Outcome, 
         output_dir: Some(output_dir),
         config_dir: None,
     })
+    .map_err(bolt::Error::from)
 }
 
 // COVERS: FR-3.15, FR-4.16 | positive
@@ -3951,106 +3955,184 @@ fn a_config_directory_says_where_jigs_are_found() {
     );
 }
 
-// COVERS: FR-5.5, FR-5.13i | negative
-/// A jig task carries no condition, and the schema is what refuses one.
+/// A tree holding a subproject, its jig, and an adapter that carries a child's
+/// verdict up.
 ///
-/// Selecting files is the nested jig's own business: the child walks its own
-/// subdirectory and its own tasks decide what they act on.
+/// Shared by the two composition tests so that the thing under test is the same
+/// tree in both: one asserts the fold, the other asserts that the same jig run
+/// by hand reaches the same verdict, and the claim only means something if
+/// neither gets its own slightly different fixture.
 ///
-/// FR-5.13i is the half worth asserting deliberately. Every field a jig task
-/// declares is schema-checkable, which a command line would not have been, so
-/// this refusal arrives as an unreadable jig from validation rather than as a
-/// rule bolt restates. A bolt that checked it again itself would pass a test
-/// that only looked for a refusal.
-///
-/// The legitimate five are asserted in the same test rather than a separate one,
-/// because a schema that refuses everything would satisfy the first half. The
-/// pair is the claim: these five and not those.
-#[test]
-fn a_jig_task_carrying_a_condition_is_refused_by_the_schema() {
+/// The adapter is FR-5.19 in nine lines of shell. It reads the result path off
+/// the stdout bolt printed, reads the child's verdict from there, and writes an
+/// envelope. Nothing about it is bolt-specific beyond knowing that the first
+/// line of stdout is a path to a result.
+fn composing_tree() -> TempDir {
     let root = tree();
+    write(root.path(), "sub/a.txt", "content");
     write_jig(
         root.path(),
-        "conditional",
-        "  - name: child\n    jig: inner\n    matching: [\"**/*.go\"]\n",
+        "inner",
+        "  - name: inner-check\n    command: \"sh -c 'exit 3'\"\n",
     );
-
-    let refusal = bolt::run::run("conditional", root.path())
-        .expect_err("a jig task carrying a condition is refused");
-    assert!(
-        matches!(refusal, bolt::Error::JigUnreadable { .. }),
-        "the refusal did not come from validating the document: {refusal:?}",
-    );
-
-    let allowed = tree();
-    write(allowed.path(), "sub/a.txt", "content");
-    write_jig(
-        allowed.path(),
-        "parent",
+    write_adapter(
+        root.path(),
+        "result-adapter",
         concat!(
-            "  - name: child\n",
-            "    jig: inner\n",
-            "    in: sub\n",
-            "    config-dir: tooling\n",
-            "    output-dir: run\n",
-            "    definitions: shared\n",
+            "for a in \"$@\"; do case $prev in --stdout) out=$a;; --work-dir) w=$a;; esac; prev=$a; done\n",
+            "child=$(cat \"$out\")\n",
+            "if grep -q '\"success\": true' \"$child\"; then\n",
+            "  printf '\"success\": true\\n' > \"$w/output.yaml\"\n",
+            "else\n",
+            "  printf '\"success\": false\\n\"reasons\":\\n  - \"kind\": \"child-failed\"\\n    \"message\": \"%s\"\\n' \"$child\" > \"$w/output.yaml\"\n",
+            "fi\n",
         ),
     );
+    write_jig(
+        root.path(),
+        "outer",
+        &format!(
+            "  - name: subproject\n    command: \"env -u {} {}=3 {} inner {{base_dir}}/sub \
+             --config-dir {{config_dir}} --output-dir {{work_dir}}/child\"\n    adapter: \
+             result-adapter\n",
+            bolt::depth::DEPTH,
+            bolt::depth::CEILING,
+            env!("CARGO_BIN_EXE_bolt"),
+        ),
+    );
+    root
+}
 
-    let refusal = bolt::run::run("parent", allowed.path()).expect_err("nested jigs are unbuilt");
+// COVERS: FR-5.1a, FR-5.1b | property
+/// The same jig on the same directory reaches the same verdict, composed or by
+/// hand.
+///
+/// That is the whole of "a child run is not a mode". Composition puts a bolt
+/// invocation on a command line, and a person putting the same invocation in a
+/// terminal is doing the identical thing, so there is one code path because
+/// there was never a second one to keep in step.
+///
+/// **Measured rather than asserted.** The composed run's child result and this
+/// one are compared on the reason text, so a bolt that treated an invocation
+/// from a jig differently would show it here rather than in a comment.
+///
+/// Run into a directory of its own, because FR-2.6c would otherwise put a
+/// second `.bolt-…` inside the tree the first run walked.
+#[test]
+fn a_jig_run_by_hand_reaches_what_composition_reached() {
+    let root = composing_tree();
+    let alone = tree();
+    let out = alone.path().join("out");
+
+    let direct = bolt::run::invoke(&bolt::run::Invocation {
+        jig: "inner",
+        base: &root.path().join("sub"),
+        definitions: None,
+        output_dir: Some(&out),
+        config_dir: Some(root.path()),
+    })
+    .expect("the same jig run by hand completes");
+
+    assert!(!direct.success, "the child jig was supposed to fail");
+    let by_hand = fs::read_to_string(direct.output_dir.join("result.yaml")).expect("the result");
     assert!(
-        matches!(refusal, bolt::Error::NestedJigNotBuilt { .. }),
-        "the five fields a jig task may declare were not accepted: {refusal:?}",
+        by_hand.contains("inner-check exited 3"),
+        "the jig run directly reached a different verdict: {by_hand}",
     );
 }
 
-// COVERS: FR-5.10a, FR-5.13a, FR-5.13h | negative
-/// A path variable in a jig task's field is a jig error, named by field.
+// COVERS: FR-5.18, FR-5.19, FR-5.20 | positive
+/// Bolt composes with itself as a command, and the child's verdict folds in.
 ///
-/// A jig task has no command consuming paths, so `{each_path}` has no selection
-/// to be one of and `{all_paths}` has nothing to expand to. Naming one asks for
-/// something bolt cannot do rather than making a typo.
+/// This is the whole of composition. A task runs `bolt` the way it runs any
+/// tool, an adapter reads the result path bolt printed and turns the child's
+/// verdict into an envelope, and the merge folds it as a constituent like any
+/// other. **Nothing in the runner knows one command is bolt**, which is FR-5.18,
+/// and the way to see it is that this test adds no bolt code at all.
 ///
-/// **Asserted against the unbuilt-feature refusal**, which is the ordering that
-/// matters and the thing a later reader might undo. Both are refusals, so a test
-/// checking only that the run was refused passes either way; this checks which,
-/// because being told nested jigs are unbuilt teaches nothing about the jig in
-/// front of you and the message changes under you when they are built.
+/// **The child fails and the parent's command succeeds**, which is the pairing
+/// that matters. FR-10.1 has bolt exit 0 whenever it carried the run out, so a
+/// parent reading the exit status would call this green. The adapter is what
+/// makes the verdict travel, and a bolt whose composition rested on `&&` would
+/// pass a weaker test than this one.
 ///
-/// FR-5.10a and FR-5.13a ride here rather than on a test of their own, and this
-/// is the test that actually discriminates them: each field is named by its
-/// hyphenated spelling, and a field bolt failed to read produces no refusal at
-/// all. A test that merely watched a jig task parse would pass against a bolt
-/// that ignored every field, because serde defaults a field it cannot find and
-/// the run still reaches the same refusal.
+/// **The child's tree lands under the parent's work directory** because the
+/// command says `--output-dir {work_dir}/child`, which is FR-5.20: a line in a
+/// jig, not a rule in the runner.
+///
+/// **The depth is cleared and the ceiling set**, as
+/// `bolt_inside_bolt_is_stopped_at_the_ceiling` does and for the reason it
+/// records: this suite is reachable from `bolt rust-quality .`, so a chain
+/// measured from the ambient depth is a different length under the gate than
+/// under `cargo test`.
 #[test]
-fn a_path_variable_in_a_jig_tasks_field_is_a_jig_error() {
-    for (field, line) in [
-        ("in", "    in: \"{each_path}\"\n"),
-        ("config-dir", "    config-dir: \"{all_paths}\"\n"),
-        ("output-dir", "    output-dir: \"{each_path}\"\n"),
-        ("definitions", "    definitions: \"{each_path}\"\n"),
-    ] {
-        let root = tree();
-        write_jig(
-            root.path(),
-            "wrong",
-            &format!("  - name: child\n    jig: inner\n{line}"),
-        );
+fn bolt_composes_as_a_command_and_the_childs_verdict_folds_in() {
+    let root = composing_tree();
 
-        let refusal =
-            bolt::run::run("wrong", root.path()).expect_err("a path variable in a field refuses");
-        let bolt::Error::PathVariableInField {
-            field: named, task, ..
-        } = &refusal
-        else {
-            panic!("{field} was not refused as a jig error: {refusal:?}");
-        };
-        assert_eq!(*named, field, "the reason names the wrong field");
-        assert_eq!(task, "child", "the reason names the wrong task");
-        assert!(
-            refusal.to_string().contains(field),
-            "the message does not say which field: {refusal}",
-        );
-    }
+    let outcome = bolt::run::run("outer", root.path()).expect("the outer run completes");
+
+    assert!(
+        !outcome.success,
+        "the child failed and the parent folded a pass",
+    );
+
+    // FR-5.20: the child's evidence is where the command put it.
+    let child_result = work(&outcome, "subproject-1").join("child/result.yaml");
+    assert!(
+        child_result.is_file(),
+        "the child's result is not under the parent's work directory: {}",
+        child_result.display(),
+    );
+
+    // FR-5.19: what the adapter carried up is the child's own reason, reached
+    // through the path bolt printed rather than through an exit status.
+    let folded = fs::read_to_string(outcome.output_dir.join("result.yaml")).expect("the result");
+    assert!(
+        folded.contains("child-failed"),
+        "the adapter's verdict did not reach the fold: {folded}",
+    );
+    let child = fs::read_to_string(&child_result).expect("the child's result");
+    assert!(
+        child.contains("inner-check exited 3"),
+        "the child did not record its own task's failure: {child}",
+    );
+}
+
+// COVERS: FR-10.3a | negative
+/// A refusal prints where it recorded itself, on stdout, like any other run.
+///
+/// FR-10.3 tells a caller where to read the verdict rather than what it says,
+/// and FR-10.3a makes that unconditional. **Asserted on a refusal**, because
+/// that is the case that used to go quiet: the reason went to stderr, stdout
+/// stayed empty, and FR-5.19's adapter would have read an empty file. FR-10.7
+/// has a caller read an absent result as a bolt that died, so a silent refusal
+/// is the one failure that misreports itself.
+///
+/// FACT 2026-08-28, before this landed: `bolt nosuchjig <dir> --output-dir
+/// <out>` wrote `out/result.yaml` and printed zero bytes on stdout.
+#[test]
+fn a_refusal_prints_where_it_recorded_itself() {
+    let root = tree();
+    let out = root.path().join("elsewhere");
+
+    let ran = bolt()
+        .arg("nosuchjig")
+        .arg(root.path())
+        .arg("--output-dir")
+        .arg(&out)
+        .output()
+        .expect("bolt runs");
+
+    assert!(!ran.status.success(), "an absent jig is a refusal");
+    let said = String::from_utf8_lossy(&ran.stdout);
+    let printed = said.trim();
+    assert_eq!(
+        Path::new(printed),
+        out.join("result.yaml"),
+        "stdout did not name the result the refusal wrote",
+    );
+    assert!(
+        Path::new(printed).is_file(),
+        "the path printed does not exist",
+    );
 }

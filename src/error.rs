@@ -27,15 +27,25 @@ pub enum Error {
         reason: String,
     },
 
-    /// A task names a jig rather than a command, and nested jigs are unbuilt.
+    /// A task carries the retired `jig` field, by FR-5.22.
     ///
-    /// FR-5.x specifies them and `clank/tasks/bolt/runner/50-nested-jigs` is
-    /// where they get built. Refusing by name matters because the alternative
-    /// message is serde's `missing field command`, which reads as a malformed
-    /// jig and invites somebody to add a command to a task that should not have
-    /// one.
-    NestedJigNotBuilt {
-        /// The task naming a jig.
+    /// FR-5.18 makes composition a command line, so a jig running another jig
+    /// invokes `bolt` like any other tool. The refusal names the field and says
+    /// what replaced it, because a jig written against the retired mechanism is
+    /// not malformed and its author needs the new spelling rather than a
+    /// complaint about a missing field.
+    TaskNamesAJig {
+        /// The task carrying the field.
+        task: String,
+    },
+
+    /// A task carries no command at all.
+    ///
+    /// Refused by name rather than by serde, so the reason says the task has
+    /// nothing to run instead of naming a field the reader has to map back to a
+    /// task.
+    TaskNamesNoCommand {
+        /// The task with no command.
         task: String,
     },
 
@@ -140,26 +150,6 @@ pub enum Error {
         tools: Vec<String>,
     },
 
-    /// A jig task's field names a path variable, by FR-5.13h.
-    ///
-    /// A jig task has no command consuming paths, so `{each_path}` and
-    /// `{all_paths}` have nothing to resolve against and naming one asks for
-    /// something that cannot happen. The location variables are what is
-    /// available in a field.
-    ///
-    /// Refused before the run rather than at substitution, and **before the
-    /// unbuilt-feature refusal**, because a reader fixing a jig should be told
-    /// what is wrong with their jig before they are told what bolt cannot do
-    /// yet.
-    PathVariableInField {
-        /// The task whose field names it.
-        task: String,
-        /// Which field, so the reason says which line to edit.
-        field: &'static str,
-        /// The variable, without its braces.
-        variable: String,
-    },
-
     /// A `time-limit` is not a duration, by FR-4.11e.
     ///
     /// Refused before anything executes, for FR-4.18a's reason: a jig whose
@@ -247,10 +237,10 @@ impl fmt::Display for Error {
             Self::OutputDirectoryInUse(path) => {
                 write!(formatter, "{} already holds a run", path.display())
             }
-            Self::NestedJigNotBuilt { task } => write!(
-                formatter,
-                "task {task} names a jig; nested jigs are specified and not built yet",
-            ),
+            Self::TaskNamesAJig { task } => write!(formatter, "{}", names_a_jig(task)),
+            Self::TaskNamesNoCommand { task } => {
+                write!(formatter, "task {task} has no command to run")
+            }
             Self::CommandNamesBothPathForms { task } => {
                 write!(formatter, "task {task} names both each_path and all_paths")
             }
@@ -269,11 +259,6 @@ impl fmt::Display for Error {
                 )
             }
             Self::RequiresMissing { tools } => write!(formatter, "{}", requires_missing(tools)),
-            Self::PathVariableInField {
-                task,
-                field,
-                variable,
-            } => write!(formatter, "{}", path_variable(task, field, variable)),
             Self::MalformedTimeLimit { task, value } => {
                 write!(
                     formatter,
@@ -323,8 +308,11 @@ fn unreadable(kind: &str, path: &std::path::Path, reason: &str) -> String {
 }
 
 /// FR-5.13h's reason, naming the field so a reader knows which line to edit.
-fn path_variable(task: &str, field: &str, variable: &str) -> String {
-    format!("task {task} names {{{variable}}} in {field}; a jig task consumes no paths")
+fn names_a_jig(task: &str) -> String {
+    format!(
+        "task {task} carries the retired jig field; \
+         run the jig as a command instead, bolt <jig> <directory>"
+    )
 }
 
 /// FR-3.10b's reason, naming every entry `PATH` did not resolve.

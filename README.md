@@ -137,17 +137,27 @@ its coverage is counted against a new document.
 
 What works today: the walk and per-task filtering, both path forms, single-pass
 substitution with three-layer definitions, `requires` resolved up front,
-adapters and declared evidence, per-task and whole-run time limits, the nesting
-depth ceiling, short-circuit, the merge, and refusals that write a parseable
-result.
+adapters and declared evidence, per-task and whole-run time limits, the depth
+ceiling, short-circuit, the merge, and refusals that write a parseable result.
 
-What is not built: **nested jigs**, where a task runs another jig at a
-subdirectory. That is the one thing standing between this and replacing the Go
-build, which still runs the gates in this estate.
+**Composition is a command line.** A jig that wants another jig run over a
+subdirectory writes `bolt` in a task's command, as it writes any other tool, and
+an adapter turns the child's result into that task's envelope. There is no jig
+task and no nesting mechanism: bolt is a tool a jig runs, and the runner does
+not know which of its commands is bolt.
+
+    - name: subproject
+      command: bolt inner {base_dir}/sub --output-dir {work_dir}/child
+      adapter: bolt-result
+
+The adapter is what carries the verdict. Bolt exits 0 whenever it carried a run
+out, whatever the tools concluded, so `bolt a && bolt b` is green with every
+check failing; the verdict lives in the envelope and the adapter is how it
+travels between runs.
 
 Its own gate reports eight tasks, seven passing. The eighth is traceability,
 which requires every test to cite a requirement and every cited requirement to
-exist; it currently reports 129 of 254 covered and fails on the rest. **That is
+exist; it currently reports 131 of 234 covered and fails on the rest. **That is
 the state of a rebuild rather than a defect**, and it is left failing on purpose:
 turning it green by marking the uncovered rows as open questions would misreport
 what is settled.

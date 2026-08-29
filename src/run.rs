@@ -14,7 +14,7 @@ use crate::depth;
 use crate::jig::{self, Task};
 use crate::limit;
 use crate::selection::{self, consumes_paths, quote, quote_str};
-use crate::{Error, Outcome, merge, stamp, walk};
+use crate::{Error, Outcome, Refusal, merge, stamp, walk};
 
 /// The directory under a run's output directory holding one entry per execution.
 pub const WORK_DIR: &str = "work";
@@ -218,6 +218,7 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
         output_dir: None,
         config_dir: None,
     })
+    .map_err(Error::from)
 }
 
 /// Everything an invocation names.
@@ -250,7 +251,12 @@ pub struct Invocation<'a> {
 /// Everything [`run`] returns, plus [`Error::ReservedDefinition`] by FR-4.19,
 /// [`Error::DefinitionsUnreadable`] by FR-4.20, and [`Error::OutputDirectoryInUse`]
 /// by FR-2.6b for a named directory that already holds a run.
-pub fn invoke(invocation: &Invocation) -> Result<Outcome, Error> {
+///
+/// Each arrives inside a [`Refusal`], which carries where the reason was
+/// written as well as what it was. FR-10.3a has the command line print that
+/// path, and this is the only place it is known: FR-2.6c derives the default
+/// from a stamp taken below.
+pub fn invoke(invocation: &Invocation) -> Result<Outcome, Refusal> {
     let Invocation {
         jig,
         base,
@@ -277,24 +283,16 @@ pub fn invoke(invocation: &Invocation) -> Result<Outcome, Error> {
     // FR-4.17b keeps this away from definitions: nothing distinguishes
     // `../REQUIREMENTS.md` from `100`, so a definition's value is left alone and
     // reaches its command as written.
-    let base = &fs::canonicalize(base).map_err(|source| Error::Io {
-        path: base.to_path_buf(),
-        reason: source.to_string(),
+    let base = &fs::canonicalize(base).map_err(|source| {
+        // Nothing is written: the base is what could not be resolved, so there
+        // is no run directory yet to write into.
+        wrote_nothing(Error::Io {
+            path: base.to_path_buf(),
+            reason: source.to_string(),
+        })
     })?;
 
-    // FR-2.4 reaches the output directory too, and it has to happen after the
-    // base is canonical: the default is derived from the base, and a named one
-    // is resolved against the working directory like any path on a command
-    // line. `.bolt-<iso8601>` at a relative base would otherwise be recorded as
-    // `./.bolt-…`, which is the defect FR-2.4 exists to prevent one level up.
-    let output_dir = named.map_or_else(|| output_dir_for(base, started), absolute);
-
-    // FR-2.6b, for a named directory as much as for the default. **This returns
-    // before anything is written, and that ordering is the guarantee rather
-    // than an implementation detail**; `holds_a_run` carries why.
-    if holds_a_run(&output_dir) {
-        return Err(Error::OutputDirectoryInUse(output_dir));
-    }
+    let output_dir = output_dir_of(base, named, started)?;
 
     // Everything past here is bolt alive and in control, so FR-10.7 wants a
     // result for whatever goes wrong. The refusal is written into the directory
@@ -303,8 +301,53 @@ pub fn invoke(invocation: &Invocation) -> Result<Outcome, Error> {
     // FR-2.8 defaults to the base, absolute like every path a caller writes.
     let config_dir = config_dir.map_or_else(|| base.clone(), absolute);
 
-    carry_out(jig, base, &output_dir, *definitions, &config_dir)
-        .inspect_err(|refusal| write_refusal(&output_dir, refusal))
+    carry_out(jig, base, &output_dir, *definitions, &config_dir).map_err(|error| {
+        write_refusal(&output_dir, &error);
+        Refusal {
+            error,
+            result: Some(output_dir.join(RESULT_FILE)),
+        }
+    })
+}
+
+/// Where this run's evidence goes, refusing a directory already holding one.
+///
+/// FR-2.4 reaches the output directory as it reaches the base, and it has to
+/// happen after the base is canonical: the default is derived from the base,
+/// and a named one is resolved against the working directory like any path on a
+/// command line. `.bolt-<iso8601>` at a relative base would otherwise be
+/// recorded as `./.bolt-…`, which is the defect FR-2.4 exists to prevent one
+/// level up.
+///
+/// # Errors
+///
+/// [`Error::OutputDirectoryInUse`] by FR-2.6b, for a named directory as much as
+/// for the default. **It returns before anything is written, and that ordering
+/// is the guarantee rather than an implementation detail**; `holds_a_run`
+/// carries why.
+fn output_dir_of(
+    base: &Path,
+    named: Option<&Path>,
+    started: SystemTime,
+) -> Result<PathBuf, Refusal> {
+    let output_dir = named.map_or_else(|| output_dir_for(base, started), absolute);
+    if holds_a_run(&output_dir) {
+        return Err(wrote_nothing(Error::OutputDirectoryInUse(output_dir)));
+    }
+    Ok(output_dir)
+}
+
+/// A refusal that wrote nothing, by FR-10.7a.
+///
+/// Named rather than written inline at each site so that "nothing was written"
+/// is one decision with one spelling. The two callers are FR-2.6b's occupied
+/// directory and a base that would not resolve, and both return before this run
+/// owns anywhere to write.
+fn wrote_nothing(error: Error) -> Refusal {
+    Refusal {
+        error,
+        result: None,
+    }
 }
 
 /// FR-2.5's refusal, with FR-10.7a's exemption applied to it.
@@ -314,17 +357,22 @@ pub fn invoke(invocation: &Invocation) -> Result<Outcome, Error> {
 /// absence is being refused. One named outside it has no such problem, which is
 /// exactly what FR-10.7b tells a caller who wants a parseable refusal in every
 /// case to do.
-fn base_missing(base: &Path, named: Option<&Path>) -> Error {
-    let refusal = Error::BaseMissing(base.to_path_buf());
-    if wrote_a_result(&refusal, base, named) {
+fn base_missing(base: &Path, named: Option<&Path>) -> Refusal {
+    let error = Error::BaseMissing(base.to_path_buf());
+    if wrote_a_result(&error, base, named) {
         // Only reachable with a named directory outside the base, so there is
         // one to write to and no default to derive from a base that is not
         // there.
         if let Some(path) = named {
-            write_refusal(&absolute(path), &refusal);
+            let output_dir = absolute(path);
+            write_refusal(&output_dir, &error);
+            return Refusal {
+                error,
+                result: Some(output_dir.join(RESULT_FILE)),
+            };
         }
     }
-    refusal
+    wrote_nothing(error)
 }
 
 /// A path made absolute without touching the filesystem, by FR-2.4.
@@ -741,6 +789,29 @@ fn task_passed(output_dir: &Path, task: &str) -> bool {
         })
 }
 
+/// The command a task will run, once the ways of not having one are refused.
+///
+/// # Errors
+///
+/// [`Error::TaskNamesAJig`] by FR-5.22, **checked first**, so a jig written
+/// against the retired nesting mechanism is told what replaced it rather than
+/// told it forgot a field. [`Error::TaskNamesNoCommand`] for a task with
+/// nothing to run at all, and [`Error::CommandNamesBothPathForms`] by FR-4.2,
+/// since a command cannot be one execution per path and one execution over all
+/// of them at once.
+fn command_of<'a>(task: &'a Task, named: &impl Fn() -> String) -> Result<&'a str, Error> {
+    if task.names_a_jig() {
+        return Err(Error::TaskNamesAJig { task: named() });
+    }
+    let Some(command) = task.command.as_deref() else {
+        return Err(Error::TaskNamesNoCommand { task: named() });
+    };
+    if command.contains("{each_path}") && command.contains("{all_paths}") {
+        return Err(Error::CommandNamesBothPathForms { task: named() });
+    }
+    Ok(command)
+}
+
 /// What validation settled about one task, so the run does not re-derive it.
 ///
 /// Everything here was proved before any task executed, which is what FR-3.10b
@@ -785,16 +856,7 @@ fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<Plan
             return Err(Error::UnsafeTaskName { task: named() });
         }
 
-        if task.is_jig() {
-            check_fields(task)?;
-        }
-        let Some(command) = task.command.as_deref() else {
-            return Err(Error::NestedJigNotBuilt { task: named() });
-        };
-        // FR-4.2's jig error.
-        if command.contains("{each_path}") && command.contains("{all_paths}") {
-            return Err(Error::CommandNamesBothPathForms { task: named() });
-        }
+        let command = command_of(task, &named)?;
 
         // FR-4.18a. Checked here rather than at substitution, which happens per
         // execution, so a jig whose second task names a placeholder nothing
@@ -817,36 +879,6 @@ fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<Plan
     }
 
     Ok(commands)
-}
-
-/// FR-5.13h's check over every field a jig task declares.
-///
-/// The path variables are what a jig task may not name. It has no command
-/// consuming paths, so there is no selection for `{each_path}` to be one of and
-/// nothing for `{all_paths}` to expand to; a jig that names one is asking for
-/// something bolt cannot do rather than making a typo.
-///
-/// **Called before the unbuilt-feature refusal**, so a jig task whose fields are
-/// wrong is told what is wrong with its fields. Being told nested jigs are
-/// unbuilt teaches nothing about the jig in front of you, and that message
-/// changes under a reader once `50b` lands while this one does not.
-///
-/// The location variables are left alone here. FR-5.13f has them substituted in
-/// a field as they are in a command, which is `50b`'s to build, and FR-4.18's
-/// refusal for a name nothing defines already covers the rest.
-fn check_fields(task: &Task) -> Result<(), Error> {
-    for (field, value) in task.declared() {
-        for variable in placeholders(value) {
-            if selection::PATH_VARIABLES.contains(&variable) {
-                return Err(Error::PathVariableInField {
-                    task: task.name.clone(),
-                    field,
-                    variable: variable.to_owned(),
-                });
-            }
-        }
-    }
-    Ok(())
 }
 
 /// Every `{name}` a command line spells, in the order they appear.

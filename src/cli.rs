@@ -138,14 +138,20 @@ where
             ExitCode::from(COMPLETED)
         }
         Err(refusal) => {
-            eprintln!("bolt: {refusal}");
+            eprintln!("bolt: {}", refusal.error);
             // FR-10.7a. A refusal that wrote nothing says so, because "no
             // result" otherwise reads as a bolt that was killed, which is
             // exactly what FR-10.7 has a caller conclude from an absent file.
             // FR-10.7b points a caller wanting one in every case at an output
             // directory outside the tree, so the advice is worth giving here
             // rather than leaving them to find the row.
-            if !run::wrote_a_result(&refusal, &base, output_dir.as_deref()) {
+            if let Some(result) = refusal.result {
+                // FR-10.3a. Stdout is where the result is, on every path that
+                // wrote one. FR-5.19's adapter reads this line, and a refusal
+                // going quiet would reach it as an empty stdout, which is what
+                // FR-10.7 has a caller read as a bolt that died.
+                println!("{}", result.display());
+            } else {
                 eprintln!(
                     "bolt: no result was written, because that is the directory in question; \
                      name --output-dir outside it for one"

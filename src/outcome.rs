@@ -2,6 +2,35 @@
 
 use std::path::PathBuf;
 
+use crate::Error;
+
+/// A run bolt could not carry out, and where it recorded that.
+///
+/// FR-10.7 has bolt write a `result.yaml` whenever it is alive and in control
+/// when it stops, and FR-10.3a has it print where that is. Carrying the path
+/// beside the reason is what makes the second possible: the directory a default
+/// run resolves to comes from FR-2.6c's stamp, taken inside
+/// [`invoke`](crate::run::invoke), so no caller can reconstruct it afterwards.
+///
+/// `result` is `None` for a refusal that deliberately wrote nothing. FR-10.7a's
+/// missing base and FR-2.6b's occupied directory are both that case, and a
+/// caller is told so rather than left to read an absent file as a bolt that
+/// died.
+#[derive(Debug)]
+pub struct Refusal {
+    /// Why the run was refused.
+    pub error: Error,
+
+    /// The `result.yaml` carrying that reason, where one was written.
+    pub result: Option<PathBuf>,
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        refusal.error
+    }
+}
+
 /// The result of a run that bolt was able to carry out.
 ///
 /// A run that bolt could *not* carry out is an [`Error`](crate::Error) instead.

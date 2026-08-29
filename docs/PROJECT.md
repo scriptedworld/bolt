@@ -54,11 +54,12 @@ run rather than of nesting: one `result.yaml` at the top of the output
 directory, "singular, because a run has exactly one result, folded from the
 results of its tasks".
 
-That matters when somebody asks whether bolt needs to nest, because the fold is
-the one capability a loop of separate invocations cannot supply, and there is no
-other component to hand it to. Anvil is dev images and nothing like a result
-aggregator; §25 is one sentence and a diagram of Go, Python and TypeScript
-environments.
+That is why a loop of separate invocations is not the whole answer to running
+one jig over several subprojects: N runs produce N results and nothing that says
+whether the repository passed. It does **not** follow that bolt has to nest.
+FR-5.19 keeps the fold here and puts the composition on a command line, because
+bolt prints where its result is and an adapter can read it, so a child run
+reaches its parent as an ordinary constituent.
 
 Bolt reads and writes nothing structured itself. Every jig, manifest, envelope
 and definitions file goes through wrench, which validates it against the shipped
@@ -118,7 +119,7 @@ licences, complexity, traceability.
 
 **Seven pass. `traceability` fails, deliberately, and should not be made green.**
 It requires every test to cite a requirement and every cited requirement to
-exist. It reports 129 of 254 covered as of 2026-08-28. The uncovered rows are
+exist. It reports 131 of 234 covered as of 2026-08-28. The uncovered rows are
 specified and unbuilt, and marking them `[?]` to turn the gate green would
 misreport what is settled. **The number going up is the progress signal**; it was
 79 four tasks ago.
@@ -135,8 +136,10 @@ Bolt runs its own gate through its own binary, which is NFR-12.1 and is what
 resolves to the Go build, and every other project in the estate gates through it.
 
 **Moving the symlink is blocked on one file.** Of 35 jig files in the estate,
-exactly one uses a nested jig: `wrench/bolt.wrench-quality.yaml`, with two jig
-tasks. This bolt refuses those by name until `runner/50b` builds them.
+exactly one was written against the retired nesting mechanism:
+`wrench/bolt.wrench-quality.yaml`, with two `jig:` tasks. This bolt refuses those
+by name and says what replaced them, by FR-5.22. Converting them is two command
+lines and an adapter, filed against wrench and toolbox.
 
 `bin/test-traceability.py` is a symlink into toolbox, so that task's verdict
 moves when toolbox moves.
@@ -176,7 +179,13 @@ than the threshold. `complexity` has failed on every task since
 ## What is decided
 
 - One jig, one directory, per invocation. Several at once is a jig whose tasks
-  are nested jigs.
+  invoke bolt.
+- **Composition is a command line and there is no second mechanism.** A task
+  running another jig names `bolt` in its command, like any other tool, and an
+  adapter reads the result path bolt printed. Nesting as a task kind, with its
+  own fields and inheritance, is retired: 26 rows, 2026-08-28. What it bought
+  was a schema-checkable grant, which FR-5.21 records as given up, leaving
+  FR-5.7's depth ceiling as the guard.
 - The exit status says whether bolt could carry out the run, never whether the
   tools passed. The verdict is in the envelope.
 - A failing task does not stop the run; a jig asks for the opposite with
@@ -190,8 +199,15 @@ than the threshold. `complexity` has failed on every task since
 
 ## What is not done
 
-**Nested jigs**, which is `runner/50b` and is the one thing between this and
-replacing the Go build. `50d` and `runner/60` follow it.
+**`runner/60`, bolt running itself under the estate's own jig**, and the
+`~/bin/bolt` cutover behind it. Composition landed 2026-08-28 as a command line
+rather than as nesting, so what remains before the symlink moves is wrench's two
+`jig:` tasks becoming command tasks and toolbox shipping the adapter that reads a
+child's result.
+
+`runner/50d`, standing a jig's commands at the repository root, waits on
+`NEXT_STEPS.md` question 39: whether a child inherits the project root. Under
+composition its five rows are vacuous unless it does.
 
 Beyond that, `NEXT_STEPS.md` holds the open questions and the defaults taken.
 Every default is a `[D]` row and reversible by editing the row it became.
