@@ -7,7 +7,7 @@ gets investigated and this does not. From inside the session running it, a check
 that could not see the thing and a check that saw nothing wrong are the same
 observation.
 
-## Nine instances, 2026-08-28 and 2026-08-29, across four repositories
+## Ten instances, 2026-08-28 and 2026-08-29, across four repositories
 
 They are collected because the shape is only obvious with several beside each
 other. Any one of them reads as an ordinary bug.
@@ -22,9 +22,10 @@ other. Any one of them reads as an ordinary bug.
 | two mtimes, one second apart | did the second **that the clock can see** change |
 | two runs into one directory | do two *refusals* differ |
 | `grep -rn … src/` | how many in `src/` |
+| `ls -la bolt.go/bin/` | is there a file, not is it tracked |
 | a status line's staleness flag | is the flag set, on a line nobody printed |
 
-Four are this tree's, four are wrench's, one is a coordinator's. Nobody in the
+Five are this tree's, four are wrench's, one is a coordinator's. Nobody in the
 estate is better at this than anybody else, which is the argument for the
 remedies rather than for care.
 
@@ -72,6 +73,26 @@ then explain any exclusion.
 **Make the scope visible in the output.** `141 of 245 … 3 open and exempt` can be
 reconciled by a reader; `failed: 3` cannot. A check that prints only its verdict
 cannot be audited by the person reading it.
+
+## A tenth, three commits after this file was written
+
+`ls -la` showed a 6MB executable in `bolt.go/bin/`, and I reported it to our
+user as **committed**, contrasting it with the Rust tree's build artefact and
+making that asymmetry a cutover blocker. It is gitignored:
+
+    git -C ~/.projects/bolt.go ls-files bin/       bin/test-traceability.py only
+    git -C ~/.projects/bolt.go check-ignore -v bin/bolt   .gitignore:17:/bin/bolt
+
+`ls` answers "is there a file", and I read it as "is it tracked". One command
+apart, and the second is the one the claim needed.
+
+**The aggravating detail is the one to keep.** `NEXT_STEPS.md` already said
+`gitignored at .gitignore:17`, in the section about that exact symlink. I had
+the fact written down in my own tree and inferred a contradicting one from a
+directory listing instead. So the remedies above are necessary and not
+sufficient, and this is the one they were missing: **check whether you already
+wrote it down.** A file you own is the cheapest second source there is, and the
+one you are least likely to consult.
 
 ## The one that generalises furthest
 

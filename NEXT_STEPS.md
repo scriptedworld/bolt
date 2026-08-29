@@ -1084,9 +1084,29 @@ on cannot live in a file designed to disappear. The wrench session asked whether
 it was deliberate or drift on 2026-08-27, which is what showed the record was
 ephemeral.
 
-`~/bin/bolt` resolves to `bolt/bin/bolt`, gitignored at `.gitignore:17`. It is
-the **Go** implementation. Nothing in this tree builds it: `cmd/` and `go.mod`
-left with the split, and the Rust bolt has no working CLI yet.
+**Renamed 2026-08-29 on our user's instruction**, by the wrench session at
+dotfiles `1e1041d`. Both names run the Go build today, so no caller changed:
+
+    ~/bin/bolt      -> ../../bolt.go/bin/bolt.go
+    ~/bin/bolt.go   -> ../../bolt.go/bin/bolt.go
+
+What it buys is that the cutover becomes **one symlink**: repoint `bin/bolt` at
+the Rust build and `bin/bolt.go` still names the Go one rather than leaving it
+unreachable. Done without a window where `bolt` was broken, which matters
+because it is what every gate in the estate invokes.
+
+`~/bin/bolt` resolves to `bolt.go/bin/bolt.go`, **gitignored, as `bin/bolt` was
+before it**. It is the **Go** implementation. Nothing in this tree builds it:
+`cmd/` and `go.mod` left with the split.
+
+**That the binary is untracked is the fact to carry into the install decision.**
+The estate-wide symlink has always pointed at a build artefact, so there is no
+asymmetry between the two trees on that axis, and the open question is where a
+built binary gets installed rather than which of them is committed. I stated the
+opposite to our user on 2026-08-29, calling the Go binary "a committed 6MB
+executable", having read `ls -la` rather than `git ls-files`. **The correct fact
+was three lines above where I wrote the wrong one**, in this file. Corrected by
+the wrench session, who ran the one command either of us could have.
 
 **Every consumer's gate runs through it.** wrench, toolbox and bolt itself. It
 keeps working while the Rust rebuild happens, and the alternative was every gate
