@@ -116,8 +116,14 @@ pub struct Task {
     ///
     /// FR-4.4d and FR-4.4h make it a jig error on a task naming no path
     /// variable, enforced by the schema rather than here.
-    #[serde(default, rename = "allow-empty")]
-    pub allow_empty: bool,
+    ///
+    /// Spelled `allow-empty` until wrench `dbc3570`. The new name is the one
+    /// that answers FR-10.8d's question: `optional` says what an empty selection
+    /// resolves to, where `allow-empty` described the permission rather than the
+    /// outcome. No jig in the estate carried the field, so the rename cost
+    /// nothing.
+    #[serde(default)]
+    pub optional: bool,
 
     /// Stop the run when this task fails, by FR-4.9.
     ///

@@ -773,9 +773,9 @@ fn a_path_consuming_task_with_an_empty_selection_fails() {
 }
 
 // COVERS: FR-4.4c | positive
-/// `allow-empty` makes an empty selection an acceptable result.
+/// `optional` makes an empty selection an acceptable result.
 #[test]
-fn allow_empty_makes_an_empty_selection_acceptable() {
+fn optional_makes_an_empty_selection_acceptable() {
     let root = tree();
     write(root.path(), "a.txt", "one");
     write_jig(
@@ -784,7 +784,7 @@ fn allow_empty_makes_an_empty_selection_acceptable() {
         concat!(
             "  - name: no-python-here\n",
             "    matching: [\"**/*.py\"]\n",
-            "    allow-empty: true\n",
+            "    optional: true\n",
             "    command: \"sh -c 'echo {each_path}'\"\n",
             "  - name: always\n",
             "    command: \"sh -c 'exit 0'\"\n",
@@ -3507,6 +3507,19 @@ fn a_timed_out_command_leaves_no_children_running() {
 /// would run the first one first. The assertion is that no work directory
 /// exists, which is what separates a check made up front from one made in
 /// passing; the exit status is the same either way.
+///
+/// **The refusal now arrives from wrench's schema rather than from bolt.** The
+/// `time-limit` pattern landed in `jig.schema.json` at wrench `dbc3570`, so a
+/// jig writing `30` is refused at validation one layer before the runner reads
+/// it. That is FR-1.5 doing its job and is the better place for it: bolt never
+/// sees a jig the schema would not accept.
+///
+/// **`Error::MalformedTimeLimit` is kept and is not dead.** It is what catches
+/// wrench's pattern and `limit::parse` drifting apart, and the two are the same
+/// regex today by agreement rather than by construction. The grammar half is
+/// asserted directly against `limit::parse` by the property test below, so the
+/// pair still covers both layers: that one checks bolt agrees, this one checks
+/// the document is stopped.
 #[test]
 fn a_time_limit_that_is_not_a_duration_refuses_the_run() {
     let root = tree();
@@ -3521,23 +3534,29 @@ fn a_time_limit_that_is_not_a_duration_refuses_the_run() {
 
     let refusal = bolt::run::run("malformed", root.path()).expect_err("a malformed limit refuses");
     assert!(
-        matches!(refusal, bolt::Error::MalformedTimeLimit { .. }),
+        matches!(refusal, bolt::Error::JigUnreadable { .. }),
         "wrong refusal for a malformed limit: {refusal:?}",
     );
     let said = refusal.to_string();
     assert!(
-        said.contains("beta") && said.contains("30"),
-        "the reason names neither the task nor what was written: {said}",
+        said.contains("time-limit") && said.contains("30"),
+        "the reason names neither the field nor what was written: {said}",
+    );
+    // Bolt's own guard still refuses the same string, so the two layers agree.
+    // A pattern loosened in wrench without this moving would show up here.
+    assert!(
+        bolt::limit::parse("30").is_none(),
+        "bolt's grammar accepts what the schema refuses",
     );
     assert!(
         !executed_anything(root.path()),
         "a task executed before the malformed limit was refused",
     );
 
-    // The jig's own limit is refused the same way, and says so as the jig's
-    // rather than as some task's. In a tree of its own, because the refusal
-    // above wrote its result into this one's default output directory and
-    // FR-2.6b refuses a second run that lands on the same second.
+    // The jig's own limit is refused the same way, and the reason points at the
+    // jig's field rather than a task's. In a tree of its own, because the
+    // refusal above wrote its result into this one's default output directory
+    // and FR-2.6b refuses a second run that lands on the same second.
     let other = tree();
     write_limited_jig(
         other.path(),
@@ -3547,9 +3566,14 @@ fn a_time_limit_that_is_not_a_duration_refuses_the_run() {
     );
     let refusal =
         bolt::run::run("malformed-run", other.path()).expect_err("a malformed run limit refuses");
+    let said = refusal.to_string();
     assert!(
-        matches!(refusal, bolt::Error::MalformedTimeLimit { task: None, .. }),
-        "the jig's own limit was reported as a task's: {refusal:?}",
+        said.contains("'/time-limit'"),
+        "the jig's own limit was not located at the document root: {said}",
+    );
+    assert!(
+        !said.contains("/tasks/"),
+        "the jig's own limit was reported as a task's: {said}",
     );
 }
 

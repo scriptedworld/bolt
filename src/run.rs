@@ -915,7 +915,7 @@ fn run_task<'a>(
     if plan.wants_paths && selection.selected.is_empty() {
         // FR-4.4c: an allowed empty selection produces no constituent at all,
         // which is what FR-4.4 alone used to mean for every task.
-        if task.allow_empty {
+        if task.optional {
             return Ok(TaskRun {
                 executions: 0,
                 expired: None,
