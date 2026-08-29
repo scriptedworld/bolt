@@ -141,11 +141,30 @@ Bolt runs its own gate through its own binary, which is NFR-12.1 and is what
 `runner/60` finishes. It does **not** yet run through `~/bin/bolt`: that symlink
 resolves to the Go build, and every other project in the estate gates through it.
 
-**Moving the symlink is blocked on one file.** Of 35 jig files in the estate,
-exactly one was written against the retired nesting mechanism:
-`wrench/bolt.wrench-quality.yaml`, with two `jig:` tasks. This bolt refuses those
-by name and says what replaced them, by FR-5.22. Converting them is two command
-lines and an adapter, filed against wrench and toolbox.
+**Moving the symlink is blocked on one file and one decision**, as of
+2026-08-29.
+
+Of 35 jig files in the estate, exactly one was written against the retired
+nesting mechanism: `wrench/bolt.wrench-quality.yaml`, with two `jig:` tasks.
+This bolt refuses those by name and says what replaced them, by FR-5.22.
+
+**The adapter they convert to now exists**: `toolbox/adapters/common/bolt-result.py`
+at toolbox `e89e7d0`, verified on a composed run where the same failing child
+folds `success: false` with the adapter and `success: true` without it. So the
+conversion is unblocked and is wrench's.
+
+**The decision is where a built Rust binary gets installed.** `~/bin/bolt` was
+renamed at dotfiles `1e1041d` so that `bolt` and `bolt.go` both name the Go
+build today and the cutover is one symlink. What it points at is untracked and
+always has been, in both trees, so the question is an install path rather than a
+choice between a committed binary and an artefact.
+
+**Nothing that works today stops working after the cutover.** Across all 35 jigs
+the task keys in use are `description`, `command`, `evidence`, `adapter`,
+`matching`, `excluding`, and the four retired ones in wrench's file alone; this
+bolt supports every other key nothing uses. And the Go build refuses flags
+written after the positionals where this one accepts them anywhere, so the
+accepted-argument set only widens.
 
 `bin/test-traceability.py` is a symlink into toolbox, so that task's verdict
 moves when toolbox moves.

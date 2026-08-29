@@ -95,6 +95,36 @@ concluded, and bolt adds that reason itself.
 merge takes that from the work directory, which keeps this contract as narrow as
 it is.
 
+## An adapter reading a composed child's result takes the LAST line
+
+FR-10.3a says bolt prints where the result is on stdout and prints nothing else
+there. **That is true of this bolt and is not what an adapter meets today**,
+because `~/bin/bolt` is still the Go build until the cutover. Measured
+2026-08-29, same jig, both builds:
+
+    Go                                    Rust
+    1  always-passes-0                    1  /…/result.yaml
+    2
+    3  passed: 1 execution(s)
+    4  /…/result.yaml
+
+Reading the first line gets a **task name**. So an adapter spanning the cutover
+takes the last non-empty line, which is correct against both and stays correct
+after. toolbox's `bolt-result` does this, found by running it.
+
+**The contract is not being weakened to match.** "Prints nothing else there" is
+the property worth having, and relaxing it to "the last line" would license bolt
+to print other things on stdout, which is precisely the summary line FR-10.3's
+note exists to keep out. The strict rule is what bolt promises; last-line is how
+a consumer stays robust while a second implementation is live. Those are
+different documents on purpose.
+
+**Flag order differs too, and in the safe direction.** The Go build refuses
+flags written after the positionals; this one accepts them anywhere. So a caller
+written against the Go build keeps working after the cutover, and one written
+against this build may not work before it. Anything authored now should put
+flags first.
+
 ## Writing one
 
 An adapter is a filter with a fixed argument list. In practice:
