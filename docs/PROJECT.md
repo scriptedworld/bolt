@@ -281,9 +281,9 @@ nothing is wrong. Two numbers, and they must reconcile:
     tail -1 .ephemera/qa/work/traceability-1/stdout
 
 Live rows must equal the denominator plus the exempt count. Measured
-247 live, `140 of 244 … 3 open and exempt`, and 244 + 3 = 247. When
-it was wrong it was 245 against 240 + 3, and nothing in the gate's output said
-so.
+243 live, `142 of 240 … 3 open and exempt`, and 240 + 3 = 243. When it was
+wrong the live count ran two ahead of the sum, and nothing in the gate's output
+said so.
 
 Every test cites the requirement it discharges, directly above it:
 
