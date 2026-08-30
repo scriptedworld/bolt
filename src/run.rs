@@ -1722,10 +1722,22 @@ fn create_dir(path: &Path) -> Result<(), Error> {
     })
 }
 
-/// Write bytes, reporting where it failed.
+/// Write bytes atomically, reporting where it failed.
+///
+/// FR-7.5a: to a temporary and renamed into place, so a killed bolt leaves the
+/// file absent instead of half written. FR-7.5b puts the temporary beside the
+/// target, since a rename across filesystems is a copy and is not atomic.
+///
+/// Every structured file goes through wrench, which does this itself. What
+/// reaches here is the `exitcode` file, which is a unit and is not one of
+/// FR-7.5c's exempt streams.
 fn write(path: &Path, bytes: &[u8]) -> Result<(), Error> {
-    fs::write(path, bytes).map_err(|source| Error::Io {
+    let failed = |path: &Path, source: std::io::Error| Error::Io {
         path: path.to_path_buf(),
         reason: source.to_string(),
-    })
+    };
+    let temporary = path.with_extension(format!("tmp-{}", std::process::id()));
+
+    fs::write(&temporary, bytes).map_err(|source| failed(&temporary, source))?;
+    fs::rename(&temporary, path).map_err(|source| failed(path, source))
 }

@@ -937,6 +937,53 @@ fn an_execution_keeps_its_native_results() {
     );
 }
 
+// COVERS: FR-7.5, FR-7.5a, FR-7.5b | property
+/// Nothing bolt writes as a unit leaves a temporary behind.
+///
+/// FR-7.5a writes to a temporary and renames, so a killed bolt leaves the file
+/// absent instead of half written, and FR-7.5b keeps the temporary beside its
+/// target because a rename across filesystems is a copy.
+///
+/// Asserted as the absence of a leftover rather than by killing a run midway,
+/// which cannot be made deterministic. A write that skipped the rename fails
+/// this twice over: the temporary survives and the target is not there.
+///
+/// Every structured file goes through wrench, which renames for itself. What
+/// this covers is bolt's own writing, which reaches only the `exitcode` file.
+#[test]
+fn a_written_file_leaves_no_temporary_beside_it() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "atomic",
+        "  - name: alpha\n    command: \"sh -c 'exit 3'\"\n",
+    );
+
+    let outcome = bolt::run::run("atomic", root.path()).expect("the run completes");
+    let dir = work(&outcome, "alpha-1");
+    let leftovers: Vec<String> = fs::read_dir(&dir)
+        .expect("the work directory is readable")
+        .filter_map(|entry| {
+            entry
+                .ok()
+                .map(|it| it.file_name().to_string_lossy().into_owned())
+        })
+        .filter(|name| name.contains(".tmp-"))
+        .collect();
+
+    assert!(
+        leftovers.is_empty(),
+        "a temporary survived the write: {leftovers:?}",
+    );
+    assert_eq!(
+        fs::read_to_string(dir.join(bolt::run::EXITCODE_FILE))
+            .expect("the exit code is at its target")
+            .trim(),
+        "3",
+        "the renamed file is not the one the run wrote",
+    );
+}
+
 // COVERS: FR-9.2b | property
 /// The ordinal is zero-padded to the width that task's execution count needs.
 #[test]
