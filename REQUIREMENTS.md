@@ -14,20 +14,16 @@ bolt or of a run, not how anything is built.
 document or in an answer. `[D]` is derived from one. `[A/D]` is both. `[?]` is
 open, recorded so it is not lost and carrying no test yet.
 
-Thirty-five rows were added on 2026-08-26, closing every question that blocked
-a build. Four came from an answer and the rest from a default taken rather than
-asked. All of them are listed in `NEXT_STEPS.md` under "Defaults taken", so a
-wrong one is found by reading that table rather than by meeting it in the code.
+Every `[D]` row is a default taken instead of a question asked, and all of them
+are listed in `NEXT_STEPS.md` under "Defaults taken", so a wrong one is found by
+reading that table instead of by meeting it in the code.
 
-Every settled row reads as uncovered under toolbox's traceability gate, and
-marking them `[?]` to turn that green would misreport what is settled.
+A settled row that no test cites reads as uncovered under toolbox's traceability
+gate, and marking those `[?]` to turn it green would misreport what is settled.
 
-FACT 2026-08-27: that is no longer only because no implementation exists.
-`tests/skeleton.rs` cites 27 rows in `COVERS:` markers and the gate still
-reports 0 of 235, because the checker knows Go and Python and no glob it holds
-matches a Rust test. Filed at
-`clank/inbox/toolbox/traceability-cannot-see-a-rust-test/` with a repro. Until
-it lands, the coverage number here measures nothing.
+`tests/skeleton.rs` carries 97 `COVERS:` marks and the gate reports 143 of 241
+covered, with 3 open and exempt. The uncovered rows are specified and untested,
+and the number going up is the progress signal.
 
 ## Where this departs from the architecture
 
@@ -120,7 +116,7 @@ not help with.
 | FR-3.4a | `excluding` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
 | FR-3.4b | `matching` and `excluding` belong to a task that consumes paths. On a command naming neither path variable they are a jig error, caught in validation rather than quietly ignored. Whether a whole-project command should run at all is a question about where the jig is pointed, and FR-4.4 already answers it: a command naming neither variable always executes. | [A] |
 | FR-3.4e | FR-4.4b's guarantee reaches only the tasks bolt selects for. A command handed a directory, whose tool finds its own files, is opaque: bolt cannot know whether it read a thousand files or none, so a tool that silently matched nothing reports a pass and bolt has nothing to notice. Where that matters, the task takes `matching` and a path variable so the selection is bolt's and FR-4.4b applies. | [D] |
-| FR-3.4f | FACT 2026-08-27: 3 of 116 tasks across 26 jigs let bolt select, all three in one jig. The rest hand their tool a directory, so FR-4.4b protects three tasks on the day it lands and the evidence FR-9.5's manifest promises is absent for the other 113. That is the state to move, not a reason against the rule. Measured by `python3 bin/count-selection.py`, which counts task blocks; an earlier figure of 8 counted matching lines and triple-counted a task carrying `matching`, `excluding` and a path variable. It reads every sibling repository's jigs, so it re-derives the figure only where the estate is checked out, and a clone of bolt alone cannot reproduce it. | [D] |
+| FR-3.4f | Almost nothing in the estate lets bolt select: `python3 bin/count-selection.py` reports 3 of 157 tasks across 30 jig files, all three in one jig. The rest hand their tool a directory, so FR-4.4b protects three tasks and the evidence FR-9.5's manifest promises is absent for the other 154. That is the state to move, and not a reason against the rule. The script counts task blocks and not matching lines, which is the difference between the figure above and a larger one that triple-counts a task carrying `matching`, `excluding` and a path variable. It reads every sibling repository's jigs, so a clone of bolt alone cannot re-derive it. | [D] |
 | FR-3.4c | The jig format carries comments, and an entry's reasoning sits beside it. Somebody asking why a path is excluded finds the answer where the path is, rather than reconstructing it from git history. | [A/D] |
 | FR-3.4d | A jig is YAML, as an envelope is. One serialisation everywhere: one parser, one schema mechanism, and a jig and a result readable by the same tooling. | [A] |
 | FR-3.5 | Filter patterns are relative to the base directory of the run they are declared in. A jig written for reuse therefore says `**/*.go` and never names the subtree it was dropped into, which is what makes it the same jig at the repository root and at `backend/`. | [A] |

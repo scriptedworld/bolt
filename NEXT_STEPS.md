@@ -125,7 +125,7 @@ than kept alongside. `silo/docs/DECISIONS/requirements-are-a-directory.md` at
 **Bolt is the measurement the ruling rests on**, and the measurement has moved
 twice since it was taken.
 
-FACT 2026-08-27, re-derived: 264 row-shaped lines in 441, counting the retired
+Re-derived 2026-08-27: 264 row-shaped lines in 441, counting the retired
 table; the traceability checker declares 244 live. The earlier figure here, 245
 rows in 397 lines, is now **`bolt.go`'s document**, because the repository split
 forked this file and froze the copy at that point. So the number did not drift,
@@ -196,15 +196,15 @@ What is wanted is complexity, function length and parameter count. A single
 cross-language analyser is the **nice-to-have** shape: helga if it exists, per
 `silo/docs/DECISIONS/components-are-named-from-the-great-clock.md` at `633cb31`,
 and what helga becomes is silo's rather than recorded here. lizard stands in
-meanwhile, and FACT 2026-08-27: it parses Rust, measured against a probe file.
+meanwhile, and it parses Rust, measured 2026-08-27 against a probe file.
 
 **Getting the same metrics from language-native tools is an accepted outcome,
 not a fallback to apologise for.** If one analyser turns out to have too many
 tricky bits across every language, `complexity` leaves the common jig entirely
 and each language jig carries its own.
 
-For Rust that is already available and needs no new tool. FACT 2026-08-27, every
-lint present in the installed clippy:
+For Rust that is already available and needs no new tool. Measured 2026-08-27,
+every lint present in the installed clippy:
 
     clippy::cognitive_complexity   the measure complexipy gives Python
     clippy::too_many_arguments     the parameter count
@@ -223,7 +223,7 @@ thresholds are stricter and bind first:
     lizard      --length 60      --arguments 5
     clippy      too_many_lines   100    too_many_arguments  7
 
-There is no `clippy.toml`, so those are the defaults. FACT 2026-08-28, measured
+There is no `clippy.toml`, so those are the defaults, measured 2026-08-28
 while implementing the skeleton: `run_task` at 73 lines and `write_manifest` at
 6 parameters both **failed lizard and passed clippy** under
 `--all-targets -- -D warnings` with `pedantic` on. So the four lints are not
@@ -249,8 +249,8 @@ whichever tool produces it.
 nothing here runs it, so hard rule 4's register is unenforced in this tree. It
 arrives with the shared common jig or before.
 
-**Unused dependencies have no task.** `cargo-udeps` would be it, and FACT
-2026-08-27: it is not installed. `requires` refuses a run naming a tool that is
+**Unused dependencies have no task.** `cargo-udeps` would be it, and it was
+not installed as of 2026-08-27. `requires` refuses a run naming a tool that is
 not there, so naming it would break the gate rather than extend it.
 
 **Docstring coverage is a lint, not a number.** `missing_docs` in `Cargo.toml`
@@ -328,11 +328,12 @@ rests on, and it does not change with the language.
     had mapped declaration order onto FR-4.5. The test now asserts what FR-4.5
     says, which is that no two executions overlap. If the answer is yes, this
     wants its own row and `runner/20` should cite it rather than FR-4.5.
-39. Is a dotfile a project file? **No row says.** FACT 2026-08-27: at `ignore`'s
-    defaults a tree holding `.editorconfig` and `.github/workflows/ci.yml` walks
-    as `["plain.txt"]`, because `hidden` defaults to true. So a jig linting CI
-    workflow files reports a clean run over zero files, and FR-8.3a does not
-    catch it, because the other tasks produced constituents.
+39. Is a dotfile a project file? **No row says.** Measured 2026-08-27: at
+    `ignore`'s defaults a tree holding `.editorconfig` and
+    `.github/workflows/ci.yml` walks as `["plain.txt"]`, because `hidden`
+    defaults to true. So a jig linting CI workflow files reports a clean run
+    over zero files, and FR-8.3a does not catch it, because the other tasks
+    produced constituents.
 
     Both answers are defensible and neither is written. `hidden(false)` walks
     `.git/` too unless something else excludes it, and FR-2.2b says bolt reads
@@ -344,7 +345,7 @@ rests on, and it does not change with the language.
     `plain.txt`, `.editorconfig` and `.github/workflows/ci.yml`, walk it with
     `ignore::WalkBuilder` at defaults, then again with `hidden(false)`.
 40. Does FR-2.2e mean bolt does not *traverse* a symlink, or that it does not
-    *return* one? FACT 2026-08-27: with `follow_links` false, a base holding a
+    *return* one? Measured 2026-08-27: with `follow_links` false, a base holding a
     file symlink pointing outside walks as
     `["dirlink", "filelink.txt", "inside.txt"]`. Nothing is traversed, so the
     row is satisfied, and a task handed `filelink.txt` reads through it to
@@ -390,7 +391,7 @@ rests on, and it does not change with the language.
 
     The defect itself is `bolt.go`'s, at `internal/cli/cli.go` in `report`.
 43. What happens when bolt's embedded schema is older than wrench's? **Nothing
-    tells anyone.** FACT 2026-08-27: wrench embeds its schemas at build time,
+    tells anyone.** Measured 2026-08-27: wrench embeds its schemas at build time,
     `//go:embed schemas/*.schema.json` in the Go pack and a `build.rs`
     generating `include_str!` in the Rust one, so bolt carries a copy fixed at
     the moment it was compiled. The Rust rebuild inherits this.
@@ -419,7 +420,7 @@ rests on, and it does not change with the language.
     or the link moves while somebody keeps an old binary, there are N embedded
     schemas and nothing says which answered a given run.
 
-    **Two staleness regimes, not one.** FACT 2026-08-27, measured in wrench's
+    **Two staleness regimes, not one.** Measured 2026-08-27, in wrench's
     source and confirmed by the wrench session against a live schema edit:
 
         Go      `//go:embed schemas/*.schema.json`              build time
@@ -500,9 +501,9 @@ than with the first adopter.
 FR-2.6e. `.bolt-<iso8601>-<pid>`, taken over sub-second precision in the stamp
 because a pid is short, is readable, and says which run left a directory behind.
 
-The collision it closes was measured twice. FACT 2026-08-28 against the Go
+The collision it closes was measured twice. First 2026-08-28 against the Go
 build: two runs starting inside one second resolve to one `.bolt-<iso8601>` and
-the second's refusal replaced the first's verdict. FACT 2026-08-29 against this
+the second's refusal replaced the first's verdict. Then 2026-08-29 against this
 build, filed as `clank/inbox/bolt/output-dir-stamp-collides-within-one-second/`:
 two jigs run back to back, and whether the second was refused depended on where
 the second boundary fell.
@@ -532,7 +533,7 @@ Decided by our user. The field says an empty selection is an acceptable result
 for this task, and `optional` says that where `allow-empty` describes the
 mechanism instead.
 
-**Do it now, because it is free now.** FACT 2026-08-28: no jig in the estate
+**Do it now, because it is free now.** Measured 2026-08-28: no jig in the estate
 carries `allow-empty`. Nothing to migrate, and that stops being true the first
 time somebody writes one.
 
@@ -583,7 +584,7 @@ argument against it is easy to lose.
 
 The Go build ends a run with a line pairing the overall verdict with the total
 execution count, so three tasks with one failing print `failed: 3 execution(s)`.
-FACT 2026-08-28, reproduced here. A reader takes it as a failure count. The
+Reproduced here 2026-08-28. A reader takes it as a failure count. The
 passing case reads correctly by accident, because with nothing failing the two
 numbers coincide, which is how it survived.
 
@@ -633,7 +634,7 @@ which is the first of the four unfixed findings in `review-stage-5.md`. The
 obvious fix, writing the refusal into the run directory bolt had resolved, is
 the one that breaks.
 
-FACT 2026-08-28, reproduced first attempt against `~/bin/bolt`, the Go build:
+Reproduced first attempt 2026-08-28, against `~/bin/bolt`, the Go build:
 two runs starting inside one second resolve to the same `.bolt-<iso8601>`. The
 second refuses, correctly, with `already holds a run`. It then writes that
 refusal into the colliding directory's `result.yaml`, replacing a completed
@@ -694,8 +695,8 @@ was derived by reading the Go build's `internal/adapter/adapter.go` and
 What an adapter author needs and had to reverse-engineer: no stdin, locations
 arrive as flags, `--evidence` once per declared file, the adapter writes
 `{work_dir}/output.yaml` itself, that file conforms to wrench's envelope schema,
-and cwd is the base directory. CLAIM, since it is the Go build's contract read
-by someone else and not measured here; the Rust build has only the built-in
+and cwd is the base directory. That is the Go build's contract as read
+by someone else, not measured here; the Rust build has only the built-in
 exit-code adapter so far, and `runner/30` is where a second one arrives.
 
 The cost is drift rather than inconvenience: three of toolbox's four adapters
@@ -765,7 +766,7 @@ paragraph**, which is what I was heading for.
 
 ### Entry points need the two-profile pattern here too, and bolt is one
 
-FACT 2026-08-28: `src/main.rs` is 11 lines and delegates to `bolt::cli::main`,
+Measured 2026-08-28: `src/main.rs` is 11 lines and delegates to `bolt::cli::main`,
 and **four tests already invoke the built binary** through a `bolt()` helper
 using `Command::new(env!("CARGO_BIN_EXE_bolt"))`, at `tests/skeleton.rs:55`.
 
@@ -776,10 +777,11 @@ shape is the Go one: instrument, run the binary, write a second profile, merge b
 taking the covered maximum. Nothing here needs cross-task evidence either.
 
 The resume session reported that this recurs across the estate, five Go repos,
-one Rust, six Python with a milder form. CLAIM, their measurement not mine, and
-**two of its figures are wrong where they touch this tree**: they recorded bolt's
-binary as never invoked, having grepped for `assert_cmd`, `Command::cargo_bin`
-and `escargot` and missed Cargo's built-in `CARGO_BIN_EXE_*`; and bolt's one
+one Rust, six Python with a milder form. That is their measurement and not
+mine, and **two of its figures are wrong where they touch this tree**: they
+recorded bolt's binary as never invoked, having grepped for `assert_cmd`,
+`Command::cargo_bin` and `escargot` and missed Cargo's built-in
+`CARGO_BIN_EXE_*`; and bolt's one
 Python entry point is `bin/test-traceability.py`, a **symlink into toolbox**,
 already counted under toolbox. The estate total is inflated by at least that one.
 
@@ -1006,7 +1008,7 @@ FR-10.3, the adapter reads it, and the merge folds an ordinary constituent.
 
 **What the shell's `&&` cannot do, and this can.** FR-10.1 has bolt exit 0
 whenever it carried the run out, so `bolt a && bolt b` is green with every tool
-failing. FACT 2026-08-28: a run whose only task exited 1 exited 0 and wrote
+failing. Measured 2026-08-28: a run whose only task exited 1 exited 0 and wrote
 `success: false`. A Justfile chaining invocations therefore answers nothing
 about quality, and the adapter is what makes a verdict travel between runs.
 `bolt_composes_as_a_command_and_the_childs_verdict_folds_in` asserts exactly
@@ -1252,10 +1254,10 @@ refused by the newer build, with no output naming which ran. That is the
 false-green class the estate exists to refuse, arriving through tooling rather
 than through a check.
 
-FACT 2026-08-27, after the swap: `bolt badversion .` exits 1 and refuses, and
+Measured 2026-08-27, after the swap: `bolt badversion .` exits 1 and refuses, and
 `bolt rust-quality .` still runs eight tasks with six passing.
 
-FACT 2026-08-27: `bolt.go` at `7604557` is clean and rebuilds it without the
+Measured 2026-08-27: `bolt.go` at `7604557` is clean and rebuilds it without the
 suffix, at `v0.0.0-20260827201109-7604557974a5`, with a **byte-identical help
 surface** including `--definitions`, and it runs the gate.
 
@@ -1283,7 +1285,7 @@ session 2026-08-28 and recorded here because sequencing it is bolt's.
 `python/` as two jig tasks. The Rust bolt does not implement nested jigs, so
 the day the symlink moves, wrench's gate stops working.
 
-FACT 2026-08-28, measured against wrench's real jig:
+Measured 2026-08-28, against wrench's real jig:
 
     bolt wrench-quality ~/.projects/wrench
     bolt: task python-common names a jig; nested jigs are specified and
@@ -1362,8 +1364,8 @@ defect cannot occur here.
   run's verdict, so the number never counts what its label says.
 
   Rejected rather than acted on: `cli.rs` prints the result path and nothing
-  else, by FR-10.3, so there is no count here to be wrong. FACT 2026-08-28,
-  measured on this tree: a run with one of eight tasks failing wrote
+  else, by FR-10.3, so there is no count here to be wrong. Measured 2026-08-28
+  on this tree: a run with one of eight tasks failing wrote
   `success: false` and printed one line, the path. The reasoning that keeps it
   that way is above, under *FR-10.3 is why bolt prints no summary line*, and the
   A/B is the sharper evidence for it than anything reached here.
