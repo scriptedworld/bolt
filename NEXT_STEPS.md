@@ -790,7 +790,7 @@ limit is spelled, which is a decimal and `s`, `m` or `h`, is FR-4.11e.
 
 ## Reasons
 
-41. **Should `evidence-missing` carry the exit status it supersedes?**
+44. **Should `evidence-missing` carry the exit status it supersedes?**
     Found by the skid session across a Go and Rust baseline, generalised by
     dispatch from the source, confirmed here.
 
@@ -822,7 +822,105 @@ limit is spelled, which is a decimal and `s`, `m` or `h`, is FR-4.11e.
 
 ## The output directory
 
-40. **Does the default run directory carry a process id?**
+48. **How does an invocation pointed at a subdirectory learn the root above it?**
+    This replaces "does a child inherit the project root", whose premise our user
+    dismantled on 2026-08-29: **there are no children.** Composition is a command
+    line, so every invocation is outermost and nothing inherits anything.
+
+    Dropping the premise does not drop the need. Question 45 has the case and the
+    measurement; this is the mechanism.
+
+    **Not by deriving it.** Walking up for `.git` is refused by FR-2.2b, which
+    says bolt does not invoke git, read under `.git/` or require a repository. It
+    would also be wrong for a plain tree and for a submodule.
+
+    **Not by the environment.** Propagating it as `BOLT_DEPTH` is propagated
+    would make one command line mean different things in different shells.
+    `BOLT_DEPTH` survives that objection because it is a runaway guard rather
+    than a semantic input; a root is a semantic input.
+
+    **By the command line, which is where everything else already is.**
+    `--project-root <path>`, defaulting to the base when absent:
+
+        command: bolt common-quality python --project-root {base_dir}
+
+    The caller knows its own base and says so **visibly, in the jig**, which is
+    the property FR-5.18 traded the jig-task fields to get. Nothing is inherited.
+    Every existing invocation is unchanged, because absent means the base.
+
+    **What it costs, stated rather than glossed:** it hands an invocation a path
+    outside its own base. That is not a new kind of reach — `--config-dir` does
+    it routinely and FR-2.3a lists both as legitimate — but it is a reach, and
+    FR-5.21's "a parent grants nothing" becomes "a parent grants nothing it does
+    not write down".
+
+    **It does not revive FR-5.14.** That row moved where commands *stand*, which
+    is CWD, which is the base. This moves what a variable *substitutes to*.
+    Different mechanism, and the retirement holds.
+
+45. **`{project_root}` must NOT retire, and the reason corrects a draft of this
+    row that said the opposite.**
+
+    Today's code makes it an alias:
+
+        run.rs:630   project_root: base.to_path_buf(),
+        run.rs:631   base_dir:     base.to_path_buf(),
+
+    I read that as redundancy and measured zero uses across all seven jigs, and
+    both were true and both were the wrong inference. **The zero is caused by
+    the conflation.** Nothing uses `{project_root}` because it currently equals
+    the base, so it buys nothing over a relative path; and the case that needs
+    it only became expressible when composition landed the same morning. A
+    variable measured as unused exactly where it would be useful.
+
+    Our user's correction, and all three clauses hold:
+
+    **`{base_dir}` is the redundant one.** FR-4.1a stands the command at the
+    base, so `base_dir` *is* the working directory and `.` already reaches it.
+
+    **`{project_root}` names something otherwise unreachable.** From inside
+    `python/` there is no portable way to say "the repository above me" short of
+    counting `../` and hardcoding the depth.
+
+    **They diverge under composition.** `bolt common-quality python` has base
+    `python/` while the repository root is its parent. Bolt is currently *wrong*
+    about the root there rather than merely redundant, and FR-2.3a already
+    contemplates this: it lists `{project_root}` as reaching above the base by
+    FR-4.1, beside `config-dir` and the output directory.
+
+    **The live case, in the estate's only composed jig**, measured
+    2026-08-29 in `wrench/bolt.wrench.definitions.yaml`:
+
+        requirements: ../docs/REQUIREMENTS
+        suppressions: ../SUPPRESSIONS
+
+    with a comment saying one set serves every pack rather than one copy per
+    base that could drift. **The `../` encodes depth one**, so that holds only
+    while every pack sits exactly one level down, and a pack at `python/sub/`
+    breaks it into a path that does not exist. `{project_root}/docs/REQUIREMENTS`
+    is depth-independent.
+
+    So the question is not whether to retire it. The mechanism is question 48.
+
+46. **Does a task need to stand somewhere other than the base?** Raised by our
+    user, 2026-08-29: *everything would use CWD unless we add to the jig schema
+    to let us specify a different path.*
+
+    **Composition may already cover it.** A task that needs to stand in `sub/`
+    writes `bolt <jig> sub/`, which is FR-5.18 and needs no field: the invocation
+    is told where to stand and that is the whole mechanism.
+
+    **What it does not cover** is a task wanting a *tool* run from a
+    subdirectory without a jig of its own to run there. Today that is
+    `sh -c 'cd sub && …'` in the command, which works and hides the directory
+    from anything reading the jig.
+
+    A field would be wrench's schema rather than bolt's, and it is the field
+    `in:` was on the retired jig task. **Worth not reaching for it until a jig
+    actually wants it**, since section 5 has just retired twenty-six rows of
+    machinery that existed for cases nobody had.
+
+47. **Does the default run directory carry a process id?**
     `.bolt-<iso8601>-<pid>` rather than `.bolt-<iso8601>`. Raised by our user
     2026-08-29 and **marked `maybe` by them, so it is not taken**; recorded with
     the case for it so taking it is a decision rather than a rediscovery.
@@ -890,22 +988,6 @@ below under *Why composition is a command line*.
     **This matters more than it did.** FR-5.21 makes the ceiling the only guard
     on composition, where FR-5.13 used to make containment schema-checkable.
 25. Can a jig be referenced by version, or is it always whatever is on disk?
-39. **Does a child inherit the project root?** Today `{project_root}` is set
-    from the run's base, so a composed `bolt inner sub/` has both pointing at
-    `sub/` and `{project_root}` can never differ from `{base_dir}`.
-
-    Propagating it, as `BOLT_DEPTH` is propagated, would keep `{project_root}`
-    meaning what it says and let one definitions file serve subprojects at
-    different depths: `{project_root}/docs/REQUIREMENTS` rather than
-    `../docs/REQUIREMENTS`, which encodes the subproject's depth in a file meant
-    to be shared. It would also keep FR-5.14's `needs-repository-root` alive.
-
-    Against it: every invocation being told where to stand and nothing else is
-    the simpler rule, and FR-4.17b already blesses a relative reach upward.
-
-    **`clank/tasks/bolt/runner/50d` waits on this.** Its five rows are vacuous
-    under the first answer and buildable under the second.
-
 ## Why composition is a command line
 
 Not a question. Settled 2026-08-28 and recorded because the argument for nesting

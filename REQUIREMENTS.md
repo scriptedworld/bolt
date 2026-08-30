@@ -222,11 +222,6 @@ not help with.
 | FR-5.7a | That is a guard against accident and runaway, not against a jig trying to defeat it. FR-5.18 makes every composition a task command invoking bolt, and such a command can unset the variable and be believed outermost. Closing that needs the ancestry cross-check, which is a question rather than a row. **It is now the only guard on composition**, by FR-5.21, so what it does not cover is worth knowing rather than reassuring. | [A/D] |
 | FR-5.8 | A run refused for depth writes its own `result.yaml` with `success: false` and a reason naming the limit, then exits non-zero. Its parent's adapter reads that result like any other, and the merge folds an ordinary failure. | [A] |
 | FR-5.9 | Paths are absolute at every depth, so a child's evidence folds into its parent with nothing rewritten. A path means the same thing to a child and to its parent. | [A/D] |
-| FR-5.14 | A jig that genuinely needs the repository root says so, and its commands stand there. It is the exception FR-4.1a names, and it reaches where a command stands and nothing else. | [A] |
-| FR-5.14a | The field is `needs-repository-root`, a boolean on the jig rather than on the jig task, because it is a property of the tool the jig runs and not of any one caller's decision to place it. FR-5.14 gave a jig a way to say so and did not name it, which writing the test is what needed. It is hyphenated, sitting with `config-dir` and `output-dir` as a field rather than with the underscored template variables. | [D] |
-| FR-5.14b | The base is not overridden. The walk, the containment FR-2.3 forms, the patterns FR-3.5 resolves and `{base_dir}` all stay what the caller granted, and `{project_root}` was already the root. A jig standing at the root reads only what its base holds. | [A/D] |
-| FR-5.14c | Overriding the base instead would let a child widen past the grant its caller wrote, with nothing in the parent's jig recording it. Measured 2026-08-26 while building FR-5.14 the other way: a parent naming `in: go` ran a child that read `secrets/keys.txt`. FR-5.13 makes narrowing the base and narrowing the containment check one act, so a mechanism that undoes one undoes both. | [D] |
-| FR-5.14d | So a command under it loses the property FR-4.1a rests on: `./...` and a bare relative path mean the root rather than the base. That is what the jig asked for, and it is why the claim is a whole-jig declaration rather than a per-task convenience. A jig wanting one path at the root writes `{project_root}` and keeps standing at its base. | [D] |
 
 ## 6. Adapters
 
@@ -466,3 +461,8 @@ oversight.
 | FR-5.17 | 2026-08-28 | FR-5.18. Six subprojects are six command lines each naming `--definitions`, which is more typing and says which file it means rather than deciding it by omission. |
 | FR-2.9a | 2026-08-28 | FR-2.9, which keeps the rule. There are no jig-task fields for the exception to apply to. |
 | FR-4.4g | 2026-08-28 | FR-4.4c. A composing task has a selection like any command task, so `optional` means what it means everywhere and is not an error. |
+| FR-5.14 | 2026-08-29 | Nothing. **There are no children**, settled by our user: composition is a command line, so every invocation is outermost and `{project_root}` is the directory it was given. A jig wanting to stand its commands at the repository root has no root to reach that is not already where it stands. |
+| FR-5.14a | 2026-08-29 | Nothing. `needs-repository-root` has nothing left to declare, by the row above. |
+| FR-5.14b | 2026-08-29 | Nothing. It said the base is not overridden by that declaration, and there is no declaration. FR-2.3's containment is unchanged and was never reached through this row. |
+| FR-5.14c | 2026-08-29 | FR-5.21, which carries the measurement. The containment escape it recorded cannot be expressed once a parent grants nothing, which is why FR-5.13 retired for the same reason. |
+| FR-5.14d | 2026-08-29 | Nothing. A command stands at the base by FR-4.1a, and there is no exception left for this row to describe. |
