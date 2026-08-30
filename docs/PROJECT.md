@@ -307,21 +307,25 @@ define.
 A gate checks that a cited row *exists*, not that the test *touches* it, so a
 wrong citation is indistinguishable from a right one forever. Two instruments
 find them. Citations added minus coverage gained should be zero, which has
-caught two; and the mutation probe below, which has caught five.
+caught two; and the mutation probe below, which has caught four.
 
 Mutation-test anything whose test was written after the code, since such a test
 tends to assert the outcome the code already produces. `.ephemera/mutate.py`
 breaks the code a row governs and runs the tests citing it, resolving them from
 the `COVERS:` marks so a probe cannot run the wrong test.
-`.ephemera/mutate-time-limits.py` is the same method aimed at one area. The
-fifth test it found that could not fail was FR-8.3's, asserted on the value the
-merge returned in memory where the row is about the document it wrote.
+`.ephemera/mutate-time-limits.py` is the same method aimed at one area.
 
 Read a survival as a question until the probe itself is checked. A mutation
-that misses the branch the row lives on looks exactly like a weak test, and two
-of eight did: FR-9.2a's hit a struct field where the directory name is built
-from a separate expression, and FR-5.7's raised a default the test overrides
-with its own environment variable.
+that misses the branch the row lives on looks exactly like a weak test, and
+three of eight did. FR-9.2a's hit a struct field where the directory name is
+built from a separate expression. FR-5.7's raised a default the test overrides
+with its own environment variable. FR-8.3's rewrote the verdict on its way into
+`result.yaml` and left the fold that computed it alone, so it produced a valid
+envelope honestly reporting a pass; `success` is the authoritative verdict and
+anything beside it is ignored, so there was no contradiction to catch.
+
+That third one is the instructive one, because a survival was written up and
+sent to two readers before it was checked.
 
 `.ephemera/` is gitignored, so both scripts are local to a worktree that has
 built them and a fresh clone does not carry one.
