@@ -20,9 +20,12 @@ targets = [
 ]
 
 [licenses]
-# NFR-12.3 says bolt is MIT. The rest are what a permissively licensed Rust
-# dependency tree carries in practice, and every one of them permits
-# redistribution in a binary without imposing terms on what links it.
+# NFR-12.3 says bolt is Apache-2.0. It is in the list below because cargo-deny
+# checks the whole graph including the root crate.
+#
+# The rest are what a permissively licensed Rust dependency tree carries in
+# practice, and every one of them permits redistribution in a binary without
+# imposing terms on what links it.
 allow = [
     "MIT",
     # MIT without the attribution clause, so strictly more permissive than the

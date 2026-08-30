@@ -95,35 +95,31 @@ concluded, and bolt adds that reason itself.
 merge takes that from the work directory, which keeps this contract as narrow as
 it is.
 
-## An adapter reading a composed child's result takes the LAST line
+## An adapter reading a composed child's result takes the last line
 
 FR-10.3a says bolt prints where the result is on stdout and prints nothing else
-there. **That is true of this bolt and is not what an adapter meets today**,
-because `~/bin/bolt` is still the Go build until the cutover. Measured
-2026-08-29, same jig, both builds:
+there. That describes this bolt. `bolt.go` is still installed and reachable by
+name, and it prints a transcript first:
 
-    Go                                    Rust
+    bolt.go                               bolt
     1  always-passes-0                    1  /…/result.yaml
     2
     3  passed: 1 execution(s)
     4  /…/result.yaml
 
-Reading the first line gets a **task name**. So an adapter spanning the cutover
-takes the last non-empty line, which is correct against both and stays correct
-after. toolbox's `bolt-result` does this, found by running it.
+Reading the first line gets a task name. An adapter that takes the last
+non-empty line is correct against both. toolbox's `bolt-result` does this.
 
-**The contract is not being weakened to match.** "Prints nothing else there" is
-the property worth having, and relaxing it to "the last line" would license bolt
-to print other things on stdout, which is precisely the summary line FR-10.3's
-note exists to keep out. The strict rule is what bolt promises; last-line is how
-a consumer stays robust while a second implementation is live. Those are
-different documents on purpose.
+The contract is not weakened to match. "Prints nothing else there" is the
+property worth having, and relaxing it to "the last line" would license bolt to
+print other things on stdout, which is the summary line FR-10.3's note exists to
+keep out. The strict rule is what bolt promises; last-line is how a consumer
+stays robust while a second implementation is reachable.
 
-**Flag order differs too, and in the safe direction.** The Go build refuses
-flags written after the positionals; this one accepts them anywhere. So a caller
-written against the Go build keeps working after the cutover, and one written
-against this build may not work before it. Anything authored now should put
-flags first.
+Flag order differs in the safe direction. `bolt.go` refuses flags written after
+the positionals and this build accepts them anywhere, so anything authored
+against `bolt.go` keeps working here. Put flags first if it has to run against
+both.
 
 ## Writing one
 

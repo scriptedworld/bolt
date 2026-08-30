@@ -849,10 +849,10 @@ limit is spelled, which is a decimal and `s`, `m` or `h`, is FR-4.11e.
     Every existing invocation is unchanged, because absent means the base.
 
     **What it costs, stated rather than glossed:** it hands an invocation a path
-    outside its own base. That is not a new kind of reach — `--config-dir` does
-    it routinely and FR-2.3a lists both as legitimate — but it is a reach, and
-    FR-5.21's "a parent grants nothing" becomes "a parent grants nothing it does
-    not write down".
+    outside its own base. `--config-dir` already does that routinely and FR-2.3a
+    lists both as legitimate, so it is not a new kind of reach, but it is a
+    reach. FR-5.21's "a parent grants nothing" becomes "a parent grants nothing
+    it does not write down".
 
     **It does not revive FR-5.14.** That row moved where commands *stand*, which
     is CWD, which is the base. This moves what a variable *substitutes to*.

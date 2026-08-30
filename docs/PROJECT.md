@@ -5,7 +5,7 @@
 Bolt executes a declared set of command lines over a directory and records what
 happened, as evidence on disk and as one envelope.
 
-**It knows nothing about any tool it runs.** That is the whole design and every
+It knows nothing about any tool it runs. That is the whole design and every
 other decision here is downstream of it. A jig names commands and which files
 they act on; bolt runs them, keeps every stream and exit status, hands each
 execution's output to an adapter that turns it into a verdict, and folds those
@@ -25,20 +25,20 @@ that does not have to change.
 ### Anvil is where bolt runs, and `requires` is its manifest
 
 Anvil is Docker-based, and the images carry the toolchain, bolt itself, the
-common quality tooling and its configuration. **They are execution environments
-rather than places a person works**: the point is that the tooling a jig needs is
+common quality tooling and its configuration. They are execution environments
+rather than places a person works: the point is that the tooling a jig needs is
 present and the same everywhere.
 
-**The coupling to bolt is `requires:`, and it is tighter than it looks.** From
+The coupling to bolt is `requires:`, and it is tighter than it looks. From
 `silo/docs/ARCHITECTURE.md` §25:
 
 > The package list is not maintained beside the jig; it derives from it. An
 > image installs exactly what the `requires:` fields in toolbox's jigs declare,
 > so the image manifest is the jig, not a second list to drift from it.
 
-So FR-3.10's rule that a jig declares **every** executable it invokes is not
-only an up-front check for a missing tool. **It is what an image is built
-from.** An under-declared jig runs locally, where the tool happens to be on
+So FR-3.10's rule that a jig declares every executable it invokes is not
+only an up-front check for a missing tool. It is what an image is built
+from. An under-declared jig runs locally, where the tool happens to be on
 `PATH`, and produces an image without it.
 
 That raises the stakes on FR-3.10b and FR-3.10d, and it is why FR-3.10's
@@ -48,7 +48,7 @@ The same tooling arrives two ways on purpose: locally `link-jigs` symlinks it
 out of toolbox, and in an image it is already present from the anvil layer
 beneath.
 
-**The fold is bolt's, by name, in the architecture.** `silo/docs/ARCHITECTURE.md`
+The fold is bolt's, by name, in the architecture. `silo/docs/ARCHITECTURE.md`
 line 79 has `BOLT fold -> result envelope`, and §22 states it as a property of a
 run rather than of nesting: one `result.yaml` at the top of the output
 directory, "singular, because a run has exactly one result, folded from the
@@ -56,15 +56,15 @@ results of its tasks".
 
 That is why a loop of separate invocations is not the whole answer to running
 one jig over several subprojects: N runs produce N results and nothing that says
-whether the repository passed. It does **not** follow that bolt has to nest.
+whether the repository passed. It does not follow that bolt has to nest.
 FR-5.19 keeps the fold here and puts the composition on a command line, because
 bolt prints where its result is and an adapter can read it, so a child run
 reaches its parent as an ordinary constituent.
 
 Bolt reads and writes nothing structured itself. Every jig, manifest, envelope
 and definitions file goes through wrench, which validates it against the shipped
-schema on the way in and on the way out. **A jig bolt cannot read is refused by
-wrench's schema before bolt sees it**, which is why several of bolt's rules are
+schema on the way in and on the way out. A jig bolt cannot read is refused by
+wrench's schema before bolt sees it, which is why several of bolt's rules are
 discharged by a test asserting the refusal arrives rather than by code here.
 
 ## The rebuild, and the rule that protects it
@@ -76,15 +76,15 @@ test.**
 Everything here reaches from `silo/docs/ARCHITECTURE.md` and from answers given
 against `NEXT_STEPS.md`, with nothing from the retired implementation in it. The
 provenance of that earlier material is unresolved, and this repository exists to
-establish that the requirements derive from the architecture alone. **Reading it
-voids that and cannot be undone.** The rule is unchanged by the language and it
+establish that the requirements derive from the architecture alone. Reading it
+voids that and cannot be undone. The rule is unchanged by the language and it
 does not expire.
 
-`~/.projects/bolt.go` is a different thing and is not sealed: it is the Go build,
-which ran every gate in the estate until 2026-08-29 and now runs none. It stays
-reachable as `bolt.go` on `PATH` so a comparison is one command. Reading it is
-fine and its task discharges are worth reading before rebuilding a piece. What is
-sealed is the *archived* tree, which is where the provenance question lives.
+`~/.projects/bolt.go` is a different thing and is not sealed. It is the Go build,
+which gates nothing and stays reachable as `bolt.go` on `PATH` so a comparison is
+one command. Reading it is fine, and its task discharges are useful before
+rebuilding a piece. What is sealed is the *archived* tree, which is where the
+provenance question lives.
 
 ## Layout
 
@@ -114,19 +114,19 @@ project's whole observable surface in the order the requirements state it.
 
     cargo build --release && cp target/release/bolt bin/bolt && bolt rust-quality .
 
-**Install before gating, and that is not optional now that bolt is self-hosted.**
+Install before gating, and that is not optional now that bolt is self-hosted.
 Since the cutover `bolt` is this tree's installed binary, so `bolt rust-quality .`
-runs **the last binary installed** over the **current** source.
+runs the last binary installed over the current source.
 
 The tasks it runs are `cargo build`, `cargo clippy`, `cargo llvm-cov` and the
 rest, which all read the working tree, so the verdict is about the source and is
-honest. **What it cannot catch is a regression in the runner itself**: break
+honest. What it cannot catch is a regression in the runner itself: break
 execution, adapters or the fold, do not reinstall, and the gate runs on the old
 binary and passes. The three-command line above closes it by making the binary
 under test the binary doing the testing.
 
 `./target/debug/bolt` is still right while iterating, and `cargo test` is the
-faster loop. The distinction to hold is that **only the installed binary gates**.
+faster loop. **Only the installed binary gates.**
 
 Check it rather than remembering it, and note this is a byte comparison because
 `mtime` says which file is newer and not whether they are the same program:
@@ -143,34 +143,33 @@ licences, complexity, traceability.
 
 **Seven pass. `traceability` fails, deliberately, and should not be made green.**
 It requires every test to cite a requirement and every cited requirement to
-exist. It reports 141 of 245 covered as of 2026-08-29. The uncovered rows are
-specified and unbuilt, and marking them `[?]` to turn the gate green would
-misreport what is settled. **The number going up is the progress signal**; it was
-79 six tasks ago.
+exist, and reports 142 of 240 covered. The uncovered rows are specified and
+unbuilt; marking them `[?]` to turn the gate green would misreport what is
+settled. The number going up is the progress signal.
 
 Re-measure rather than believing that figure:
 
     bolt rust-quality . --output-dir .ephemera/qa
     tail -1 .ephemera/qa/work/traceability-1/stdout
 
+`bin/test-traceability.py` is a symlink into toolbox, so that task's verdict
+moves when toolbox moves.
+
 ### Adopter status
 
-**Bolt gates itself through `~/bin/bolt`, and so does the estate**, since
-2026-08-29. That is NFR-12.1 discharged at full strength rather than through a
-path in `target/`: `bolt rust-quality .` runs the installed binary, so the tool
-under test and the tool doing the testing are the same file every other project
-uses.
+`~/bin/bolt` is this tree's installed binary, so bolt gates itself and the estate
+through the same file. `~/bin/bolt.go` reaches the Go build, which gates nothing
+and stays for comparison.
 
-The trap that comes with it is in `docs/LESSONS/a-check-that-answers-a-weaker-question.md`
-under trap 1: this suite is now reachable from a gate that exports `BOLT_DEPTH`
-into it, so a test creating a nested run is a level deeper here than under
-`cargo test`.
+Reverting the estate to it is one command:
+
+    ln -sfn ../../bolt.go/bin/bolt.go ~/.projects/dotfiles/bin/bolt
 
 ### The estate has seven jigs, not thirty-five
 
-`find` over the estate returns 35 paths matching `bolt.*.yaml`. **Twenty-two are
-symlinks** placed by `link-jigs`, and six of the rest are `.definitions.yaml`
-files, which are not jigs. Distinct jigs:
+`find` over the estate returns 35 paths matching `bolt.*.yaml`. Twenty-two are
+symlinks placed by `link-jigs`, and six of the rest are `.definitions.yaml`,
+which are not jigs.
 
     10x  toolbox/bolt.common-quality.yaml        shared, symlinked
      9x  toolbox/bolt.secrets.yaml               shared, symlinked
@@ -180,86 +179,38 @@ files, which are not jigs. Distinct jigs:
      1x  bolt.go/bolt.go-quality.yaml
      1x  bolt/bolt.rust-quality.yaml
 
-**Resolve before counting.** `find … -exec readlink -f {} \; | sort -u`. Counting
-paths answers how many places a jig is reachable from, which is a different
-question and four times the number.
+**Resolve before counting**: `find … -exec readlink -f {} \; | sort -u`. Counting
+paths answers how many places a jig is reachable from, which is four times the
+number and a different question.
 
-### Compatibility, measured over the seven
+Task keys in use across the seven: `command`, `description`, `evidence`,
+`matching`, `adapter`, `excluding`. Nothing uses `short-circuit-failure`,
+`time-limit`, `optional` or `adapter-command`, so this bolt is a superset of what
+is in service.
 
-Task keys in use: `command`, `description`, `evidence`, `matching`, `adapter`,
-`excluding`. **Nothing else.** No jig uses `short-circuit-failure`, `time-limit`,
-`optional` or `adapter-command`, so this bolt is a superset of what is in
-service. The Go build also refuses flags written after the positionals where this
-one accepts them anywhere, so the accepted-argument set only widens.
+### Where this build differs from `bolt.go`
 
-### Both code blockers are gone
+Work directories number from one. FR-9.2a specifies that, so the Go build was the
+divergence, but it breaks anything naming a directory and the failure presents as
+`No such file or directory` rather than as a rename.
 
-`toolbox/adapters/common/bolt-result.py` landed at toolbox `e89e7d0`, and wrench
-converted their two `jig:` tasks to composed command tasks at wrench `8a1b9dd`.
-**Verified end to end**: this bolt runs `wrench-quality` through to 19 work
-directories with no refusal, and the composed tasks carry an adapter verdict
-rather than bolt's exit status.
+    bolt.go   out/work/composed-0/stdout
+    bolt      out/work/composed-1/stdout
 
-**A composed task resolves `bolt` through `PATH`**, so until the symlink moves
-the parent can be this build and the child the Go one. That happened in the
-verification above, and it is why a composed child's refusal message may not be
-this tree's: `the directory X is not there` is ours, `X is not a directory to run
-over` is the Go build's.
+Flags may be written after the positionals here and not there, so the accepted
+argument set only widens.
 
-### The cutover is done, 2026-08-29
-
-    ~/bin/bolt     -> ../../bolt/bin/bolt        this tree, release build
-    ~/bin/bolt.go  -> ../../bolt.go/bin/bolt.go  still reachable by name
-
-**Every distinct jig in the estate was run through it first**, against an empty
-directory so that each one's validation and `requires` were exercised without
-running anybody's suite. All seven accepted and produced work directories:
-`common-quality` 3 tasks, `secrets` 2, `go-std-quality` 7, `python-std-quality`
-10, `wrench-quality` 19, `go-quality` 7, `rust-quality` 8. No refusals.
-
-**The binary is installed, not committed**, which is what bolt.go did before it:
-
-    cargo build --release && cp target/release/bolt bin/bolt
-
-**Nothing rebuilds it for you**, and a stale one reports green rather than
-failing, over every project rather than one session.
-`docs/LESSONS/the-installed-binary-gates-everything.md`.
-
-Reverting is one command, and worth knowing before it is needed:
-
-    ln -sfn ../../bolt.go/bin/bolt.go ~/.projects/dotfiles/bin/bolt
-
-### Work directories are numbered from one, and the Go build numbered from zero
-
-    Go     out/work/composed-0/stdout
-    Rust   out/work/composed-1/stdout
-
-FR-9.2a specifies from one, so this build is the conforming one and the Go build
-was the divergence. **It is still a breaking change for anything naming a work
-directory**, and the failure presents as `No such file or directory`, which reads
-as the run not happening rather than as a rename. Found by the toolbox session on
-their own probe, 2026-08-29.
-
-**Measured blast radius: one executable script in the estate**, not the several
-trees a first look suggests. `grep -rl 'work/[a-z-]*-0'` returns 96 files and 90
-of them are `manifest.yaml` and `result.yaml` inside past `.bolt-*` output
-directories, which are records of runs that did number from zero and are correct
-as history. Of the six live files, five are prose citing a path and one runs:
-`clank/inbox/bolt.go/a-refusal-overwrites-the-run-it-refused/repro.sh`, fixed to
-invoke `bolt.go` explicitly since it reproduces a defect only that build has.
-
-`silo/docs/ARCHITECTURE.md` shows the layout with `-0` and is silo's to correct.
-
-`bin/test-traceability.py` is a symlink into toolbox, so that task's verdict
-moves when toolbox moves.
+A composed task resolves `bolt` through `PATH`, so a refusal message says which
+build ran: `the directory X is not there` is this one, `X is not a directory to
+run over` is the Go build's.
 
 ## Telling a refusal from a verdict, by the reason's `kind`
 
-Three sessions asked this on 2026-08-29 and none could answer it without reading
-the source, so it belongs here. **The vocabularies are disjoint**, and which one
+Three sessions have asked this and none could answer it without reading
+the source, so it belongs here. The vocabularies are disjoint, and which one
 a `kind` comes from is the whole discrimination.
 
-**Bolt could not run.** Sixteen, a closed set, all in `src/error.rs`, and each is
+Bolt could not run. Sixteen, a closed set, all in `src/error.rs`, and each is
 `Error::kind()`:
 
     base-missing            duplicate-task-name    no-constituents
@@ -269,7 +220,7 @@ a `kind` comes from is the whole discrimination.
                             malformed-time-limit   task-without-command
                             unknown-placeholder    unsafe-task-name
 
-**Bolt ran and judged.** Four, and bolt writes these itself rather than taking
+Bolt ran and judged. Four, and bolt writes these itself rather than taking
 them from a tool:
 
     empty-selection     FR-4.4b, the task matched nothing and was not optional
@@ -277,11 +228,11 @@ them from a tool:
     nonzero-exit        FR-6.9, the generic exit-code adapter's verdict
     constituent-failed  the fold, in `src/merge.rs`
 
-**An adapter said so.** Open set, and not bolt's to enumerate: an adapter writes
+An adapter said so. Open set, and not bolt's to enumerate: an adapter writes
 whatever `kind` its format warrants, `findings` and `child-failed` among them.
 FR-6.1 makes the adapter's result the verdict and bolt does not second-guess it.
 
-**So "is the kind in `error.rs`" answers it**, and the practical form for a
+So "is the kind in `error.rs`" answers it, and the practical form for a
 reader without the source is the sixteen above. Anything else is a run that
 happened.
 
@@ -293,10 +244,10 @@ dispatch from the source, confirmed here at `src/run.rs`:
     Go     nonzero-exit      tests exited 4
     Rust   evidence-missing  tests declared coverage.xml and did not write it
 
-The evidence check returns before the exit-code path, so **whenever both apply
-the status is lost.** That is systematic and not incidental.
+The evidence check returns before the exit-code path, so whenever both apply
+the status is lost. That is systematic and not incidental.
 
-**It is the more actionable reason and it drops the more diagnostic fact.** A
+It is the more actionable reason and it drops the more diagnostic fact. A
 `pytest` exit of 4 is a usage error and means something different from 1, and it
 is usually *why* the coverage file is absent: the tool never ran. Reporting only
 the symptom sends a reader to their coverage configuration when the command line
@@ -305,7 +256,7 @@ because it alters what every gate in the estate prints.
 
 ## Conventions particular to this repository
 
-**Substitution is a single left-to-right pass, and that is a security property.**
+Substitution is a single left-to-right pass, and that is a security property.
 Chained `str::replace` re-expands a template token appearing inside an
 already-substituted filename, which breaks the quoting and puts the rest of the
 name on the command line. Measured: a file named ``p{all_paths};id #`` executed
@@ -313,28 +264,28 @@ name on the command line. Measured: a file named ``p{all_paths};id #`` executed
 other half. The test is
 `a_filename_containing_a_template_token_is_not_re_expanded`.
 
-**A requirement id takes at most one letter of suffix.** `FR-10.8a` is an id and
+A requirement id takes at most one letter of suffix. `FR-10.8a` is an id and
 `FR-10.8ca` is not: the checker's grammar is `(?:FR|NFR)-\d+(?:\.\d+)?[a-z]?`, so
-a two-letter suffix **fails to match as a row at all** and, in a `COVERS:` mark,
-degrades to whatever prefix does match. Measured 2026-08-29: two such rows were
+a two-letter suffix fails to match as a row at all and, in a `COVERS:` mark,
+degrades to whatever prefix does match. Two such rows were
 silently absent from the denominator, and the citation resolved to `FR-10`,
 reported as an id `REQUIREMENTS.md` does not define. Only the second half is
 loud. Where a letter is taken, take the next number.
 
-**So count the rows against the denominator, because a row the checker cannot
-see is not reported as missing.** That is the general form and the suffix is one
+So count the rows against the denominator, because a row the checker cannot
+see is not reported as missing. That is the general form and the suffix is one
 instance of it: any row the grammar rejects is absent from a run that says
 nothing is wrong. Two numbers, and they must reconcile:
 
     awk '/^## Retired/{r=1} !r && /^\| *(FR|NFR)-[0-9.a-z]+ \|/{n++} END{print n}' REQUIREMENTS.md
     tail -1 .ephemera/qa/work/traceability-1/stdout
 
-**Live rows must equal the denominator plus the exempt count.** Measured
-2026-08-29: 247 live, `140 of 244 … 3 open and exempt`, and 244 + 3 = 247. When
+Live rows must equal the denominator plus the exempt count. Measured
+247 live, `140 of 244 … 3 open and exempt`, and 244 + 3 = 247. When
 it was wrong it was 245 against 240 + 3, and nothing in the gate's output said
 so.
 
-**Every test cites the requirement it discharges**, directly above it:
+Every test cites the requirement it discharges, directly above it:
 
     // COVERS: FR-4.11a, FR-4.11b | property
 
@@ -342,17 +293,17 @@ Kinds are `positive`, `negative`, `edge`, `property`, `regression`. A test citin
 nothing fails the gate, and so does one citing a row `REQUIREMENTS.md` does not
 define.
 
-**Citations added minus coverage gained should be zero.** A gate checks that a
+Citations added minus coverage gained should be zero. A gate checks that a
 cited row *exists*, not that the test *touches* it, so a wrong citation is
 indistinguishable from a right one forever. The subtraction is the only
 instrument that has caught one here, and it has caught two.
 
-**Mutation-test anything whose test was written after the code.** A test written
+Mutation-test anything whose test was written after the code. A test written
 afterwards tends to assert the outcome the code already produces.
 `.ephemera/mutate-time-limits.py` breaks the code twenty ways and checks the test
 that should catch each one does. It has found four tests that could not fail.
 
-**Expect the gate to catch the change you are making**, and fix the code rather
+Expect the gate to catch the change you are making, and fix the code rather
 than the threshold. `complexity` has failed on every task since
 `definitions/10`.
 
@@ -360,18 +311,18 @@ than the threshold. `complexity` has failed on every task since
 
 - One jig, one directory, per invocation. Several at once is a jig whose tasks
   invoke bolt.
-- **Composition is a command line and there is no second mechanism.** A task
+- Composition is a command line and there is no second mechanism. A task
   running another jig names `bolt` in its command, like any other tool, and an
   adapter reads the result path bolt printed. Nesting as a task kind, with its
-  own fields and inheritance, is retired: 26 rows, 2026-08-28. What it bought
+  own fields and inheritance, is retired, 26 rows. What it bought
   was a schema-checkable grant, which FR-5.21 records as given up, leaving
   FR-5.7's depth ceiling as the guard.
 - The exit status says whether bolt could carry out the run, never whether the
-  tools passed. The verdict is in the envelope. **`--result-to-exitcode` opts
-  out**, making the exit code `0 if success else 1`, because a Justfile recipe
+  tools passed. The verdict is in the envelope. `--result-to-exitcode` opts
+  out, making the exit code `0 if success else 1`, because a Justfile recipe
   chaining bolt calls cannot short-circuit otherwise. Off unless named, so
   nothing already written changes meaning.
-- **Two exit outcomes under that flag, not three, and no engine codes.** A
+- Two exit outcomes under that flag, not three, and no engine codes. A
   refusal is 1, like any other failure, and `success` is what wrench's envelope
   schema calls the authoritative verdict, so reading `kind` to promote a refusal
   to "no verdict" would overrule an authoritative field with its neighbour. The
@@ -379,10 +330,10 @@ than the threshold. `complexity` has failed on every task since
   nothing is satisfied, a required one that never ran has failed, and neither is
   an absent verdict. Built two other ways first, a no-verdict code and then a
   code per remedy, and corrected both times by our user.
-- **Discrimination between refusals lives in the envelope's `kind`, not in the
-  exit status.** Every refusal names its own, so a base that is not there is
+- Discrimination between refusals lives in the envelope's `kind`, not in the
+  exit status. Every refusal names its own, so a base that is not there is
   `base-missing` where a task carrying a retired field is `jig-task-retired`.
-  They all said `bolt-refused` until 2026-08-29, which is one name across
+  One kind, `bolt-refused`, covered all of them: one name across
   sixteen situations with sixteen different fixes. The exit status has the
   verdict to carry, and a consumer reads the envelope anyway.
 - A failing task does not stop the run; a jig asks for the opposite with
@@ -396,8 +347,8 @@ than the threshold. `complexity` has failed on every task since
 
 ## What is not done
 
-**`runner/60`, bolt running itself under the estate's own jig**, and the
-`~/bin/bolt` cutover behind it. Composition landed 2026-08-28 as a command line
+`runner/60`, bolt running itself under the estate's own jig, and the
+`~/bin/bolt` cutover behind it. Composition is a command line
 rather than as nesting, so what remains before the symlink moves is wrench's two
 `jig:` tasks becoming command tasks and toolbox shipping the adapter that reads a
 child's result.
@@ -411,21 +362,21 @@ Every default is a `[D]` row and reversible by editing the row it became.
 
 This `docs/` tree is new and thin. The estate's standard is one file per
 decision, pattern and lesson under `docs/DECISIONS/`, `docs/PATTERNS/` and
-`docs/LESSONS/`. Bolt has two patterns and one lesson, and **no `DECISIONS/`
-directory yet**: its decisions are still the `[D]` rows in `REQUIREMENTS.md` and
+`docs/LESSONS/`. Bolt has two patterns and one lesson, and no `DECISIONS/`
+directory yet: its decisions are still the `[D]` rows in `REQUIREMENTS.md` and
 the "Defaults taken" table in `NEXT_STEPS.md`, which is a defensible place for
 them and not the estate's shape. The rest of its durable reasoning is in the task
 records under `clank/tasks/bolt/`, where the test plans carry more about why the
 tests are what they are than this tree does.
 
-**`REQUIREMENTS.md` is a single file and the estate's standard is now a
-directory**, one file per requirement under `docs/REQUIREMENTS/<category>/`. Bolt
-has not migrated and **cannot yet**: it has 17 retired rows and where a retired
+`REQUIREMENTS.md` is a single file and the estate's standard is now a
+directory, one file per requirement under `docs/REQUIREMENTS/<category>/`. Bolt
+has not migrated and cannot yet: it has 17 retired rows and where a retired
 id lives under the directory layout is an open estate question. Recorded as
 `clank/tasks/bolt/commission/10-requirements-becomes-a-directory.blocked`, which
 carries the row-diff proof the move would need.
 
-**`Cargo.lock` is gitignored**, which is the convention for a library and the
+`Cargo.lock` is gitignored, which is the convention for a library and the
 opposite of the convention for a binary. Bolt ships a binary. Nobody has said
 whether that was deliberate, so it is recorded rather than changed.
 

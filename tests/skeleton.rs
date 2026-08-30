@@ -4462,3 +4462,76 @@ fn a_reused_output_directory_leaves_the_earlier_result_alone() {
         "the earlier run's result was overwritten by the refusal: {standing:?}",
     );
 }
+
+// ---- the project's own claims about itself ----------------------------------
+
+/// This repository's root, for the tests that assert something about bolt
+/// rather than about a run.
+///
+/// `CARGO_MANIFEST_DIR` rather than the working directory, because a test's cwd
+/// is not promised and FR-4.1a moves it for anything running under a gate.
+fn repository() -> &'static Path {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+}
+
+// COVERS: NFR-12.3 | property
+/// Every place that names bolt's licence names the same one.
+///
+/// **The assertion is agreement, not a value.** Four files state the licence and
+/// each can be edited alone, so checking each against a literal `Apache-2.0`
+/// would pass with three correct and one stale. What has to hold is that no
+/// place naming a licence names a different one, which is why the manifest is
+/// read first and everything else is compared against what it declares.
+#[test]
+fn every_statement_of_the_licence_agrees() {
+    let manifest = fs::read_to_string(repository().join("Cargo.toml")).expect("Cargo.toml");
+    let declared = manifest
+        .lines()
+        .find_map(|line| line.strip_prefix("license = "))
+        .map(|value| value.trim_matches('"').to_owned())
+        .expect("the manifest declares a licence");
+
+    // The manifest carries an SPDX identifier and the prose files spell it out,
+    // so the comparison is on both halves rather than on the identifier. A
+    // NOTICE reading "Apache License, Version 2.0" agrees with `Apache-2.0` and
+    // does not contain it.
+    let (family, version) = declared.split_once('-').expect("an SPDX identifier");
+
+    let notice = fs::read_to_string(repository().join("NOTICE")).expect("NOTICE");
+    assert!(
+        notice.contains(family) && notice.contains(version),
+        "NOTICE does not name {declared}, in either spelling: {notice}",
+    );
+    assert!(
+        notice.to_lowercase().contains("copyright"),
+        "NFR-12.3 wants a NOTICE naming the copyright holder: {notice}",
+    );
+
+    let licence = fs::read_to_string(repository().join("LICENSE")).expect("LICENSE");
+    assert!(
+        licence.contains(family) && licence.contains(version),
+        "LICENSE is not the {declared} text",
+    );
+
+    // `deny.toml` is prose about the licence as well as configuration, and the
+    // prose is what went stale. **The discriminator is citing the requirement**:
+    // a comment naming NFR-12.3 is making a claim about what that row says, so
+    // it has to agree with it. Matching on "bolt is" instead was tried and
+    // caught "the targets bolt is built for", which is the kind of false
+    // positive that gets a check deleted rather than fixed.
+    let deny = fs::read_to_string(repository().join("deny.toml")).expect("deny.toml");
+    let citing: Vec<&str> = deny
+        .lines()
+        .filter(|line| line.trim_start().starts_with('#') && line.contains("NFR-12.3"))
+        .collect();
+    assert!(
+        !citing.is_empty(),
+        "deny.toml no longer cites NFR-12.3, so this half of the test checks nothing",
+    );
+    for line in citing {
+        assert!(
+            line.contains(&declared),
+            "a comment cites NFR-12.3 and does not name {declared}: {line}",
+        );
+    }
+}
