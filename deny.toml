@@ -1,7 +1,7 @@
 # cargo-deny's policy, read by the `licences` task in bolt.rust-quality.yaml.
 #
-# Without this the check fails on bolt's own MIT licence, because an empty
-# allow list allows nothing. That is the tool working rather than a nuisance:
+# Without this the check fails on bolt's own Apache-2.0 licence, because an
+# empty allow list allows nothing. That is the tool working, not a nuisance:
 # a licence policy nobody wrote is a licence policy nobody agreed.
 
 # The targets bolt is built for. Without this cargo-deny reads every target's
