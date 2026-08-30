@@ -304,17 +304,27 @@ Kinds are `positive`, `negative`, `edge`, `property`, `regression`. A test citin
 nothing fails the gate, and so does one citing a row `REQUIREMENTS.md` does not
 define.
 
-Citations added minus coverage gained should be zero. A gate checks that a
-cited row *exists*, not that the test *touches* it, so a wrong citation is
-indistinguishable from a right one forever. The subtraction is the only
-instrument that has caught one here, and it has caught two.
+A gate checks that a cited row *exists*, not that the test *touches* it, so a
+wrong citation is indistinguishable from a right one forever. Two instruments
+find them. Citations added minus coverage gained should be zero, which has
+caught two; and the mutation probe below, which has caught five.
 
-Mutation-test anything whose test was written after the code. A test written
-afterwards tends to assert the outcome the code already produces.
-`.ephemera/mutate-time-limits.py` breaks the code twenty ways and checks the test
-that should catch each one does. It has found four tests that could not fail.
-`.ephemera/` is gitignored, so that script is local to a worktree that has built
-it and a fresh clone does not carry one.
+Mutation-test anything whose test was written after the code, since such a test
+tends to assert the outcome the code already produces. `.ephemera/mutate.py`
+breaks the code a row governs and runs the tests citing it, resolving them from
+the `COVERS:` marks so a probe cannot run the wrong test.
+`.ephemera/mutate-time-limits.py` is the same method aimed at one area. The
+fifth test it found that could not fail was FR-8.3's, asserted on the value the
+merge returned in memory where the row is about the document it wrote.
+
+Read a survival as a question until the probe itself is checked. A mutation
+that misses the branch the row lives on looks exactly like a weak test, and two
+of eight did: FR-9.2a's hit a struct field where the directory name is built
+from a separate expression, and FR-5.7's raised a default the test overrides
+with its own environment variable.
+
+`.ephemera/` is gitignored, so both scripts are local to a worktree that has
+built them and a fresh clone does not carry one.
 
 Expect the gate to catch the change you are making, and fix the code, not the
 threshold. `complexity` is the task that catches it: it has failed during every
