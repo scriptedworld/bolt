@@ -25,3 +25,21 @@ START_HERE.md
 /bin/bolt
 target/
 Cargo.lock
+
+# The adopted jig links. `toolbox/jigs.yaml` declares the set and `link-jigs`
+# makes them, so adoption is a step a clone performs rather than content this
+# repository ships. In a built image the same files arrive from the layer
+# beneath, so a committed copy would be a third statement of one thing.
+#
+# A tracked symlink stores its target path as content, so committing one encodes
+# where ../toolbox happens to sit and dangles in any clone without that sibling.
+#
+# Named one at a time rather than as `bolt.*.yaml`, because that glob would
+# swallow `bolt.rust-quality.yaml`, which is this project's own gate and IS
+# tracked. `bin/` cannot be ignored wholesale for the same reason:
+# `bin/count-selection.py` is this project's own checker.
+bolt.common-quality.yaml
+bolt.secrets.yaml
+bin/suppression-register.py
+bin/test-traceability.py
+adapters/
