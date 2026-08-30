@@ -56,9 +56,12 @@ $ tail -1 .bolt-gate/work/traceability-1/stdout
 147 of 226 requirements covered; 3 open and exempt
 ```
 
-The uncovered rows are specified and unbuilt or built and untested. Marking them
-open to clear the gate would misreport what is settled. The number going up is
-the progress signal, and it moves in both directions as rows retire.
+Of the 79 uncovered rows, 57 want a test, 3 want a citation against a test that
+already exercises them, and 19 assert a design property no test can observe.
+Those 19 are waiting on a ruling, so do not try to close one by writing a test:
+`docs/PROJECT.md` says what they are. Marking a row open to clear the gate would
+misreport what is settled. The number going up is the progress signal, and it
+moves in both directions as rows retire.
 
 Mass co-citation is refused for the reason the gate exists. A citation is
 checked for naming a real row, never for the test touching it, so a wrong

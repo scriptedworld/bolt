@@ -122,10 +122,21 @@ they are the same program.
 `LESSONS/a-second-build-answers-for-the-tree.md` carry that in full.
 
 Seven of the eight tasks pass. `traceability` fails deliberately and should not
-be made green: it reports 147 of 226 requirements covered, and the uncovered
-rows are specified and unbuilt, or built and untested. Marking them `[?]` to
-clear the gate would misreport what is settled, and the number going up is the
+be made green: it reports 147 of 226 requirements covered. Marking the rest `[?]`
+to clear the gate would misreport what is settled, and the number going up is the
 progress signal.
+
+The 79 uncovered rows fall into three groups, and the third is why the gate
+cannot simply be worked down to green:
+
+    57  a new test discharges it
+    19  asserts a design property no test can observe
+     3  an existing test exercises it and needs the citation
+
+The 19 are negative universals, ecosystem decisions bolt honours rather than
+owns, and claims resting on tools outside a clone. Each has to be rewritten as
+something checkable, retired in favour of the project that owns it, or accepted
+as permanently exempt, and that is a ruling rather than work.
 
 `bin/test-traceability.py` is a symlink to the shared checker in toolbox, so
 that task's verdict moves when toolbox does.
