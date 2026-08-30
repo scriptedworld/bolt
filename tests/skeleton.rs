@@ -1288,6 +1288,23 @@ fn the_merge_passes_only_when_every_constituent_passes() {
         !failing.success,
         "one failing constituent did not fail the run"
     );
+
+    // Asserted on `result.yaml` and not only on the returned struct. FR-8.3 is
+    // about the merged result, FR-10.3 makes the envelope the verdict, and
+    // every gate in the estate reads the file. The two are computed from one
+    // value today, so a mutation writing `success: true` into the document
+    // while the struct stayed false passed both assertions above.
+    for (outcome, expected) in [(&passing, true), (&failing, false)] {
+        let written = read_validated(
+            &outcome.output_dir.join(bolt::run::RESULT_FILE),
+            &wrench::schemas::ENVELOPE,
+        );
+        assert_eq!(
+            written.get("success").and_then(Value::as_bool),
+            Some(expected),
+            "the written result disagrees with the run it folded: {written}",
+        );
+    }
 }
 
 // COVERS: FR-8.3a | negative
