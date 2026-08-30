@@ -142,6 +142,15 @@ divergence, but it breaks anything naming a directory and the failure presents a
     Go build   out/work/composed-0/stdout
     this one   out/work/composed-1/stdout
 
+`metadata.evidence` moved with it, in three ways at once. A task's key carries
+the ordinal, `complexity-1` rather than `complexity`; the value is one mapping
+rather than a list of them; and `result` is absolute rather than relative to the
+base. A consumer looking a task up by bare name and indexing `[0]` breaks on all
+three, and breaks by raising rather than by reading a wrong value. Nothing in the
+estate reads that block: audited across `~/.projects` on 2026-08-30, the only
+readers are bolt's own tests, and `adapters/common/bolt-result.py` folds a
+child's `reasons` and `success` without touching it.
+
 Flags may be written after the positionals here and not there, so the accepted
 argument set only widens.
 
