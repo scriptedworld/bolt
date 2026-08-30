@@ -156,22 +156,30 @@ not know which of its commands is bolt.
       command: bolt inner {base_dir}/sub --output-dir {work_dir}/child
       adapter: adapters/common/bolt-result.py
 
-The adapter is what carries the verdict, since bolt exits 0 whenever it carried
-a run out, whatever the tools concluded.
-
-`--result-to-exitcode` opts out of that, for a shell that needs to compose:
+`--result-to-exitcode` opts out of the exit-status rule, for a shell that needs
+to compose:
 
     bolt --result-to-exitcode gate . && bolt --result-to-exitcode other .
 
 The rule is `0 if success else 1` and it has no cases; a refusal is 1 like any
-other failure, because a refusal is a verdict bolt reached. Off unless named, so
-every caller written against the default is unaffected.
+other failure, because a refusal is a verdict bolt reached.
 
 Its own gate reports eight tasks, seven passing. The eighth is traceability,
 which requires every test to cite a requirement and every cited requirement to
-exist; it reports 143 of 241 covered and fails on the rest. That is the state of
-a rebuild and not a defect, and it is left failing on purpose: turning it green
-by marking the uncovered rows as open questions would misreport what is settled.
+exist. It reports 143 of 241 covered and fails on the rest.
+
+That number is the rebuild's progress signal and it moves: `7913e17` reported
+129 of 254, and the denominator fell as 26 rows of retired nesting machinery
+went. It is left failing instead of turned green by marking the uncovered rows
+as open questions, which would misreport what is settled.
+
+What closes it is a reading of the 98 uncovered rows, sorting each into one a
+new test discharges, one an existing test already exercises without citing, and
+one asserting a design property no test can observe. The third group needs the
+row rewritten or retired instead of a test, and how large it is has not been
+established. Mass co-citation would close the gate this week and is refused: a
+citation is checked for naming a real row, never for the test touching it, so a
+wrong one is indistinguishable from a right one afterwards.
 
 ## Licence
 
