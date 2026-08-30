@@ -229,6 +229,27 @@ Reverting is one command, and worth knowing before it is needed:
 
     ln -sfn ../../bolt.go/bin/bolt.go ~/.projects/dotfiles/bin/bolt
 
+### Work directories are numbered from one, and the Go build numbered from zero
+
+    Go     out/work/composed-0/stdout
+    Rust   out/work/composed-1/stdout
+
+FR-9.2a specifies from one, so this build is the conforming one and the Go build
+was the divergence. **It is still a breaking change for anything naming a work
+directory**, and the failure presents as `No such file or directory`, which reads
+as the run not happening rather than as a rename. Found by the toolbox session on
+their own probe, 2026-08-29.
+
+**Measured blast radius: one executable script in the estate**, not the several
+trees a first look suggests. `grep -rl 'work/[a-z-]*-0'` returns 96 files and 90
+of them are `manifest.yaml` and `result.yaml` inside past `.bolt-*` output
+directories, which are records of runs that did number from zero and are correct
+as history. Of the six live files, five are prose citing a path and one runs:
+`clank/inbox/bolt.go/a-refusal-overwrites-the-run-it-refused/repro.sh`, fixed to
+invoke `bolt.go` explicitly since it reproduces a defect only that build has.
+
+`silo/docs/ARCHITECTURE.md` shows the layout with `-0` and is silo's to correct.
+
 `bin/test-traceability.py` is a symlink into toolbox, so that task's verdict
 moves when toolbox moves.
 

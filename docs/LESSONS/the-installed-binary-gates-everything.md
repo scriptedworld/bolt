@@ -69,6 +69,30 @@ permission:
 `bolt.go` stays on `PATH` by name, so comparing the two is one command and does
 not require a revert at all.
 
+## The estate is one instrument, so the usual remedy is unavailable
+
+Put by the toolbox session, 2026-08-29, and it is the sharpest thing anyone has
+said about this hazard:
+
+> unlike the instances we have been collecting there is no second observation
+> anywhere that would disagree with it. Every consumer reads the same wrong
+> thing and agrees.
+
+**That is what makes this one different in kind.** Every other instance in
+`a-check-that-answers-a-weaker-question.md` was caught by two readings
+disagreeing: two binaries with different wordings, two sessions with different
+counts, a row count against a denominator. The remedy that file arrives at is
+**have something to disagree with**.
+
+A stale `bin/bolt` removes that by construction. Twelve projects run the same
+file, so twelve green gates are one observation repeated, not twelve. Agreement
+across the estate is exactly what it would look like whether the binary is
+current or a week old, and **the more projects that agree, the more convincing
+the wrong answer gets**.
+
+So the byte comparison above is not a nicety on top of the ordinary defences. It
+is the only defence, because the ordinary one cannot exist here.
+
 ## Why this is bolt's lesson and not the estate's
 
 Filed here on the wrench session's argument, 2026-08-29: the exposure is now
