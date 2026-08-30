@@ -7,7 +7,7 @@ gets investigated and this does not. From inside the session running it, a check
 that could not see the thing and a check that saw nothing wrong are the same
 observation.
 
-## Eleven instances, across four repositories
+## Twelve instances, across four repositories
 
 Collected because the shape is only obvious with several beside each other. Any
 one of them reads as an ordinary bug.
@@ -25,16 +25,17 @@ one of them reads as an ordinary bug.
 | `ls -la bolt.go/bin/` | is there a file, not is it tracked |
 | `find … -name 'bolt.*.yaml' \| wc -l` | how many paths, not how many files |
 | a status line's staleness flag | is the flag set, on a line nobody printed |
+| `git status --short && echo clean` | did `git status` run |
 
-Six are this tree's, four are wrench's, one is a coordinator's. Nobody in the
+Seven are this tree's, four are wrench's, one is a coordinator's. Nobody in the
 estate is better at this than anybody else, which is the argument for the
 remedies rather than for care.
 
-Five of eleven are not bolt's, so where this file should live is filed at
+Five of twelve are not bolt's, so where this file should live is filed at
 `clank/inbox/silo/a-cross-repository-lesson-collection-lives-in-one-project/`.
 A copy in wrench drifted, in `docs/LESSONS/`, which is the last directory
 anybody would search for a stale copy. **If you are reading a version of this
-that says fewer than eleven, it is not the one being maintained.**
+that says fewer than twelve, it is not the one being maintained.**
 
 ## Why the name is the trap
 
@@ -84,6 +85,24 @@ to consult.
 reconciled by a reader; `failed: 3` cannot. A check that prints only its verdict
 cannot be audited by the person reading it.
 
+## Which commands the remedies get skipped on
+
+The remedies above are known and do get used. Where they are not is the
+throwaway check, which is where they cost most.
+
+Wrench found both of its pipe-status instances in ad-hoc verification one-liners
+and none in its gate commands, which already redirect to a file and test for the
+artefact afterwards. The coordinator's was a `$?` read after a pipe while
+checking whether a peer's report was true. This tree's newest row is the same
+shape: `git status --short && echo clean` prints `clean` against a dirty tree,
+because `git status` exits 0 either way, and it was written to tell somebody the
+tree was clean.
+
+The ceremony goes where the output is kept and is skipped where the output only
+decides what somebody believes. So the targeting rule is not which commands
+matter; it is which produce nothing but an answer, because a gate command leaves
+an artefact somebody reads again and a one-liner leaves a conclusion.
+
 ## A sibling shape: the answer was right and expired
 
 Kept out of the table deliberately. Every row above is a check that never looked
@@ -99,14 +118,12 @@ which is the right one, and the claim was true when written and false when read.
 "Who has run since X" is a question about a moving target.
 
 An instrument error is fixed by a better instrument. A perishable answer is
-fixed by publishing the time of the reading, not only the threshold it was
-measured against. A command and a cutover timestamp let a reader re-run it; a
-command, a threshold and no reading time let a correct measurement become a
-wrong claim with nothing having gone wrong.
+fixed by publishing the time of the reading and not only the threshold it was
+measured against, since a threshold with no reading time lets a correct
+measurement become a wrong claim with nothing having gone wrong.
 
-So when the question is "since when", record when you looked. And prefer handing
-on the command over handing on its output, because a command re-runs and a
-number does not.
+So when the question is "since when", record when you looked, and prefer handing
+on the command over its output: a command re-runs and a number does not.
 
 ## The one that generalises furthest
 
