@@ -79,12 +79,16 @@ Every command and every adapter invocation can name these.
 |---|---|
 | `{work_dir}` | This execution's directory under `work/`. |
 | `{base_dir}` | The directory bolt was pointed at. |
-| `{project_root}` | The outermost invocation's directory. |
+| `{project_root}` | The same directory as `{base_dir}`. |
 | `{config_dir}` | Where the jig was found. |
 | `{output_dir}` | The run directory. |
 
 All five are absolute, and they are reserved: a jig or a definitions file naming
 one is refused with `reserved-definition`, so nothing can shadow them.
+
+`{project_root}` and `{base_dir}` always name the same directory. Composition is
+a command line rather than a nesting, so every invocation is pointed at its own
+base and none inherits another's.
 
 A path that travels with the jig resolves against `{config_dir}`. A path
 belonging to the project being checked stays relative to the base, where the
