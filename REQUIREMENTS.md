@@ -67,7 +67,7 @@ not help with.
 | FR-1.4 | A run captures each command's native results whatever form they take: stdout, stderr, exit code, and arbitrary files the command generated. Those results survive the run as evidence. | [A/D] |
 | FR-1.5 | Every file bolt reads as data is parsed and validated against a schema before anything acts on it, a jig, a definitions file and a task's envelope alike. What a schema leaves open stays open; what it requires is checked. | [A] |
 | FR-1.6 | Validation is two steps: can the parser load the file at all, and does the structure it produced match the JSON Schema for that kind of file. Schemas apply to decoded maps and lists rather than to text, so one mechanism covers everything bolt reads. | [A] |
-| FR-1.6a | FR-1.5, FR-1.6 and FR-3.4d are ecosystem decisions bolt honours rather than decisions bolt makes. YAML everywhere and JSON Schema over decoded structures apply to every component, and bolt does not get to differ. Filed for the architecture document as `clank/inbox/silo/yaml-and-json-schema-is-a-platform-decision/`. | [A] |
+| FR-1.6a | FR-1.5, FR-1.6 and FR-3.4d are ecosystem decisions bolt honours rather than decisions bolt makes. YAML everywhere and JSON Schema over decoded structures apply to every component, and bolt does not get to differ. Raised against the architecture document rather than settled here. | [A] |
 | FR-1.7 | A schema checks shape, not meaning. A command that parsed differently from how it was written is still a string of the right type, and validation passes it. | [D] |
 | FR-1.8 | Validation runs before writing as well as after reading. Bolt checks a file against its schema on the way out, so it cannot emit something it would refuse to read back. | [A] |
 | FR-1.9 | Every read and every write of a file bolt treats as data goes through one path that requires a schema. Validation is not a step a call site can omit, so such a file is covered because of how it was handled rather than because somebody remembered. | [A] |
@@ -371,7 +371,7 @@ A run's whole output is one directory:
 | NFR-12.1 | Bolt runs itself. Its own quality gate is a bolt run over its own repository. | [A] |
 | NFR-12.2 | Bolt installs into a standardised development image beside a toolchain it knows nothing about. | [D] |
 | NFR-12.3 | Bolt is Apache-2.0 licensed, with a `NOTICE` naming the copyright holder. Every manifest that declares a licence declares the same one, so the machine-readable answer and the file agree. Was MIT when this row was written; the licence changed at `ada063b` and `Cargo.toml` went on saying MIT until 2026-08-28, which is the case the row now covers rather than the one it started as. | [A] |
-| NFR-12.4 | Bolt builds without a C toolchain and links statically, so an image carries one file and a cross-build needs no target compiler. Anything bolt links against inherits that constraint. | [D] |
+| NFR-12.4 | Bolt builds without a C toolchain, so a cross-build needs no target compiler. Nothing in the dependency tree compiles C and `libc` is declarations only. Anything bolt links against inherits that constraint. The binary is dynamically linked against the system `libc`, `libm` and `libgcc_s`; a single-file image would need a musl target, and nothing requires one. | [D] |
 
 ## 13. Open
 
@@ -423,7 +423,7 @@ oversight.
 | FR-1.17 | 2026-08-26 | `wrench` FR-3.3, JSON Schema over the decoded structure. |
 | FR-1.18 | 2026-08-26 | `wrench` FR-4.3, canonical form belonging to the save call. |
 | FR-1.19 | 2026-08-26 | `wrench` FR-2.3, a compelled schema and not the right one. |
-| FR-6.5 | 2026-08-26 | Filed at `clank/inbox/toolbox/adapters-carry-their-conformance-tests/`. Adapters reading structured formats is toolbox's, not bolt's. |
+| FR-6.5 | 2026-08-26 | Raised with toolbox, which owns it. Adapters reading structured formats is toolbox's, not bolt's. |
 | FR-6.8 | 2026-08-26 | The same entry. FR-6.7 kept the merge's half, which is bolt's own producer. |
 | FR-13.1 | 2026-08-26 | FR-6.2b. An adapter writes `output.yaml` into the work directory it was given and the name never varies. |
 | FR-13.2 | 2026-08-26 | FR-7.9 and FR-7.10. A reason carries `kind`, so a task that could not execute is distinguishable from one that executed and failed. |

@@ -380,16 +380,15 @@ decision, pattern and lesson under `docs/DECISIONS/`, `docs/PATTERNS/` and
 `docs/LESSONS/`. Bolt has two patterns and four lessons, and no `DECISIONS/`
 directory yet: its decisions are still the `[D]` rows in `REQUIREMENTS.md` and
 the "Defaults taken" table in `NEXT_STEPS.md`, which is a defensible place for
-them and not the estate's shape. The rest of its durable reasoning is in the task
-records under `clank/tasks/bolt/`, where the test plans carry more about why the
-tests are what they are than this tree does.
+them and not the estate's shape. The rest of its durable reasoning is in the
+task records this repository's work is tracked in, where the test plans carry
+more about why the tests are what they are than this tree does.
 
 `REQUIREMENTS.md` is a single file and the estate's standard is now a
 directory, one file per requirement under `docs/REQUIREMENTS/<category>/`. Bolt
 has not migrated and cannot yet: it has 48 retired rows and where a retired
-id lives under the directory layout is an open estate question. Recorded as
-`clank/tasks/bolt/commission/10-requirements-becomes-a-directory.blocked`, which
-carries the row-diff proof the move would need.
+id lives under the directory layout is an open estate question. A blocked task
+holds the row-diff proof the move would need.
 
 `Cargo.lock` is gitignored, which is the convention for a library and the
 opposite of the convention for a binary. Bolt ships a binary. Nobody has said
