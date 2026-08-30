@@ -73,7 +73,7 @@ not help with.
 | FR-1.9 | Every read and every write of a file bolt treats as data goes through one path that requires a schema. Validation is not a step a call site can omit, so such a file is covered because of how it was handled rather than because somebody remembered. | [A] |
 | FR-1.9a | FR-1.5's "as data" is the scope, and most of what a run touches is outside it. Captured stdout and stderr, the `exitcode` file, `.gitignore`, and every artifact a command wrote are read or written without a schema, because none of them has a structure bolt reasons about. A rule claiming every read would be false the moment a command produced anything. | [D] |
 | FR-1.10 | YAML is written in canonical form: block style, one key to a line, and a scalar quoted exactly when it is meant to be a string, so its type is never in question. Booleans and numbers stay bare. `no`, `1.20` and `null` therefore survive a round trip as the strings they were, and `success` stays a boolean. Flow style is valid YAML and so is JSON, and neither is what bolt emits. Two results then differ by the lines that changed rather than by one long line. | [A] |
-| FR-1.12 | Bolt reads and writes every structured file through wrench's Go library, so bolt is one consumer of that contract and not its owner. What the contract is belongs to `wrench/REQUIREMENTS.md`, and bolt does not restate it. | [A/D] |
+| FR-1.12 | Bolt reads and writes every structured file through wrench, so bolt is one consumer of that contract and not its owner. `Cargo.toml` names the Rust crate at `../wrench/rust`. What the contract is belongs to `wrench/REQUIREMENTS.md`, and bolt does not restate it. | [A/D] |
 | FR-1.13 | Bolt validates with nothing else installed beside it. | [A] |
 
 ## 2. Invocation
