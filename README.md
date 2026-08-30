@@ -166,20 +166,19 @@ other failure, because a refusal is a verdict bolt reached.
 
 Its own gate reports eight tasks, seven passing. The eighth is traceability,
 which requires every test to cite a requirement and every cited requirement to
-exist. It reports 143 of 241 covered and fails on the rest.
+exist. It reports 147 of 226 covered and fails on the rest.
 
 That number is the rebuild's progress signal and it moves: `7913e17` reported
-129 of 254, and the denominator fell as 26 rows of retired nesting machinery
-went. It is left failing instead of turned green by marking the uncovered rows
-as open questions, which would misreport what is settled.
+129 of 254. The denominator falls too as rows retire, 26 for the nesting
+machinery composition replaced and 15 rationale rows folded into what they
+explained.
 
-What closes it is a reading of the 98 uncovered rows, sorting each into one a
-new test discharges, one an existing test already exercises without citing, and
-one asserting a design property no test can observe. The third group needs the
-row rewritten or retired instead of a test, and how large it is has not been
-established. Mass co-citation would close the gate this week and is refused: a
-citation is checked for naming a real row, never for the test touching it, so a
-wrong one is indistinguishable from a right one afterwards.
+Every uncovered row has been read and sorted. 57 want a new test and 3 want a
+citation, together reaching 207 of 226; the last 19 assert a design property no
+test can observe and need rewriting or retiring instead. Marking those open
+would misreport what is settled, and mass co-citation is refused for the reason
+the gate exists: a citation is checked for naming a real row, never for the test
+touching it.
 
 ## Licence
 

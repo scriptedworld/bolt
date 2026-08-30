@@ -143,7 +143,7 @@ licences, complexity, traceability.
 
 **Seven pass. `traceability` fails, deliberately, and should not be made green.**
 It requires every test to cite a requirement and every cited requirement to
-exist, and reports 143 of 241 covered. The uncovered rows are specified and
+exist, and reports 147 of 226 covered. The uncovered rows are specified and
 unbuilt; marking them `[?]` to turn the gate green would misreport what is
 settled. The number going up is the progress signal.
 
@@ -292,7 +292,7 @@ nothing is wrong. Two numbers, and they must reconcile:
     tail -1 .ephemera/qa/work/traceability-1/stdout
 
 Live rows must equal the denominator plus the exempt count. Measured
-244 live, `143 of 241 … 3 open and exempt`, and 241 + 3 = 244. When it was
+229 live, `147 of 226 … 3 open and exempt`, and 226 + 3 = 229. When it was
 wrong the live count ran two ahead of the sum, and nothing in the gate's output
 said so.
 
@@ -391,7 +391,7 @@ Every default is a `[D]` row and reversible by editing the row it became.
 
 This `docs/` tree is new and thin. The estate's standard is one file per
 decision, pattern and lesson under `docs/DECISIONS/`, `docs/PATTERNS/` and
-`docs/LESSONS/`. Bolt has two patterns and four lessons, and no `DECISIONS/`
+`docs/LESSONS/`. Bolt has two patterns and five lessons, and no `DECISIONS/`
 directory yet: its decisions are still the `[D]` rows in `REQUIREMENTS.md` and
 the "Defaults taken" table in `NEXT_STEPS.md`, which is a defensible place for
 them and not the estate's shape. The rest of its durable reasoning is in the
