@@ -84,10 +84,13 @@ pub enum Error {
 
     /// The run's output directory already holds a run.
     ///
-    /// FR-2.6b. `.bolt-<iso8601>` is second-granular, so two runs started in one
-    /// second share a directory and each folds the other's evidence. Reproduced
-    /// 2026-08-28: a second jig's result reported a failing task belonging to
-    /// the first, and both callers were handed the same conflated file.
+    /// FR-2.6b. Writing into a directory that already holds a run interleaves
+    /// two runs' evidence. Measured 2026-08-28, before the default directory
+    /// carried a process id: a second jig's result reported a failing task
+    /// belonging to the first, and both callers were handed the same conflated
+    /// file. FR-2.6e separates two invocations, so what reaches this is an
+    /// `--output-dir` named twice, a rerun into a directory kept from before,
+    /// or two runs of the library inside one process.
     OutputDirectoryInUse(PathBuf),
 
     /// A task's command names both `{each_path}` and `{all_paths}`.

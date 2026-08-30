@@ -18,8 +18,7 @@
 use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::SystemTime;
+use std::process::{Command, Stdio};
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -1408,43 +1407,30 @@ fn the_missing_base_refusal_writes_nothing_and_says_so() {
 /// A refactor satisfying FR-10.7 by writing the refusal into the resolved
 /// directory passes every other test in this file.
 ///
-/// Deterministic without landing two runs inside one second: the run directory
-/// is a function of the base and the clock, so the collision is set up by
-/// predicting it. The retry covers a second boundary falling between predicting
-/// and running, and a failure to collide is a failure rather than a pass, since
-/// a test that quietly skips its own case is worse than no test.
+/// The directory is named rather than resolved from the stamp, which since
+/// FR-2.6e's nanoseconds no longer collides by clock. Both cases reach the
+/// same refusal through `wrote_a_result`, and a named directory constructs it
+/// without a retry loop that could pass by never exercising its own case.
 #[test]
 fn a_refusal_does_not_write_into_the_directory_it_refused() {
     let root = tree();
     let sentinel = "success: true\n";
+    let named = root.path().join("qa");
+    fs::create_dir_all(&named).expect("the colliding run directory");
+    let result = named.join(bolt::run::RESULT_FILE);
+    fs::write(&result, sentinel).expect("the previous run's verdict");
 
-    for attempt in 0..20 {
-        let predicted = bolt::run::output_dir_for(root.path(), SystemTime::now());
-        fs::create_dir_all(&predicted).expect("the colliding run directory");
-        let result = predicted.join(bolt::run::RESULT_FILE);
-        fs::write(&result, sentinel).expect("the previous run's verdict");
+    let refusal = run_into("check", root.path(), &named).expect_err("the directory is in use");
 
-        let refusal = bolt::run::run("check", root.path());
-
-        match refusal {
-            Err(bolt::Error::OutputDirectoryInUse(path)) => {
-                assert_eq!(path, predicted, "the refusal names the wrong directory");
-                assert_eq!(
-                    fs::read_to_string(&result).expect("the previous verdict survives"),
-                    sentinel,
-                    "the refusal overwrote the verdict of the run it refused to share",
-                );
-                return;
-            }
-            // The clock crossed a second, so this run resolved elsewhere and
-            // the case was not exercised. Clear up and try again.
-            other => {
-                assert!(other.is_err(), "a directory holding a run must be refused");
-                fs::remove_dir_all(&predicted).expect("the fixture is removable");
-                assert!(attempt < 19, "never landed inside one second in 20 tries");
-            }
-        }
-    }
+    assert!(
+        matches!(&refusal, bolt::Error::OutputDirectoryInUse(path) if *path == named),
+        "the refusal names the wrong directory: {refusal:?}",
+    );
+    assert_eq!(
+        fs::read_to_string(&result).expect("the previous verdict survives"),
+        sentinel,
+        "the refusal overwrote the verdict of the run it refused to share",
+    );
 }
 
 // ---- the merge carries its constituents up --------------------------------
@@ -2416,6 +2402,72 @@ fn the_default_output_directory_is_a_filesystem_safe_stamp_at_the_base() {
     );
 }
 
+// COVERS: FR-2.6e | regression
+/// The default run directory ends in the process id of the run that wrote it.
+///
+/// The stamp is second-granular, so two invocations starting in one second
+/// resolved to one directory and FR-2.6b refused the second. Whether they did
+/// depended on where the wall clock fell, which is why the id is asserted from
+/// the child's own pid: a pair straddling a second boundary would pass on
+/// difference alone, against the old code as well as this one.
+///
+/// Through the binary, because one invocation is one process and the process is
+/// what the id separates.
+#[test]
+fn a_run_directory_is_named_for_the_process_that_wrote_it() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let (first, first_pid) = run_the_binary(root.path());
+    let (second, second_pid) = run_the_binary(root.path());
+
+    assert!(
+        first.ends_with(&format!("-{first_pid}")),
+        "the run directory is not named for the process that wrote it: {first}",
+    );
+    assert_ne!(
+        first_pid, second_pid,
+        "the two invocations shared a process, so the case was not exercised",
+    );
+    assert_ne!(
+        first, second,
+        "two invocations back to back shared one output directory",
+    );
+}
+
+/// One invocation of the built binary over `base`, and the pid it ran under.
+///
+/// The run directory is read back off the result path bolt prints, which is the
+/// only place a caller learns it when `--output-dir` was not named.
+fn run_the_binary(base: &Path) -> (String, u32) {
+    let child = bolt()
+        .arg("check")
+        .arg(base)
+        .stdout(Stdio::piped())
+        .spawn()
+        .expect("the binary runs");
+    let pid = child.id();
+    let output = child.wait_with_output().expect("the run finishes");
+
+    assert!(
+        output.status.success(),
+        "the run did not complete: {output:?}"
+    );
+    let printed = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+    let directory = Path::new(&printed)
+        .parent()
+        .and_then(Path::file_name)
+        .expect("the result sits in a run directory")
+        .to_string_lossy()
+        .into_owned();
+
+    (directory, pid)
+}
+
 // COVERS: FR-2.6b | negative
 /// A named output directory that already holds a run is refused.
 ///
@@ -3316,6 +3368,13 @@ fn a_killed_command_keeps_its_output_and_its_adapter_still_runs() {
 /// FR-4.8's rule holds for a slow task exactly as it does for a failing one: the
 /// tasks after it still execute, because stopping throws away the evidence they
 /// would have produced.
+///
+/// Asserted on `stopped` and on the following task's envelope, not on a count of
+/// executions. A 0.05s limit can expire during the task's own setup, and
+/// FR-4.11b's check then reports the task as having run nothing where a limit
+/// expiring during the command reports one. Both discharge FR-4.12, so a count
+/// asserts which of two legal paths the clock took: measured 2026-08-29, it gave
+/// 1 under an instrumented build inside a gate run and 2 everywhere else.
 #[test]
 fn a_slow_task_fails_and_the_run_carries_on() {
     let root = tree();
@@ -3337,7 +3396,6 @@ fn a_slow_task_fails_and_the_run_carries_on() {
         !outcome.success,
         "a task that passed its limit did not fail"
     );
-    assert_eq!(outcome.executions, 2, "the run stopped at the slow task");
     assert!(
         outcome.stopped.is_empty(),
         "a task's limit stopped the whole run: {:?}",

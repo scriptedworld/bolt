@@ -495,6 +495,22 @@ what is missing is the number and the thing that reads it. A shared Rust jig has
 to answer that, and the answer belongs with whoever owns the standard rather
 than with the first adopter.
 
+## The default run directory carries a process id, settled 2026-08-29
+
+FR-2.6e. `.bolt-<iso8601>-<pid>`, taken over sub-second precision in the stamp
+because a pid is short, is readable, and says which run left a directory behind.
+
+The collision it closes was measured twice. FACT 2026-08-28 against the Go
+build: two runs starting inside one second resolve to one `.bolt-<iso8601>` and
+the second's refusal replaced the first's verdict. FACT 2026-08-29 against this
+build, filed as `clank/inbox/bolt/output-dir-stamp-collides-within-one-second/`:
+two jigs run back to back, and whether the second was refused depended on where
+the second boundary fell.
+
+It does not remove FR-2.6b. A caller naming `--output-dir` twice still collides,
+and so do two runs of the library inside one process, which is what the test for
+FR-2.6e runs through the binary to avoid.
+
 ## A caller that finds its output directory by timestamp is wrong
 
 Not a question. Recorded from skid's withdrawn finding, because the same mistake
@@ -919,25 +935,6 @@ limit is spelled, which is a decimal and `s`, `m` or `h`, is FR-4.11e.
     `in:` was on the retired jig task. **Worth not reaching for it until a jig
     actually wants it**, since section 5 has just retired twenty-six rows of
     machinery that existed for cases nobody had.
-
-47. **Does the default run directory carry a process id?**
-    `.bolt-<iso8601>-<pid>` rather than `.bolt-<iso8601>`. Raised by our user
-    2026-08-29 and **marked `maybe` by them, so it is not taken**; recorded with
-    the case for it so taking it is a decision rather than a rediscovery.
-
-    The collision is measured, not hypothetical: `.bolt-<iso8601>` is
-    second-granular, so two runs starting inside one second resolve to the same
-    directory, and FR-2.6b refuses the second. One bolt process carries out one
-    run, so a pid makes the default unique without a clock of finer resolution.
-
-    What it costs: `.bolt-*` globs still match, but anything naming a run
-    directory by reconstructing the stamp stops working, and
-    `run::output_dir_for` is what the collision tests use to predict it. Both
-    are inside this tree.
-
-    **It does not remove FR-2.6b or FR-10.7c.** A caller naming `--output-dir`
-    twice still collides, which is the case our user answered with "the user can
-    clean up first", so the refusal stays whatever the default is called.
 
 16. Is a task skipped for an empty selection recorded in `result.yaml`?
     FR-8.3a closes the case where every task skips, since a merge finding no

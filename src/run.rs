@@ -502,13 +502,20 @@ fn holds_a_run(output_dir: &Path) -> bool {
 
 /// Where a run over `base` starting at `at` writes, by FR-2.6c.
 ///
-/// Exposed because the directory name is part of what a caller observes, and a
-/// test that cannot predict it cannot set up the collision FR-2.6b refuses.
-/// FR-2.6's filesystem-safe stamp rather than the strict ISO 8601 form, since
-/// this is a path component.
+/// FR-2.6's filesystem-safe stamp and not the strict ISO 8601 form, since this
+/// is a path component.
+///
+/// FR-2.6e appends the process id. The stamp is second-granular, so two
+/// invocations starting in one second resolve to one directory and FR-2.6b
+/// refuses the second; one invocation is one process, so the id separates them
+/// and says which run wrote a directory that is still there.
 #[must_use]
-pub fn output_dir_for(base: &Path, at: SystemTime) -> PathBuf {
-    base.join(format!(".bolt-{}", stamp::iso8601(at)))
+fn output_dir_for(base: &Path, at: SystemTime) -> PathBuf {
+    base.join(format!(
+        ".bolt-{}-{}",
+        stamp::iso8601(at),
+        std::process::id(),
+    ))
 }
 
 /// Write a refusal's `result.yaml`, by FR-10.7, in FR-2.5a's shape.
