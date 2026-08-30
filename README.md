@@ -58,7 +58,7 @@ belongs in the file and a caller that wants it reads one document either way.
 ```
 
 Every execution gets a directory whether it passed, failed, was killed at a time
-limit, or never started. The manifest is written **before** the command runs, so
+limit, or never started. The manifest is written before the command runs, so
 an execution that was killed still records what it was going to attempt.
 
 `result.yaml` is an envelope, the same shape every producer in this ecosystem
@@ -77,7 +77,7 @@ the two is read off the command, so there is no mode to set and no way to set it
 inconsistently.
 
 **Adapter.** A separate program that reads an execution's captured output and
-writes an envelope. Where it reaches a verdict, that verdict **is** the result and
+writes an envelope. Where it reaches a verdict, that verdict is the result and
 bolt does not second-guess it. A task naming no adapter gets the generic
 exit-code one, which is the single adapter that needs to know nothing about the
 tool it is reading.
@@ -89,27 +89,27 @@ adopter overrides one line without forking it.
 
 ## Things it is deliberate about
 
-**Every substituted path is quoted, in a single left-to-right pass.** Not one
+Every substituted path is quoted, in a single left-to-right pass. Not one
 pass per variable. Chained replacement re-expands a token that appears inside an
 already-substituted filename, which breaks the quoting: a file named
 ``p{all_paths};id #`` executed `id`. The property is the quoting *and* never
 reading substituted bytes again.
 
-**A failing task does not stop the run.** Stopping discards the evidence the
+A failing task does not stop the run. Stopping discards the evidence the
 later tasks would have produced and leaves a reader unable to tell what else was
 wrong. A task can ask for the opposite with `short-circuit-failure`.
 
-**A run refuses rather than writing into a directory that already holds one.**
+A run refuses rather than writing into a directory that already holds one.
 The default output directory is stamped to the second, so two runs starting
 together would otherwise interleave their evidence and hand both callers the
 same conflated file.
 
-**The exit status says whether bolt could carry out the run, not whether the
-tools passed.** A gate whose linter found problems exits 0 with
+The exit status says whether bolt could carry out the run, not whether the
+tools passed. A gate whose linter found problems exits 0 with
 `success: false`; a bolt that could not read the jig exits non-zero. Those are
 different questions and a caller usually wants them answered separately.
 
-**A time limit kills the process group**, so a command that spawned children
+A time limit kills the process group, so a command that spawned children
 does not leave them writing into a directory bolt has finished with. The killed
 command keeps whatever output it gathered and its adapter still runs over it,
 because a tool that reported forty problems before hanging reported forty real
@@ -125,12 +125,12 @@ One binary, no runtime dependencies, no C toolchain. Bolt's own gate is a bolt
 run over its own repository:
 
 ```console
-cargo build && ./target/debug/bolt rust-quality .
+cargo build --release && cp target/release/bolt bin/bolt && bolt rust-quality .
 ```
 
 ## Status
 
-**Rust, under active rebuild, and honest about it.** Bolt was previously written
+Rust, under active rebuild. Bolt was previously written
 in Go; this tree is a fresh implementation derived from the architecture
 document rather than a port, which is why its requirements are renumbered and
 its coverage is counted against a new document.
@@ -140,7 +140,7 @@ substitution with three-layer definitions, `requires` resolved up front,
 adapters and declared evidence, per-task and whole-run time limits, the depth
 ceiling, short-circuit, the merge, and refusals that write a parseable result.
 
-**Composition is a command line.** A jig that wants another jig run over a
+Composition is a command line. A jig that wants another jig run over a
 subdirectory writes `bolt` in a task's command, as it writes any other tool, and
 an adapter turns the child's result into that task's envelope. There is no jig
 task and no nesting mechanism: bolt is a tool a jig runs, and the runner does
@@ -154,7 +154,7 @@ The adapter is what carries the verdict. Bolt exits 0 whenever it carried a run
 out, whatever the tools concluded, so the verdict lives in the envelope and the
 adapter is how it travels between runs.
 
-**`--result-to-exitcode` opts out of that**, for a shell that needs to compose:
+`--result-to-exitcode` opts out of that, for a shell that needs to compose:
 
     bolt --result-to-exitcode gate . && bolt --result-to-exitcode other .
 
@@ -164,8 +164,8 @@ every caller written against the default is unaffected.
 
 Its own gate reports eight tasks, seven passing. The eighth is traceability,
 which requires every test to cite a requirement and every cited requirement to
-exist; it currently reports 131 of 234 covered and fails on the rest. **That is
-the state of a rebuild rather than a defect**, and it is left failing on purpose:
+exist; it reports 142 of 240 covered and fails on the rest. That is
+the state of a rebuild rather than a defect, and it is left failing on purpose:
 turning it green by marking the uncovered rows as open questions would misreport
 what is settled.
 
