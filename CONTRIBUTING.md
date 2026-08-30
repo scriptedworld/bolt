@@ -2,10 +2,24 @@
 
 ## What you need
 
-Rust 1.97 or newer, and a checkout of wrench at `../wrench/rust`, which
-`Cargo.toml` takes as a path dependency.
+Rust 1.97 or newer.
 
-The gate additionally runs `rustfmt`, `lizard`, `python3`, `cargo-llvm-cov`,
+**A standalone clone does not build.** `Cargo.toml` takes wrench as a path
+dependency at `../wrench/rust`, so `cargo build` stops at `failed to load source
+for dependency wrench` unless a checkout of wrench sits beside this one. wrench
+is a separate repository, and publishing it is what removes this step.
+
+The gate needs a second sibling. Its `traceability` task runs a checker shared
+from toolbox, which a project adopts as links rather than as committed files:
+
+    python3 ../toolbox/bin/link-jigs.py . common secrets --yes
+
+That places six links, all of them gitignored, because a committed symlink
+stores its target path as content and dangles in a clone without the sibling it
+names. Without them `traceability` fails on its checker being absent, which
+reads like a coverage failure until you look at `stderr`.
+
+The gate also runs `rustfmt`, `lizard`, `python3`, `cargo-llvm-cov`,
 `cargo-audit` and `cargo-deny`. A jig names every executable it invokes in
 `requires`, so a missing one refuses the run up front instead of failing a task
 halfway through.
