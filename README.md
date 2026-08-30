@@ -1,15 +1,18 @@
 # bolt
 
-Bolt runs a declared set of commands over a directory and records what happened.
+Bolt runs a project's quality gate. It takes a declared list of commands, runs
+them over a directory, keeps everything they produced on disk, and folds their
+results into one verdict a build system can read.
 
 It knows nothing about any tool it runs. A jig says which commands, over which
-files; bolt executes them, keeps every stream and exit status on disk, hands each
-one's output to an adapter that turns it into a verdict, and folds those verdicts
-into a single result. Swapping a linter for another linter is an edit to the jig.
+files; bolt executes them, keeps every stream and exit status, hands each one's
+output to an adapter that turns it into a verdict, and folds those verdicts
+into a single result. Swapping a linter for another linter is an edit to the
+jig.
 
-That separation is the whole idea. A quality gate that knows about its tools has
-to change whenever they do, and gates written that way rot into shell scripts
-nobody will touch. Bolt is the part that does not need to change.
+A gate that knows about its tools has to change whenever they do, and gates
+written that way rot into shell scripts nobody will touch. Bolt is the part
+that does not need to change.
 
 ## What a run looks like
 
@@ -31,21 +34,20 @@ tasks:
     matching: ["**/*.rs"]
     excluding: ["**/target/**"]
     command: "lizard --CCN 15 {all_paths}"
-    adapter: adapters/lizard.py
 ```
 
 ```console
 $ bolt rust-quality .
-/home/you/project/.bolt-2026-08-28T13-45-02Z/result.yaml
+/home/you/project/.bolt-2026-08-30T03-34-55Z-1921009/result.yaml
 ```
 
-Bolt prints where the result is rather than what it says, because the verdict
-belongs in the file and a caller that wants it reads one document either way.
+Bolt prints where the result is, not what it says. The verdict belongs in the
+file, and a caller that wants it reads one document either way.
 
 ## What it leaves behind
 
 ```
-.bolt-2026-08-28T13-45-02Z/
+.bolt-2026-08-30T03-34-55Z-1921009/
 ├── result.yaml              the run's one verdict, folded from below
 └── work/
     ├── format-1/
@@ -57,9 +59,14 @@ belongs in the file and a caller that wants it reads one document either way.
     └── complexity-1/
 ```
 
+The default directory carries the time and the process id. One invocation is one
+process, so two runs starting in the same second get two directories.
+`--output-dir` names one instead, and a run refuses a directory that already
+holds a run, because writing into one would interleave two runs' evidence.
+
 Every execution gets a directory whether it passed, failed, was killed at a time
-limit, or never started. The manifest is written before the command runs, so
-an execution that was killed still records what it was going to attempt.
+limit, or never started. The manifest is written before the command runs, so an
+execution that was killed still records what it was going to attempt.
 
 `result.yaml` is an envelope, the same shape every producer in this ecosystem
 writes: `success`, and `reasons` carrying a `kind` and a `message` when it is
@@ -67,50 +74,45 @@ false. A consumer reads one format whatever produced it.
 
 ## The pieces
 
-**Jig.** A named YAML file listing tasks. Spoken of by name, never by path, so a
-shared jig can be distributed and a project runs `bolt go-quality .` without
-knowing where the file came from.
+A jig is a named YAML file listing tasks. It is spoken of by name and never by
+path, so a shared jig can be distributed and a project runs `bolt go-quality .`
+without knowing where the file came from.
 
-**Task.** One command, plus which files it acts on. `{each_path}` runs it once
+A task is one command, plus which files it acts on. `{each_path}` runs it once
 per matched file; `{all_paths}` runs it once with the whole selection. Which of
-the two is read off the command, so there is no mode to set and no way to set it
-inconsistently.
+the two applies is read off the command, so there is no mode to set and no way
+to set it inconsistently.
 
-**Adapter.** A separate program that reads an execution's captured output and
+An adapter is a separate program that reads an execution's captured output and
 writes an envelope. Where it reaches a verdict, that verdict is the result and
 bolt does not second-guess it. A task naming no adapter gets the generic
-exit-code one, which is the single adapter that needs to know nothing about the
-tool it is reading.
+exit-code one, the single adapter that needs to know nothing about the tool it
+is reading.
 
-**Definitions.** Values a jig's commands name as `{placeholder}`, resolved
+Definitions are values a jig's commands name as `{placeholder}`, resolved
 against three layers: bolt's own locations, then the jig's `definitions` block,
-then a file named with `--definitions`. So a shared jig ships defaults and an
+then a file named with `--definitions`. A shared jig ships defaults and an
 adopter overrides one line without forking it.
 
 ## Things it is deliberate about
 
-Every substituted path is quoted, in a single left-to-right pass. Not one
+Every substituted path is quoted, in a single left-to-right pass, and not one
 pass per variable. Chained replacement re-expands a token that appears inside an
 already-substituted filename, which breaks the quoting: a file named
-``p{all_paths};id #`` executed `id`. The property is the quoting *and* never
-reading substituted bytes again.
+``p{all_paths};id #`` executed `id`. The property is the quoting together with
+never reading substituted bytes again.
 
-A failing task does not stop the run. Stopping discards the evidence the
-later tasks would have produced and leaves a reader unable to tell what else was
+A failing task does not stop the run. Stopping discards the evidence the later
+tasks would have produced and leaves a reader unable to tell what else was
 wrong. A task can ask for the opposite with `short-circuit-failure`.
 
-A run refuses rather than writing into a directory that already holds one.
-The default output directory is stamped to the second, so two runs starting
-together would otherwise interleave their evidence and hand both callers the
-same conflated file.
+The exit status says whether bolt could carry out the run, not whether the tools
+passed. A gate whose linter found problems exits 0 with `success: false`; a bolt
+that could not read the jig exits non-zero. Those are different questions and a
+caller usually wants them answered separately.
 
-The exit status says whether bolt could carry out the run, not whether the
-tools passed. A gate whose linter found problems exits 0 with
-`success: false`; a bolt that could not read the jig exits non-zero. Those are
-different questions and a caller usually wants them answered separately.
-
-A time limit kills the process group, so a command that spawned children
-does not leave them writing into a directory bolt has finished with. The killed
+A time limit kills the process group, so a command that spawned children does
+not leave them writing into a directory bolt has finished with. The killed
 command keeps whatever output it gathered and its adapter still runs over it,
 because a tool that reported forty problems before hanging reported forty real
 problems.
@@ -121,8 +123,12 @@ problems.
 cargo build --release
 ```
 
-One binary, no runtime dependencies, no C toolchain. Bolt's own gate is a bolt
-run over its own repository:
+One binary and no build-time C toolchain: nothing in the dependency tree
+compiles C, and `libc` is declarations only. The binary is dynamically linked
+against the system `libc`, `libm` and `libgcc_s`, so it is not a single-file
+image today.
+
+Bolt's own gate is a bolt run over its own repository:
 
 ```console
 cargo build --release && cp target/release/bolt bin/bolt && bolt rust-quality .
@@ -130,10 +136,10 @@ cargo build --release && cp target/release/bolt bin/bolt && bolt rust-quality .
 
 ## Status
 
-Rust, under active rebuild. Bolt was previously written
-in Go; this tree is a fresh implementation derived from the architecture
-document rather than a port, which is why its requirements are renumbered and
-its coverage is counted against a new document.
+Rust, under active rebuild. Bolt was previously written in Go; this tree is a
+fresh implementation derived from the architecture document and not a port,
+which is why its requirements are renumbered and its coverage is counted against
+a new document.
 
 What works today: the walk and per-task filtering, both path forms, single-pass
 substitution with three-layer definitions, `requires` resolved up front,
@@ -148,11 +154,10 @@ not know which of its commands is bolt.
 
     - name: subproject
       command: bolt inner {base_dir}/sub --output-dir {work_dir}/child
-      adapter: bolt-result
+      adapter: adapters/common/bolt-result.py
 
-The adapter is what carries the verdict. Bolt exits 0 whenever it carried a run
-out, whatever the tools concluded, so the verdict lives in the envelope and the
-adapter is how it travels between runs.
+The adapter is what carries the verdict, since bolt exits 0 whenever it carried
+a run out, whatever the tools concluded.
 
 `--result-to-exitcode` opts out of that, for a shell that needs to compose:
 
@@ -164,10 +169,9 @@ every caller written against the default is unaffected.
 
 Its own gate reports eight tasks, seven passing. The eighth is traceability,
 which requires every test to cite a requirement and every cited requirement to
-exist; it reports 142 of 240 covered and fails on the rest. That is
-the state of a rebuild rather than a defect, and it is left failing on purpose:
-turning it green by marking the uncovered rows as open questions would misreport
-what is settled.
+exist; it reports 143 of 241 covered and fails on the rest. That is the state of
+a rebuild and not a defect, and it is left failing on purpose: turning it green
+by marking the uncovered rows as open questions would misreport what is settled.
 
 ## Licence
 
