@@ -2020,6 +2020,49 @@ fn declared_evidence_that_was_not_produced_fails_the_task() {
     );
 }
 
+// COVERS: FR-6.14, FR-6.9, FR-7.2 | regression
+/// Missing evidence and a non-zero exit are two reasons, not one.
+///
+/// The evidence check returns before the exit-code path, so the status used to
+/// be lost whenever both applied. It is the more diagnostic of the two: a
+/// `pytest` exit of 4 is a usage error, is distinct from 1, and is usually
+/// *why* the declared file is absent at all, so reporting only the symptom
+/// sends a reader to their coverage configuration when the command line is
+/// what is wrong.
+///
+/// The task declares no adapter, which is what makes the status bolt's to
+/// report under FR-6.9. Where an adapter is declared FR-6.3 keeps that
+/// judgement the adapter's, and the status stays out.
+#[test]
+fn missing_evidence_carries_the_exit_status_beside_it() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "version: \"1.0.0\"\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 4'\"\n",
+            "    evidence: [\"report.json\"]\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+    let carried = reasons_in(&work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE));
+
+    assert!(
+        carried
+            .iter()
+            .any(|(kind, message)| kind == "evidence-missing" && message.contains("report.json")),
+        "no reason names the evidence that was not produced: {carried:?}",
+    );
+    assert!(
+        carried
+            .iter()
+            .any(|(kind, message)| kind == "nonzero-exit" && message.contains("exited 4")),
+        "the exit status was dropped: {carried:?}",
+    );
+}
+
 // COVERS: FR-6.6, FR-6.13 | property
 /// Re-folding a finished run costs no re-execution.
 ///

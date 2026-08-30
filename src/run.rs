@@ -1362,13 +1362,30 @@ fn adapt<'a>(
         .iter()
         .find(|file| !work_dir.join(file).exists())
     {
-        return write_envelope(
-            work_dir,
-            false,
-            "evidence-missing",
-            &format!("{} declared {missing} and did not write it", task.name),
-        )
-        .map(|()| None);
+        let mut reasons = vec![(
+            "evidence-missing".to_owned(),
+            format!("{} declared {missing} and did not write it", task.name),
+        )];
+
+        // FR-6.14 is the more actionable reason and the status is the more
+        // diagnostic fact, so both are carried. A `pytest` exit of 4 is a usage
+        // error, means something different from 1, and is usually *why* the
+        // declared file is absent: the tool never ran. Reporting only the
+        // symptom sends a reader to their coverage configuration when the
+        // command line is what is wrong.
+        //
+        // Only where no adapter is declared, because FR-6.9 makes bolt the
+        // generic exit-code adapter there and FR-6.3 keeps the judgement an
+        // adapter's everywhere else. FR-6.9a excludes a killed command, whose
+        // status is bolt's own signal rather than an answer the tool gave.
+        if task.adapter.is_none() && !ran.killed && ran.status != 0 {
+            reasons.push((
+                "nonzero-exit".to_owned(),
+                format!("{} exited {}", execution.task, ran.status),
+            ));
+        }
+
+        return write_reasons(work_dir, false, &reasons).map(|()| None);
     }
 
     let Some(name) = task.adapter.as_deref() else {
@@ -1680,12 +1697,26 @@ fn variables(
 
 /// Write an execution's envelope.
 fn write_envelope(work_dir: &Path, success: bool, kind: &str, message: &str) -> Result<(), Error> {
+    write_reasons(work_dir, success, &[(kind.to_owned(), message.to_owned())])
+}
+
+/// Write an execution's envelope carrying every reason it has.
+///
+/// FR-7.2 makes `reasons` a list, so a failure with two things to say about it
+/// says both. FR-7.9's kind lets a consumer tell one sort from another without
+/// reading English, and FR-7.8's message rides with each so one consumer can
+/// render every reason it meets.
+fn write_reasons(
+    work_dir: &Path,
+    success: bool,
+    reasons: &[(String, String)],
+) -> Result<(), Error> {
     let mut envelope = json!({ "success": success });
     if !success {
-        // FR-7.9's kind, so a consumer tells one sort of failure from another
-        // without reading English, and FR-7.8's message, which every reason
-        // carries so one consumer can render every reason it meets.
-        envelope["reasons"] = json!([{ "kind": kind, "message": message }]);
+        envelope["reasons"] = reasons
+            .iter()
+            .map(|(kind, message)| json!({ "kind": kind, "message": message }))
+            .collect();
     }
     save(
         &work_dir.join(OUTPUT_FILE),
