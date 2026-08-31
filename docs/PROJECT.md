@@ -20,11 +20,17 @@ that does not have to change.
     toolbox   the jigs bolt runs, and the checkers and adapters they name
     wrench    reads and writes every structured file, and owns the schemas
     bolt      runs the jig, records what happened, and folds one result
-    anvil     the portable execution environments a jig runs inside
+    anvil     the portable execution environments a jig runs inside,
+              designed and not built
 
-### Anvil is where bolt runs, and `requires` is its manifest
+### Anvil is where bolt is to run, and `requires` is its manifest
 
-Anvil is Docker-based, and the images carry the toolchain, bolt itself, the
+**Anvil is not built.** Its repository holds documentation and no Dockerfiles.
+The design is recorded here because two of bolt's requirements are shaped by it,
+and a reader who meets those requirements without it cannot tell why they are
+drawn the way they are.
+
+The design is Docker-based, with images carrying the toolchain, bolt itself, the
 common quality tooling and its configuration. They are execution environments
 and not places a person works: the tooling a jig needs is present and the same
 everywhere.
@@ -44,9 +50,9 @@ from. An under-declared jig runs locally, where the tool happens to be on
 That raises the stakes on FR-3.10b and FR-3.10d, and it is why FR-3.10's
 inventory covers the whole jig instead of flagging the unusual tools in it.
 
-The same tooling arrives two ways on purpose: locally `link-jigs` symlinks it
-out of toolbox, and in an image it is already present from the anvil layer
-beneath.
+The same tooling is to arrive two ways on purpose: locally `link-toolbox`
+symlinks it out of toolbox, and in an image it would already be present from the
+anvil layer beneath.
 
 The fold is bolt's, by name, in that architecture: `BOLT fold -> result
 envelope`, stated as a property of a run and not of nesting. One `result.yaml`
