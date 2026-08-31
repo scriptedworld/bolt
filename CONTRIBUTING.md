@@ -34,7 +34,7 @@ the binary doing the testing:
 ```console
 $ cargo build --release
 $ ./target/release/bolt rust-quality . --output-dir .bolt-gate
-./.bolt-gate/result.yaml
+/home/you/bolt/.bolt-gate/result.yaml
 ```
 
 Eight tasks: format, lint, build, tests with coverage, vulnerabilities,
@@ -49,7 +49,7 @@ and a change to the runner, the adapters or the fold will not be in it.
 
 `traceability` is the one task that does not pass, and making it green is not
 the goal. It requires every test to cite the requirement it discharges, and
-every cited requirement to exist:
+every cited requirement to exist.
 
 The uncovered rows include requirements that need tests, requirements that need
 citations against existing tests, and design properties no test can observe.

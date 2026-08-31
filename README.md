@@ -40,11 +40,13 @@ tasks:
 
 ```console
 $ bolt rust-quality .
-./.bolt-2026-08-30T03-34-55Z-1921009/result.yaml
+/home/you/project/.bolt-2026-08-30T03-34-55Z-1921009/result.yaml
 ```
 
 Bolt prints where the result is, not what it says. The verdict belongs in the
-file, and a caller that wants it reads one document either way.
+file, and a caller that wants it reads one document either way. The path is
+absolute whatever the run was given, so a caller can hold it without also
+holding the directory it was run from.
 
 Every executable a jig names goes in `requires`, and a run stops before it
 starts if one of them is not on `PATH`. Half a gate run on a machine missing a
