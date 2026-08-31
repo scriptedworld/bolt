@@ -17,9 +17,12 @@ that does not have to change.
 
 ## Where this stands, and what is not done
 
-**Active, and in daily use.** Bolt gates its own repository and five others,
-and this is the Rust implementation that replaced an earlier Go one, which has
-been deleted rather than kept as a fallback.
+**Active, and in daily use.** Bolt gates its own repository and five others.
+
+Rust because the work is process spawning, file walking and reading output
+under a time limit, and it does that faster than the Go implementation it
+replaced. That implementation was retired once this one passed it, rather than
+kept as a fallback.
 
 MIT licensed because somebody else might want it, not run as an open-source
 project: no release cadence and no compatibility promise. The command line is
