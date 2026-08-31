@@ -15,6 +15,40 @@ hands each execution's output to an adapter that turns it into a verdict, so
 swapping a linter for another linter is an edit to the jig. Bolt is the part
 that does not have to change.
 
+## Where this stands, and what is not done
+
+**Active, and in daily use.** Bolt gates its own repository and five others,
+and this is the Rust implementation that replaced an earlier Go one, which has
+been deleted rather than kept as a fallback.
+
+MIT licensed because somebody else might want it, not run as an open-source
+project: no release cadence and no compatibility promise. The command line is
+the interface.
+
+**Working today:** the walk and per-task filtering, both path forms, single-pass
+substitution with three-layer definitions, `requires` resolved up front,
+adapters and declared evidence, per-task and whole-run time limits, the depth
+ceiling, short-circuit, the fold, and refusals that write a parseable result.
+
+**Not done, and the gate reports it rather than hiding it:**
+
+- **147 of 228 settled requirements have a test citing them.** The traceability
+  task fails until the rest do, and prints the number.
+- Requirements describing design constraints no test can observe need
+  classifying: made testable, moved to the component that owns them, or
+  exempted.
+- `REQUIREMENTS.md` is one file and should be one per requirement. The checker
+  reads either shape; it waits on where a retired id lives once the single file
+  is gone, and 63 rows are retired.
+- The repository-local quality jig should become the shared one once that
+  offers the same checks.
+- Definitions files and the jig's `definitions` block have no schema yet.
+
+**Setup takes three repositories.** bolt runs the gates, toolbox supplies the
+jigs and checkers, wrench validates the structured files. `docs/runbook.md`
+covers cloning them as siblings and linking them, and a fresh clone has no gate
+until you do.
+
 ## Running it
 
 A jig is a file called `bolt.<name>.yaml`. Bolt looks for it in the directory
@@ -179,17 +213,10 @@ adapter's verdict, and adapters are separate programs a jig names.
 Unix only. Time limits kill the process group through `libc::kill`, so the
 build does not target Windows.
 
-## Status
+## Composition
 
-Under active rebuild, with no released version and no stable interface. The
-command line is the only interface, and the crate is not published.
-
-Working today: the walk and per-task filtering, both path forms, single-pass
-substitution with three-layer definitions, `requires` resolved up front,
-adapters and declared evidence, per-task and whole-run time limits, the depth
-ceiling, short-circuit, the fold, and refusals that write a parseable result.
-
-Composition uses that command-line mechanism.
+A task can run bolt against a subdirectory and take its verdict, which is how a
+repository of several projects gates as one.
 
 ```yaml
   - name: subproject
