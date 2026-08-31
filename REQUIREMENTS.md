@@ -357,14 +357,21 @@ A run's whole output is one directory:
 
 ## 13. Open
 
-Each row states a property that must eventually hold and cannot be stated yet.
-The questions that would settle them are in `NEXT_STEPS.md`.
+Rows that could not be stated until somebody decided them. A row keeps its id
+once answered rather than moving to the section its subject belongs to, because
+an id is never reused and never renumbered, so the section records where a
+requirement came from rather than what it is about.
+
+An answered row is settled and carries no test yet, so it reads as uncovered
+until one is written. That is the honest reading and is not a reason to leave it
+`[?]`.
+
+The questions that would settle any remaining row are in `NEXT_STEPS.md`.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-13.6 | Run directories are removed on a stated rule, so a dogfooding repository does not accumulate them without bound. | [?] |
-| FR-13.7 | Evidence can be tied to the exact tree state it was produced from, as §65 requires, by something. Bolt reads no git, so either it acquires that dependency or the requirement belongs to the caller. | [?] |
-| FR-13.8 | The number of bolt runs a user may have live at once is bounded, if that guard is wanted at all. | [?] |
+| FR-13.6 | A run directory older than **seven days** is removed, and the cleanup is automatic, so a dogfooding repository does not accumulate them without bound. | [A] |
+| FR-13.7 | An execution's manifest records the **commit SHA its source materials came from**, so evidence can be tied to the tree state that produced it, as §65 requires. Bolt reads no git and does not acquire that dependency: the SHA reaches it from the caller, through the definitions layer that already records a `from:` provenance for every key. | [A] |
 
 ## Retired
 
@@ -410,6 +417,7 @@ oversight.
 | FR-13.1 | 2026-08-26 | FR-6.2b. An adapter writes `output.yaml` into the work directory it was given and the name never varies. |
 | FR-13.2 | 2026-08-26 | FR-7.9 and FR-7.10. A reason carries `kind`, so a task that could not execute is distinguishable from one that executed and failed. |
 | FR-13.3 | 2026-08-24 | FR-8.3a. A merge finding no constituent fails, so a green result cannot mean nothing was checked. |
+| FR-13.8 | 2026-08-31 | Nothing replaces it. The bound was asked for conditionally, "if that guard is wanted at all", and the answer is that it is not wanted yet: no crazy nesting depth has been seen, and a runtime that is not parallel surfaces excess depth without needing a large bound. A cap on concurrent bolt processes per user may be wanted later, and takes a new id when it is. |
 | FR-13.5 | 2026-08-26 | FR-4.12 and its sub-rows, which give a timed-out task a defined outcome at length. |
 | FR-13.9 | 2026-08-26 | FR-3.4d, FR-1.5 and FR-3.12: a jig is YAML, every file is schema-validated, and bolt validates the jig it is handed. |
 | FR-13.4 | 2026-08-27 | FR-8.3. It asked for a stated default for whether a constituent is required, and FR-8.3 answers by removing the question: every constituent counts, and a check nobody wants enforced is a check not in the jig. |
