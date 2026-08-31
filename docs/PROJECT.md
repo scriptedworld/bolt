@@ -277,8 +277,10 @@ are in `docs/DECISIONS/`; derived requirements remain `[D]` rows in
 `REQUIREMENTS.md`.
 
 `REQUIREMENTS.md` is one file where the intended shape is a directory, one file
-per requirement category. The checker must support that layout before the file
-can be split.
+per requirement category. The checker reads either shape, so what holds the split
+up is the 63 retired rows: there is no agreed place to record a retired id once
+the single file is gone, and a retired row cannot sit among live ones without
+defeating the check that an id is never reused.
 
 `Cargo.lock` is gitignored, which is the convention for a library and the
 opposite of the convention for a binary. Bolt ships a binary, and a gitignored
