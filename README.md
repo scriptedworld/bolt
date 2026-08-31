@@ -40,7 +40,7 @@ tasks:
 
 ```console
 $ bolt rust-quality .
-/home/you/project/.bolt-2026-08-30T03-34-55Z-1921009/result.yaml
+./.bolt-2026-08-30T03-34-55Z-1921009/result.yaml
 ```
 
 Bolt prints where the result is, not what it says. The verdict belongs in the
@@ -161,9 +161,10 @@ them.
 No task consumes another task's output. Work that needs several steps is one
 script producing one exit code.
 
-One jig over one directory per invocation. A repository of subprojects is a jig
-whose tasks invoke bolt, and the fold takes the child results as ordinary
-constituents.
+One jig over one directory per invocation. A repository of subprojects uses a
+jig whose ordinary task commands invoke bolt. An adapter turns each child
+result into a task envelope, and the parent folds those envelopes as ordinary
+constituents. There is no separate jig task or nesting data model.
 
 Bolt judges nothing itself beyond the exit status. Anything richer is an
 adapter's verdict, and adapters are separate programs a jig names.
@@ -181,10 +182,7 @@ substitution with three-layer definitions, `requires` resolved up front,
 adapters and declared evidence, per-task and whole-run time limits, the depth
 ceiling, short-circuit, the fold, and refusals that write a parseable result.
 
-Composition is a command line. A jig that wants another jig run over a
-subdirectory writes `bolt` in a task's command, as it writes any other tool, and
-an adapter turns the child's result into that task's envelope. There is no jig
-task and no nesting mechanism.
+Composition uses that command-line mechanism.
 
 ```yaml
   - name: subproject

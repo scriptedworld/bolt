@@ -1,11 +1,12 @@
 # bolt, Requirements
 
-Derived from `silo/docs/ARCHITECTURE.md` and from answers given against
-`NEXT_STEPS.md`. No earlier bolt implementation, requirements document, design
-note or test was read while writing this. The provenance of that earlier
-material is unresolved. This document exists to establish that the requirements
-reach from the architecture and from fresh answers alone, and reading it would
-have destroyed that.
+Derived from the ecosystem architecture and the decisions recorded in this
+repository. The archived first implementation was not used as a source because
+its provenance is unresolved.
+
+Two separate repositories supply shared contracts. Wrench is the structured-file
+library and schema owner. Toolbox contains shared jigs, adapters, and quality
+checkers.
 
 Requirements are stated as observable properties. Each says what must be true of
 bolt or of a run, not how anything is built.
@@ -18,12 +19,8 @@ Every `[D]` row is a default taken instead of a question asked, and all of them
 are listed in `NEXT_STEPS.md` under "Defaults taken", so a wrong one is found by
 reading that table instead of by meeting it in the code.
 
-A settled row that no test cites reads as uncovered under toolbox's traceability
-gate, and marking those `[?]` to turn it green would misreport what is settled.
-
-`tests/skeleton.rs` carries 97 `COVERS:` marks and the gate reports 143 of 241
-covered, with 3 open and exempt. The uncovered rows are specified and untested,
-and the number going up is the progress signal.
+A settled row that no test cites reads as uncovered under the traceability gate,
+and marking those `[?]` to turn it green would misreport what is settled.
 
 ## Where this departs from the architecture
 
@@ -115,7 +112,7 @@ not help with.
 | FR-3.4a | `excluding` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
 | FR-3.4b | `matching` and `excluding` belong to a task that consumes paths. On a command naming neither path variable they are a jig error, caught in validation rather than quietly ignored. Whether a whole-project command should run at all is a question about where the jig is pointed, and FR-4.4 already answers it: a command naming neither variable always executes. | [A] |
 | FR-3.4e | FR-4.4b's guarantee reaches only the tasks bolt selects for. A command handed a directory, whose tool finds its own files, is opaque: bolt cannot know whether it read a thousand files or none, so a tool that silently matched nothing reports a pass and bolt has nothing to notice. Where that matters, the task takes `matching` and a path variable so the selection is bolt's and FR-4.4b applies. | [D] |
-| FR-3.4f | Almost nothing in the estate lets bolt select: `python3 bin/count-selection.py` reports 3 of 157 tasks across 30 jig files, all three in one jig. The rest hand their tool a directory, so FR-4.4b protects three tasks and the evidence FR-9.5's manifest promises is absent for the other 154. That is the state to move, and not a reason against the rule. The script counts task blocks and not matching lines, which is the difference between the figure above and a larger one that triple-counts a task carrying `matching`, `excluding` and a path variable. It reads every sibling repository's jigs, so a clone of bolt alone cannot re-derive it. | [D] |
+| FR-3.4f | Tasks that pass a directory directly to their tool cannot record the selected paths promised by FR-9.5. This is a reason to move selection into the jig, not a reason against the rule. | [D] |
 | FR-3.4c | The jig format carries comments, and an entry's reasoning sits beside it. Somebody asking why a path is excluded finds the answer where the path is, rather than reconstructing it from git history. | [A/D] |
 | FR-3.4d | A jig is YAML, as an envelope is. One serialisation everywhere: one parser, one schema mechanism, and a jig and a result readable by the same tooling. | [A] |
 | FR-3.5 | Filter patterns are relative to the base directory of the run they are declared in. A jig written for reuse therefore says `**/*.go` and never names the subtree it was dropped into, which is what makes it the same jig at the repository root and at `backend/`. | [A] |
@@ -207,7 +204,7 @@ not help with.
 | FR-5.1a | A child run is not a mode. It is the same binary invoked the same way, so a jig run over a subdirectory by a parent's command line and that jig run over the same directory by a person are one operation. There is one code path because there was never a second one. | [A] |
 | FR-5.1b | A parent knows the command line it wrote and nothing about what is inside the jig that command names. The child follows its own process when invoked: its own `requires`, its own tasks, its own filtering. Nothing rolls up and no parent reads a child's content. | [A] |
 | FR-5.6 | Bolt carries its depth in the environment of every process it spawns, and increments it on finding the variable already set. The depth therefore survives reparenting, backgrounding and any number of shells between one bolt and the next, which is what FR-5.18 rests on: composition is a command line, so the environment is the only thing carrying the count. | [A/D] |
-| FR-5.6a | The variables are `BOLT_DEPTH` for the current depth and `BOLT_MAX_DEPTH` for the ceiling. Both spellings are the Go build's, deliberately: while both implementations exist, one nested inside the other has to agree on how deep it is, and a run through `~/bin/bolt` can reach either. FR-5.6 gave the depth an environment and did not name the variable, which writing the test is what needed. | [D] |
+| FR-5.6a | The variables are `BOLT_DEPTH` for the current depth and `BOLT_MAX_DEPTH` for the ceiling. The names allow independently built bolt invocations to agree on the current depth. | [D] |
 | FR-5.7 | The ceiling defaults to 4 and is read from the environment only at the outermost invocation, so a jig cannot raise the limit it is running under. | [A/D] |
 | FR-5.7b | Bolt overwrites both variables on every process it spawns, which is the mechanism FR-5.7 describes rather than a separate check: a nested bolt reading them gets what the bolt above it set and never what a jig wrote. There is no branch on being outermost, and one would only matter for a command deliberately rewriting the variable, which FR-5.7a puts out of scope. | [D] |
 | FR-5.7c | A value that will not parse is treated as absent, so the run reads as outermost rather than being refused. A caller's environment is not a document bolt was asked to validate, and refusing on stray shell state would fail runs while stopping nobody who meant it. | [D] |
@@ -380,7 +377,7 @@ requirement, which is what makes this worth a warning rather than a note.
 
 The checker fails an id that is both live and retired, so the collision is
 caught. **A row that is only retired is not a collision**, and nothing objects
-until something cites it. Measured 2026-08-27 by the toolbox session: a row
+until something cites it. A row
 appended here and cited by no test passes the gate with the id absent from the
 output entirely; the moment a test cites it, the gate fails naming the test and
 prints the row's own text back, which for an accidental retirement is the
@@ -443,7 +440,7 @@ oversight.
 | FR-5.17 | 2026-08-28 | FR-5.18. Six subprojects are six command lines each naming `--definitions`, which is more typing and says which file it means rather than deciding it by omission. |
 | FR-2.9a | 2026-08-28 | FR-2.9, which keeps the rule. There are no jig-task fields for the exception to apply to. |
 | FR-4.4g | 2026-08-28 | FR-4.4c. A composing task has a selection like any command task, so `optional` means what it means everywhere and is not an error. |
-| FR-5.14 | 2026-08-29 | Nothing. **There are no children**, settled by our user: composition is a command line, so every invocation is outermost and `{project_root}` is the directory it was given. A jig wanting to stand its commands at the repository root has no root to reach that is not already where it stands. |
+| FR-5.14 | 2026-08-29 | Nothing. Composition is a command line, so every invocation determines `{project_root}` from the directory it was given. |
 | FR-5.14a | 2026-08-29 | Nothing. `needs-repository-root` has nothing left to declare, by the row above. |
 | FR-5.14b | 2026-08-29 | Nothing. It said the base is not overridden by that declaration, and there is no declaration. FR-2.3's containment is unchanged and was never reached through this row. |
 | FR-5.14c | 2026-08-29 | FR-5.21, which carries the measurement. The containment escape it recorded cannot be expressed once a parent grants nothing, which is why FR-5.13 retired for the same reason. |

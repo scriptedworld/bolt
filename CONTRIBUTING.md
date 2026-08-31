@@ -1,20 +1,20 @@
 # Contributing to bolt
 
-## What you need
+## Prerequisites
 
 Rust 1.97 or newer.
 
-**A standalone clone does not build.** `Cargo.toml` takes wrench as a path
-dependency at `../wrench/rust`, so `cargo build` stops at `failed to load source
-for dependency wrench` unless a checkout of wrench sits beside this one. wrench
-is a separate repository, and publishing it is what removes this step.
+This repository currently requires two adjacent checkouts:
 
-The gate needs a second sibling. Its `traceability` task runs a checker shared
-from toolbox, which a project adopts as links rather than as committed files:
+- Clone `wrench`, the structured-file library, beside this repository so its
+  Rust crate is available at `../wrench/rust`. `Cargo.toml` uses that path
+  dependency, so a standalone clone cannot build.
+- Clone `toolbox`, the shared quality-jig and checker repository, beside this
+  repository. From the bolt checkout, run:
 
-    python3 ../toolbox/bin/link-jigs.py . common secrets --yes
+      python3 ../toolbox/bin/link-jigs.py . common secrets --yes
 
-That places six links, all of them gitignored, because a committed symlink
+The command places six links, all of them gitignored, because a committed symlink
 stores its target path as content and dangles in a clone without the sibling it
 names. Without them `traceability` fails on its checker being absent, which
 reads like a coverage failure until you look at `stderr`.
@@ -34,7 +34,7 @@ the binary doing the testing:
 ```console
 $ cargo build --release
 $ ./target/release/bolt rust-quality . --output-dir .bolt-gate
-/home/you/bolt/.bolt-gate/result.yaml
+./.bolt-gate/result.yaml
 ```
 
 Eight tasks: format, lint, build, tests with coverage, vulnerabilities,
@@ -51,17 +51,10 @@ and a change to the runner, the adapters or the fold will not be in it.
 the goal. It requires every test to cite the requirement it discharges, and
 every cited requirement to exist:
 
-```console
-$ tail -1 .bolt-gate/work/traceability-1/stdout
-147 of 226 requirements covered; 3 open and exempt
-```
-
-Of the 79 uncovered rows, 57 want a test, 3 want a citation against a test that
-already exercises them, and 19 assert a design property no test can observe.
-Those 19 are waiting on a ruling, so do not try to close one by writing a test:
-`docs/PROJECT.md` says what they are. Marking a row open to clear the gate would
-misreport what is settled. The number going up is the progress signal, and it
-moves in both directions as rows retire.
+The uncovered rows include requirements that need tests, requirements that need
+citations against existing tests, and design properties no test can observe.
+The last group waits on a decision recorded in `NEXT_STEPS.md`. Marking a row
+open merely to clear the gate would misreport what is settled.
 
 Mass co-citation is refused for the reason the gate exists. A citation is
 checked for naming a real row, never for the test touching it, so a wrong

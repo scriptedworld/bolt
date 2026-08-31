@@ -121,22 +121,11 @@ they are the same program.
 `LESSONS/the-installed-binary-gates-everything.md` and
 `LESSONS/a-second-build-answers-for-the-tree.md` carry that in full.
 
-Seven of the eight tasks pass. `traceability` fails deliberately and should not
-be made green: it reports 147 of 226 requirements covered. Marking the rest `[?]`
-to clear the gate would misreport what is settled, and the number going up is the
-progress signal.
-
-The 79 uncovered rows fall into three groups, and the third is why the gate
-cannot simply be worked down to green:
-
-    57  a new test discharges it
-    19  asserts a design property no test can observe
-     3  an existing test exercises it and needs the citation
-
-The 19 are negative universals, ecosystem decisions bolt honours rather than
-owns, and claims resting on tools outside a clone. Each has to be rewritten as
-something checkable, retired in favour of the project that owns it, or accepted
-as permanently exempt, and that is a ruling rather than work.
+`traceability` fails deliberately while settled requirements remain uncovered.
+Marking them `[?]` merely to clear the gate would misreport what is settled.
+Some need tests, some need citations against existing tests, and some describe
+design properties no test can observe. The last group must become testable,
+move to the component that owns it, or be explicitly exempted.
 
 `bin/test-traceability.py` is a symlink to the shared checker in toolbox, so
 that task's verdict moves when toolbox does.
@@ -144,7 +133,10 @@ that task's verdict moves when toolbox does.
 No jig in service uses `short-circuit-failure`, `time-limit`, `optional` or
 `adapter-command`, so this build is a superset of what is exercised in practice.
 
-## Where this build differs from the Go implementation
+## Where this build differs from the legacy Go implementation
+
+The legacy Go implementation is a separate repository retained for behaviour
+comparison during the rebuild.
 
 Work directories number from one. FR-9.2a specifies that, so the Go build was the
 divergence, but it breaks anything naming a directory and the failure presents as
@@ -153,14 +145,14 @@ divergence, but it breaks anything naming a directory and the failure presents a
     Go build   out/work/composed-0/stdout
     this one   out/work/composed-1/stdout
 
-`metadata.evidence` moved with it, in three ways at once. A task's key carries
+`metadata.evidence` differs in three ways. A task's key carries
 the ordinal, `complexity-1` rather than `complexity`; the value is one mapping
 rather than a list of them; and `result` is absolute rather than relative to the
 base. A consumer looking a task up by bare name and indexing `[0]` breaks on all
-three, and breaks by raising rather than by reading a wrong value. Nothing in the
-estate reads that block: audited across `~/.projects` on 2026-08-30, the only
-readers are bolt's own tests, and `adapters/common/bolt-result.py` folds a
-child's `reasons` and `success` without touching it.
+three, and breaks by raising rather than by reading a wrong value. This
+repository has no production reader of that block. Bolt's tests read it, while
+the composition adapter folds a child's `reasons` and `success` without touching
+it.
 
 Flags may be written after the positionals here and not there, so the accepted
 argument set only widens.
@@ -175,8 +167,7 @@ The `kind` on a reason says which of two disjoint vocabularies it came from:
 sixteen refusals, where bolt could not run, and eight verdicts bolt writes
 itself once it has. Anything else is an adapter's own and that set is open.
 `jig-reference.md` lists both closed sets, and which file a name is defined in
-is the discrimination. Three sessions have asked this and none could answer it
-from the source.
+is the discrimination.
 
 The one that misleads is `adapter-failed`. It reads like a verdict an adapter
 reached and is bolt reporting that it could not get one out of the adapter at
@@ -277,21 +268,17 @@ question 48: how an invocation pointed at a subdirectory learns the root above
 it. Under composition those rows are vacuous until it is answered, since every
 invocation is outermost and inherits nothing.
 
-79 requirement rows are uncovered. Sampling them shows most are built and
-untested instead of unbuilt: FR-9.4's deterministic ordinals, FR-7.9's reason
-kinds and FR-9.8's manifests all work. So the bulk of the remaining work is
-writing tests.
+Uncovered requirements include implemented behaviour that still needs tests.
+FR-9.4's deterministic ordinals, FR-7.9's reason kinds, and FR-9.8's manifests
+are examples.
 
-`NEXT_STEPS.md` holds the open questions and the defaults taken. Every default
-is a `[D]` row, reversible by editing the row it became.
+`NEXT_STEPS.md` holds the open questions. Settled choices and their rationale
+are in `docs/DECISIONS/`; derived requirements remain `[D]` rows in
+`REQUIREMENTS.md`.
 
-This `docs/` tree is thin. There is no `DECISIONS/` directory: the decisions are
-still the `[D]` rows in `REQUIREMENTS.md` and the defaults table in
-`NEXT_STEPS.md`, which is a defensible place for them.
-
-`REQUIREMENTS.md` is one file where the shape it is heading for is a directory,
-one file per requirement. The 48 retired rows are what blocks the move, because
-where a retired id lives under that layout is unsettled.
+`REQUIREMENTS.md` is one file where the intended shape is a directory, one file
+per requirement category. The checker must support that layout before the file
+can be split.
 
 `Cargo.lock` is gitignored, which is the convention for a library and the
 opposite of the convention for a binary. Bolt ships a binary, and a gitignored
