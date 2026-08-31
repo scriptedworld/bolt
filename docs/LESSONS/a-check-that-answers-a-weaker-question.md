@@ -31,11 +31,11 @@ Seven are this tree's, four are wrench's, one is a coordinator's. Nobody in the
 estate is better at this than anybody else, which is the argument for the
 remedies rather than for care.
 
-Five of twelve are not bolt's, so where this file should live is filed at
-`clank/inbox/silo/a-cross-repository-lesson-collection-lives-in-one-project/`.
-A copy in wrench drifted, in `docs/LESSONS/`, which is the last directory
-anybody would search for a stale copy. **If you are reading a version of this
-that says fewer than twelve, it is not the one being maintained.**
+Five of twelve are not bolt's, so where this file should live is an open
+question: a collection spanning repositories has no obvious home inside any one
+of them. A copy in wrench drifted, in `docs/LESSONS/`, which is the last
+directory anybody would search for a stale copy. **If you are reading a version
+of this that says fewer than twelve, it is not the one being maintained.**
 
 ## Why the name is the trap
 
