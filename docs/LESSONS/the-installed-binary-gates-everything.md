@@ -68,16 +68,6 @@ not exist instead of being one somebody has to remember.
 `./target/debug/bolt` and `cargo test` stay right for iterating. Only the
 installed binary gates, and that distinction is the whole of this file.
 
-## If it goes wrong
-
-Reverting the estate to the Go build is one command and needs nobody's
-permission:
-
-    ln -sfn ../../bolt.go/bin/bolt.go ~/.projects/dotfiles/bin/bolt
-
-`bolt.go` stays on `PATH` by name, so comparing the two does not require a
-revert at all.
-
 ## Why this is bolt's lesson and not the estate's
 
 The exposure is everybody's and the thing that can create it is one session's
