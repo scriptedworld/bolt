@@ -2,27 +2,14 @@
 
 ## Prerequisites
 
-Rust 1.97 or newer.
+`docs/runbook.md` carries all of it: the tools, the three sibling checkouts
+bolt needs to build and gate, and the one command that links the shared gate
+from toolbox. A clone that has not run that step fails `traceability` on its
+checker being absent, which reads like a coverage failure until you look at
+`stderr`.
 
-This repository currently requires two adjacent checkouts:
-
-- Clone `wrench`, the structured-file library, beside this repository so its
-  Rust crate is available at `../wrench/rust`. `Cargo.toml` uses that path
-  dependency, so a standalone clone cannot build.
-- Clone `toolbox`, the shared quality-jig and checker repository, beside this
-  repository. From the bolt checkout, run:
-
-      python3 ../toolbox/bin/link-jigs.py . common secrets --yes
-
-The command places six links, all of them gitignored, because a committed symlink
-stores its target path as content and dangles in a clone without the sibling it
-names. Without them `traceability` fails on its checker being absent, which
-reads like a coverage failure until you look at `stderr`.
-
-The gate also runs `rustfmt`, `lizard`, `python3`, `cargo-llvm-cov`,
-`cargo-audit` and `cargo-deny`. A jig names every executable it invokes in
-`requires`, so a missing one refuses the run up front instead of failing a task
-halfway through.
+A jig names every executable it invokes in `requires`, so a missing one refuses
+the run up front instead of failing a task halfway through.
 
 ## The loops
 

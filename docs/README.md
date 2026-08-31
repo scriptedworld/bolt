@@ -4,6 +4,8 @@
 `CONTRIBUTING.md` is what a change is held to, and `SECURITY.md` states the
 trust boundary and how to report a vulnerability.
 
+    runbook.md         getting bolt, wrench and toolbox onto a box so the
+                       gate runs, and what the two setup failures look like
     jig-reference.md   every jig field, every placeholder, the run directory,
                        the reason kinds, and the exit status rule
     PROJECT.md         what bolt is for, how it is gated, what is decided,

@@ -153,6 +153,10 @@ Nothing in the dependency tree compiles C, and `libc` is declarations only. The
 binary is dynamically linked against the system `libc`, `libm` and `libgcc_s`,
 so it is not a single-file image today.
 
+The gate itself comes from a third repository, `toolbox`, which ten projects
+adopt from one source. `docs/runbook.md` is the setup: what to install, the
+three checkouts, and the one command that links the gate into a clone.
+
 `CONTRIBUTING.md` has the gate, the test conventions and how a change gets made.
 
 ## What it does not do
