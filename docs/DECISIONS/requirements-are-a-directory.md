@@ -10,7 +10,7 @@ single file is gone. A retired row cannot share a file with live ones, because a
 checker reading the tree parses every file it finds, and an id that is both live
 and retired is the collision the never-reuse rule exists to catch.
 
-Bolt carries 63 retired rows, so that has to be answered before the split rather
+Bolt carries 64 retired rows, so that has to be answered before the split rather
 than after. The checker already supports one answer, a document whose filename
 ends `.retired`, which is a candidate and not a ruling. `NEXT_STEPS.md` tracks
 the question.

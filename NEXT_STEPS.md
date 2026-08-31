@@ -1,6 +1,6 @@
 # What is not done
 
-Bolt is an active rebuild with no released version or stable interface. The
+Bolt is in daily use and has no released version or stable interface. The
 command line is the only supported interface, and the crate is not published.
 
 The remaining implementation work is:
@@ -12,7 +12,7 @@ The remaining implementation work is:
   or be explicitly exempted.
 - Split `REQUIREMENTS.md` into one file per requirement category. The checker
   reads either shape already. What this waits on is where a retired id is
-  recorded once the single file is gone, and 63 rows are retired. See
+  recorded once the single file is gone, and 64 rows are retired. See
   `docs/DECISIONS/requirements-are-a-directory.md`.
 - Replace the repository-local quality jig with shared jig definitions once the
   shared Rust definition provides the same checks. See

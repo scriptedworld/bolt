@@ -72,23 +72,21 @@ schema on the way in and on the way out. A jig bolt cannot read is refused by
 wrench's schema before bolt sees it, which is why several of bolt's rules are
 discharged by a test asserting the refusal arrives, with no code here.
 
-## The rebuild, and the rule that protects it
+## Where the requirements come from
 
-**This tree is Rust and it is a rebuild. The archived first implementation is
-sealed: do not read it, and do not go looking for an older bolt requirements
-document, design note or test.**
+**Every requirement here derives from the architecture and from answers
+recorded against `NEXT_STEPS.md`, and none of it from an earlier
+implementation.** That is deliberate: the provenance of the first tree's
+requirements was unresolved, so this one was written to establish that they
+stand on the architecture alone.
 
-Everything here reaches from the ecosystem architecture and from answers given
-against `NEXT_STEPS.md`, with nothing from the retired implementation in it. The
-provenance of that earlier material is unresolved, and this repository exists to
-establish that the requirements derive from the architecture alone. Reading the
-sealed tree voids that and cannot be undone. The rule is unchanged by the
-language and it does not expire.
+Two earlier implementations existed and neither is available. The first is
+sealed for the provenance reason above. The second was Go, and it was deleted
+once this tree reached parity rather than kept as a fallback.
 
-The later Go build is a different thing and is not sealed. It gates nothing and
-stays reachable for comparison, and its task discharges are useful before
-rebuilding a piece. What is sealed is the first tree, which is where the
-provenance question lives.
+**So a claim here is checkable against this repository or it is not checkable
+at all.** There is no older tree to appeal to, which is the point rather than a
+gap.
 
 ## Layout
 
@@ -284,7 +282,7 @@ are in `docs/DECISIONS/`; derived requirements remain `[D]` rows in
 
 `REQUIREMENTS.md` is one file where the intended shape is a directory, one file
 per requirement category. The checker reads either shape, so what holds the split
-up is the 63 retired rows: there is no agreed place to record a retired id once
+up is the 64 retired rows: there is no agreed place to record a retired id once
 the single file is gone, and a retired row cannot sit among live ones without
 defeating the check that an id is never reused.
 

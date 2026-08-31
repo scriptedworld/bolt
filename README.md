@@ -19,12 +19,12 @@ that does not have to change.
 
 **Active, and in daily use.** Bolt gates its own repository and five others.
 
-Rust because the work is process spawning, file walking and reading output
-under a time limit, and it does that faster than the Go implementation it
-replaced. That implementation was retired once this one passed it, rather than
-kept as a fallback.
+Rust, replacing an earlier Go implementation that was retired once this one
+reached parity rather than kept as a fallback. `docs/DECISIONS/` carries what
+the retired task kind did and why every capability of it has a command-line
+spelling now.
 
-MIT licensed because somebody else might want it, not run as an open-source
+Apache-2.0 licensed because somebody else might want it, not run as an open-source
 project: no release cadence and no compatibility promise. The command line is
 the interface.
 
@@ -42,7 +42,7 @@ ceiling, short-circuit, the fold, and refusals that write a parseable result.
   exempted.
 - `REQUIREMENTS.md` is one file and should be one per requirement. The checker
   reads either shape; it waits on where a retired id lives once the single file
-  is gone, and 63 rows are retired.
+  is gone, and 64 rows are retired.
 - The repository-local quality jig should become the shared one once that
   offers the same checks.
 - Definitions files and the jig's `definitions` block have no schema yet.
