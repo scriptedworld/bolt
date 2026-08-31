@@ -244,9 +244,8 @@ impl Error {
     /// [`Self::OutputDirectoryInUse`] is the one that never writes, whatever
     /// the caller named. The directory holds a previous run, so writing a
     /// refusal into it replaces a completed verdict with `kind: bolt-refused`
-    /// while the per-task evidence still says otherwise. The Go build does
-    /// exactly that, reproduced 2026-08-28 and filed at
-    /// `clank/inbox/bolt.go/a-refusal-overwrites-the-run-it-refused/`. Writing
+    /// while the per-task evidence still says otherwise. An earlier Go
+    /// implementation of bolt does exactly that, reproduced 2026-08-28. Writing
     /// it anywhere else would invent a location no caller was told about.
     ///
     /// [`Self::BaseMissing`] is the one that depends: with the default output

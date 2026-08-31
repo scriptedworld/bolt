@@ -1,9 +1,5 @@
 //! The walking skeleton: one jig, one directory, end to end.
 //!
-//! Stage 4 of `silo/docs/PATTERNS/how-a-change-gets-made.md`. These are written
-//! to fail. Nothing in `src/` is implemented, so every one of them panics on a
-//! `todo!()` rather than on an assertion, and that is the expected state.
-//!
 //! One file rather than one per concern, because a shared `tests/common/mod.rs`
 //! compiles into every test binary separately and its helpers are then dead
 //! code in each binary that does not call them. Under `-D warnings` that fails
@@ -1460,13 +1456,12 @@ fn the_missing_base_refusal_writes_nothing_and_says_so() {
 /// Refusing a directory as unusable does not write into it.
 ///
 /// **This is the guarantee FR-10.7 can be satisfied without, which is why it is
-/// asserted rather than described.** The Go build writes a conformant refusal
+/// asserted rather than described.** An earlier Go implementation of bolt
+/// writes a conformant refusal
 /// into the run directory it resolved, and because the stamp is second-granular
 /// two runs starting in one second resolve to the same one: the second refuses,
 /// correctly, and its refusal replaces the first's completed verdict while the
-/// per-task evidence still says `nonzero-exit`. Reproduced 2026-08-28, filed
-/// with a `repro.sh` at
-/// `clank/inbox/bolt.go/a-refusal-overwrites-the-run-it-refused/`.
+/// per-task evidence still says `nonzero-exit`. Reproduced 2026-08-28.
 ///
 /// A refactor satisfying FR-10.7 by writing the refusal into the resolved
 /// directory passes every other test in this file.
