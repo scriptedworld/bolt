@@ -98,28 +98,22 @@ it is.
 ## An adapter reading a composed child's result takes the last line
 
 FR-10.3a says bolt prints where the result is on stdout and prints nothing else
-there. That describes this bolt. `bolt.go` is still installed and reachable by
-name, and it prints a transcript first:
+there, so the path is the only line and reading it needs no parsing.
 
-    bolt.go                               bolt
-    1  always-passes-0                    1  /…/result.yaml
-    2
-    3  passed: 1 execution(s)
-    4  /…/result.yaml
+**Adapters take the last non-empty line anyway, and that is deliberate.** An
+earlier implementation printed a transcript first and the path last, so reading
+the first line got a task name rather than a path. Taking the last non-empty
+line was correct against both. toolbox's `bolt-result` still does this.
 
-Reading the first line gets a task name. An adapter that takes the last
-non-empty line is correct against both. toolbox's `bolt-result` does this.
+That implementation is gone, and the habit is kept because the cost is one line
+and the failure it prevents is silent: an adapter reading the wrong line gets a
+plausible string rather than an error.
 
 The contract is not weakened to match. "Prints nothing else there" is the
 property worth having, and relaxing it to "the last line" would license bolt to
 print other things on stdout, which is the summary line FR-10.3's note exists to
 keep out. The strict rule is what bolt promises; last-line is how a consumer
-stays robust while a second implementation is reachable.
-
-Flag order differs in the safe direction. `bolt.go` refuses flags written after
-the positionals and this build accepts them anywhere, so anything authored
-against `bolt.go` keeps working here. Put flags first if it has to run against
-both.
+stays robust against an implementation that does not.
 
 ## Writing one
 
