@@ -26,7 +26,7 @@ START_HERE.md
 target/
 Cargo.lock
 
-# The adopted jig links. `toolbox/jigs.yaml` declares the set and `link-jigs`
+# The adopted jig links. `toolbox/jigs.yaml` declares the set and `link-toolbox`
 # makes them, so adoption is a step a clone performs rather than content this
 # repository ships. In a built image the same files arrive from the layer
 # beneath, so a committed copy would be a third statement of one thing.

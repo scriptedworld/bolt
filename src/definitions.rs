@@ -44,8 +44,8 @@ pub const RESERVED: [&str; 7] = [
 /// A definitions file is `bolt.<name>.definitions.yaml`, by FR-4.16a.
 ///
 /// A jig is `bolt.<name>.yaml` in the same place by FR-3.9, so a definitions
-/// file is adopted, linked and spoken of exactly as a jig is, and `link-jigs`
-/// can distribute a shared one.
+/// file is adopted, linked and spoken of exactly as a jig is, and
+/// `link-toolbox` can distribute a shared one.
 #[must_use]
 pub fn file_name(name: &str) -> String {
     format!("bolt.{name}.definitions.yaml")

@@ -107,7 +107,8 @@ An adapter is a separate program that reads an execution's captured output and
 writes an envelope. Where an adapter reaches a verdict, that verdict is the
 result and bolt does not second-guess it. A task naming no adapter gets the
 generic exit-code adapter, the one adapter that needs to know nothing about the
-tool it is reading.
+tool it is reading. `docs/PATTERNS/the-adapter-contract.md` is what you write
+one against.
 
 Definitions are values a command names as `{placeholder}`, resolved against
 bolt's own locations first, then the jig's `definitions` block, then a file

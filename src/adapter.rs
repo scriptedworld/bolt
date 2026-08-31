@@ -66,7 +66,7 @@ impl Unauthoritative {
 /// Where an adapter named `name` is found, by FR-6.10.
 ///
 /// Resolved from the config directory, where FR-2.8 already finds jigs, so a jig
-/// and the adapters it names travel together and `link-jigs` places both or
+/// and the adapters it names travel together and `link-toolbox` places both or
 /// neither.
 #[must_use]
 pub fn path(config_dir: &Path, name: &str) -> PathBuf {
