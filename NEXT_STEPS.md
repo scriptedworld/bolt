@@ -12,7 +12,7 @@ The remaining implementation work is:
   or be explicitly exempted.
 - Split `REQUIREMENTS.md` into one file per requirement category. The checker
   reads either shape already. What this waits on is where a retired id is
-  recorded once the single file is gone, and 64 rows are retired. See
+  recorded once the single file is gone, and the retired rows are counted by the command in README.md. See
   `docs/DECISIONS/requirements-are-a-directory.md`.
 - Replace the repository-local quality jig with shared jig definitions once the
   shared Rust definition provides the same checks. See

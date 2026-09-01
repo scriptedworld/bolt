@@ -32,9 +32,9 @@ mise use --global gitleaks@latest
 ## Clone the three as siblings
 
 ```sh
-git clone <bolt> bolt
-git clone <wrench> wrench
-git clone <toolbox> toolbox
+git clone https://github.com/scriptedworld/bolt.git
+git clone https://github.com/scriptedworld/wrench.git
+git clone https://github.com/scriptedworld/toolbox.git
 ```
 
 The parent directory's name does not matter and the sibling relationship does.

@@ -35,14 +35,20 @@ ceiling, short-circuit, the fold, and refusals that write a parseable result.
 
 **Not done, and the gate reports it rather than hiding it:**
 
-- **147 of 228 settled requirements have a test citing them.** The traceability
-  task fails until the rest do, and prints the number.
+- **Settled requirements without a test citing them.** The traceability task
+  fails until there are none, and prints the count rather than this file
+  claiming one:
+
+      bolt common-quality .   # or run the checker directly, see CONTRIBUTING
 - Requirements describing design constraints no test can observe need
   classifying: made testable, moved to the component that owns them, or
   exempted.
 - `REQUIREMENTS.md` is one file and should be one per requirement. The checker
   reads either shape; it waits on where a retired id lives once the single file
-  is gone, and 64 rows are retired.
+  is gone, and a good many rows are retired:
+
+      awk '/^## Retired/{f=1;next} /^## /{f=0} f' REQUIREMENTS.md |
+        grep -cE '^\| *(FR|NFR)-[0-9]'
 - The repository-local quality jig should become the shared one once that
   offers the same checks.
 - Definitions files and the jig's `definitions` block have no schema yet.

@@ -13,7 +13,7 @@ the run up front instead of failing a task halfway through.
 
 ## The loops
 
-`cargo test` is the fast one. The suite is 99 tests and runs in under a second.
+`cargo test` is the fast one. The suite runs in under a second; `cargo test` prints how many.
 
 The gate is a bolt run over bolt's own repository, so the binary under test is
 the binary doing the testing:
@@ -24,10 +24,16 @@ $ ./target/release/bolt rust-quality . --output-dir .bolt-gate
 /home/you/bolt/.bolt-gate/result.yaml
 ```
 
-Eight tasks: format, lint, build, tests with coverage, vulnerabilities,
-licences, complexity, traceability. Read the verdict in `result.yaml` and each
-task's own output under `.bolt-gate/work/`. The run exits 0 whenever it could be
-carried out, so the exit status is not the answer; `success` in the result is.
+Eight tasks: format, lint, build, tests, vulnerabilities, licences, complexity,
+traceability. Read the verdict in `result.yaml` and each task's own output under
+`.bolt-gate/work/`. The run exits 0 whenever it could be carried out, so the
+exit status is not the answer; `success` in the result is.
+
+**The tests task writes a coverage profile and gates on nothing but the suite
+passing.** `coverage.lcov` lands in the work directory as evidence and no
+threshold is applied to it, so coverage can fall without the gate noticing.
+That is a gap rather than a decision: the shared Go jig judges coverage per
+file and this one does not yet.
 
 Build before you gate. A stale binary answers for the tree it was built from,
 and a change to the runner, the adapters or the fold will not be in it.

@@ -13,7 +13,7 @@ Paste the traceability line, which is the one that moves:
 
     tail -1 .bolt-gate/work/traceability-1/stdout
 
-`traceability` fails by design while the rebuild is under way, so a failing gate
+`traceability` fails by design until every settled requirement has a test, so a failing gate
 is expected there and nowhere else. `CONTRIBUTING.md` has the rest.
 
 ## Requirements
