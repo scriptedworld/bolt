@@ -34,12 +34,22 @@ Cargo.lock
 # A tracked symlink stores its target path as content, so committing one encodes
 # where ../toolbox happens to sit and dangles in any clone without that sibling.
 #
-# Named one at a time rather than as `bolt.*.yaml`, because that glob would
-# swallow `bolt.rust-quality.yaml`, which is this project's own gate and IS
-# tracked. `bin/` cannot be ignored wholesale for the same reason:
-# `bin/count-selection.py` is this project's own checker.
-bolt.common-quality.yaml
+# MATCHED BY SHAPE RATHER THAN NAMED ONE AT A TIME. `bolt.*-quality.yaml` is
+# narrow enough to be safe: it cannot match a `*.definitions.yaml`, and this
+# repository carries no jig of its own in any case, since `bolt.rust-quality.yaml`
+# moved to toolbox on 2026-09-03.
+#
+# THE LIST IS WHAT WENT WRONG. Adopting toolbox's `rust` set added
+# `bolt.rust-std-quality.yaml` and `config/rust/clippy.toml`; neither was added
+# here, so both sat untracked where `git add -A` would have committed them as
+# symlinks — the exact failure the paragraph above describes. A pattern covers a
+# set that grows and a list does not.
+#
+# `bin/count-selection.py` was the other reason given for naming files here and
+# it no longer exists, so `bin/` now holds nothing of this project's but the
+# built binary named above.
+bolt.*-quality.yaml
 bolt.secrets.yaml
-bin/suppression-register.py
-bin/test-traceability.py
+bin/*.py
 adapters/
+config/

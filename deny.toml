@@ -1,4 +1,5 @@
-# cargo-deny's policy, read by the `licences` task in bolt.rust-quality.yaml.
+# cargo-deny's policy, read by the `licences` task in toolbox's
+# bolt.rust-std-quality.yaml, which this repository adopts as a link.
 #
 # Without this the check fails on bolt's own Apache-2.0 licence, because an
 # empty allow list allows nothing. That is the tool working, not a nuisance:

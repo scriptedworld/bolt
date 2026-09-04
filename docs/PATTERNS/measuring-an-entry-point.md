@@ -60,7 +60,7 @@ Re-derive it instead of believing this. `end_of_record` has to reset the current
 file, because `SF:` otherwise carries forward and the counts you read belong to
 whatever record came next:
 
-    bolt rust-quality . --output-dir .ephemera/qa
+    bolt rust-std-quality . --output-dir .ephemera/qa
     awk '/^SF:/{f=$0} /^end_of_record/{f=""} /^L[FH]:/ && f ~ /\/(main|cli)\.rs$/ \
         {sub(/^SF:.*\/src\//,"src/",f); print f, $0}' \
         .ephemera/qa/work/tests-1/coverage.lcov

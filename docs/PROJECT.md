@@ -106,15 +106,24 @@ gap.
     tests/skeleton.rs   the whole suite, one external test package
     REQUIREMENTS.md     what must be true, and the only source for a COVERS mark
     NEXT_STEPS.md       what is not done, the open questions, defaults taken
-    bolt.rust-quality.yaml   bolt's own gate, run by bolt
-
 `src/main.rs` carries no command functionality, so the interface is reachable
 from an external test package. `tests/` is one file on purpose: it is the
 project's whole observable surface in the order the requirements state it.
 
 ## The gate
 
-Bolt gates itself, so `bolt rust-quality .` is a bolt run over this repository.
+Bolt gates itself, so gating this repository is a bolt run over it:
+
+    bolt common-quality .
+    bolt rust-std-quality .
+
+**BOTH JIGS ARE TOOLBOX'S, and bolt carries neither.** `bolt.rust-quality.yaml`
+lived here while toolbox shipped no Rust jig, and it was written to be moved:
+its header named which of its tasks belonged to a shared rust-std jig and which
+to the common one. It moved on 2026-09-03 and this repository keeps no jig and
+no definitions file, because every value it used to set — `REQUIREMENTS.md` and
+`deny: warnings` — is the shared default.
+
 `CONTRIBUTING.md` has the commands and the conventions a change is held to.
 
 The gate cannot catch a regression in the runner itself. Break execution, the

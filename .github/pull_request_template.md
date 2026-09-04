@@ -4,10 +4,11 @@ One or two lines. The reasoning belongs in the files the change touches.
 
 ## How it was checked
 
-`cargo test`, and the gate:
+`cargo test`, and the gate, which is two runs and neither jig is bolt's:
 
     cargo build --release
-    ./target/release/bolt rust-quality . --output-dir .bolt-gate
+    ./target/release/bolt common-quality . --output-dir .bolt-gate
+    ./target/release/bolt rust-std-quality . --output-dir .bolt-gate-rust
 
 Paste the traceability line, which is the one that moves:
 

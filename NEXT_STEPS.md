@@ -14,9 +14,18 @@ The remaining implementation work is:
   reads either shape already. What this waits on is where a retired id is
   recorded once the single file is gone, and the retired rows are counted by the command in README.md. See
   `docs/DECISIONS/requirements-are-a-directory.md`.
-- Replace the repository-local quality jig with shared jig definitions once the
-  shared Rust definition provides the same checks. See
-  `docs/DECISIONS/the-rust-quality-jig-is-shared.md`.
+- Lift `src/error.rs` and `src/limit.rs` over the coverage line. The `tests` task
+  began judging its profile per file on 2026-09-04 and both sit just under:
+
+      error.rs   63 of 80 lines   78.8%
+      limit.rs   24 of 31 lines   77.4%
+
+  Two lines between them would clear it, which is exactly why the number should
+  not be moved to fit: a threshold set to whatever passes is
+  `toolbox/docs/LESSONS/a-dead-threshold-is-a-latent-relaxation.md`. Write the
+  tests the uncovered branches deserve, or exempt them by name with a reason.
+  Until then `rust-std-quality` fails on those two files and nothing else, the
+  way `common-quality` fails on `traceability` and nothing else.
 - Add and validate schemas for definitions files and for the jig's `definitions`
   block in the structured-file library.
 
