@@ -65,7 +65,7 @@ being run over, or in the directory given to `--config-dir`. A run names the jig
 and the directory:
 
 ```yaml
-requires: [cargo, lizard]
+requires: [cargo]
 
 tasks:
   - name: format
@@ -75,14 +75,17 @@ tasks:
     command: cargo clippy --all-targets -- -D warnings
     time-limit: "5m"
 
-  - name: complexity
-    matching: ["**/*.rs"]
-    excluding: ["**/target/**"]
-    command: lizard --CCN 15 {all_paths}
+  - name: tests
+    command: >-
+      cargo llvm-cov --all-targets --lcov
+      --output-path {work_dir}/coverage.lcov
+    evidence:
+      - coverage.lcov
+    adapter: adapters/rust/coverage.py
 ```
 
 ```console
-$ bolt rust-quality .
+$ bolt rust-std-quality .
 /home/you/project/.bolt-2026-08-30T03-34-55Z-1921009/result.yaml
 ```
 

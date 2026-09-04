@@ -20,18 +20,37 @@ the binary doing the testing:
 
 ```console
 $ cargo build --release
-$ ./target/release/bolt rust-quality . --output-dir .bolt-gate
+$ ./target/release/bolt common-quality . --output-dir .bolt-gate
+$ ./target/release/bolt rust-std-quality . --output-dir .bolt-gate-rust
 /home/you/bolt/.bolt-gate/result.yaml
 ```
 
-Eight tasks: format, lint, build, tests, vulnerabilities, licences, complexity,
-traceability. Read the verdict in `result.yaml` and each task's own output under
-`.bolt-gate/work/`. The run exits 0 whenever it could be carried out, so the
-exit status is not the answer; `success` in the result is.
+**Two runs, and neither jig is bolt's.** `bolt.rust-quality.yaml` lived here
+while toolbox shipped no Rust jig; it moved to toolbox on 2026-09-03 as
+`bolt.rust-std-quality.yaml`, and the tasks it marked as belonging to the common
+jig were already there. This repository now carries no jig and no definitions
+file: every value it set is the shared default.
 
-**The tests task writes a coverage profile and gates on nothing but the suite
-passing.** `coverage.lcov` lands in the work directory as evidence and no
-threshold is applied to it, so coverage can fall without the gate noticing.
+`rust-std-quality` is six tasks: format, lint, build, tests, vuln, licences.
+`common-quality` is three: traceability, suppressions, secrets. Complexity is no
+longer a task of its own — the four numbers it produced now come from clippy
+inside `lint`, which is why that task's description says so.
+
+Read the verdict in `result.yaml` and each task's own output under `work/`. A
+run exits 0 whenever it could be carried out, so the exit status is not the
+answer; `success` in the result is.
+
+**The tests task judges that profile per file at 80% of lines**, as of
+toolbox's 2026-09-04 change. `coverage.lcov` lands in the work directory as
+evidence and `adapters/rust/coverage.py` reads it, so a file falling below the
+line fails the run and names itself. There is no aggregate threshold, because an
+aggregate is what lets a well-tested file carry an untested one.
+
+**Lines and not branches, and that is the toolchain rather than a choice.**
+cargo-llvm-cov writes `BRF:0` and no `BRDA` records at all without `--branch`,
+which is unstable and needs a nightly compiler. The adapter reads branch records
+where they exist and reports `branch_measured: false` where they do not, so
+nothing here passes a threshold that had nothing to judge.
 That is a gap rather than a decision: the shared Go jig judges coverage per
 file and this one does not yet.
 

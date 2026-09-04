@@ -15,8 +15,7 @@ Rust 1.97 or newer, with `rustfmt` and `clippy`.
 | `cargo-llvm-cov` | `tests` |
 | `cargo-audit` | `vuln` |
 | `cargo-deny` | `licences` |
-| `lizard` | `complexity` |
-| `python3` | `traceability`, and every checker toolbox ships |
+| `python3` with PyYAML | `traceability`, and every checker and adapter toolbox ships |
 | `gitleaks`, `detect-secrets` | the secret scan, which is a separate run |
 
 Installed here with the spellings `dotfiles/bin/setup` uses:
@@ -24,9 +23,18 @@ Installed here with the spellings `dotfiles/bin/setup` uses:
 ```sh
 rustup component add rustfmt clippy
 cargo install --locked cargo-llvm-cov cargo-audit cargo-deny
-uv tool install lizard
 uv tool install detect-secrets
 mise use --global gitleaks@latest
+```
+
+**PyYAML has to be importable by the `python3` that runs the adapters**, and
+nothing declares it. `adapters/common/bolt-result.py` and
+`adapters/rust/coverage.py` both import `yaml`, so a machine without it fails
+the `secrets` composition and the coverage judgement with an ImportError rather
+than with a verdict.
+
+```sh
+python3 -c "import yaml"   # must succeed for the gate to run
 ```
 
 ## Clone the three as siblings
@@ -46,22 +54,28 @@ relative to `../toolbox`.
 From the bolt checkout:
 
 ```console
-$ python3 ../toolbox/bin/link-toolbox.py . common --yes
-6 to link:
-  bolt.secrets.yaml
-  bolt.common-quality.yaml
-  bin/test-traceability.py
-  bin/suppression-register.py
-  adapters/common/lizard.py
-  adapters/common/bolt-result.py
+$ python3 ../toolbox/bin/link-toolbox.py . rust --yes
+linked 8 file(s)
 
-linked 6 file(s)
-
-all 6 link(s) present and correct
+all 8 link(s) present and correct
 ```
 
-`common` pulls `secrets`, so naming it alone gets all six. `--plan` shows the
-same list and stops; `--check` re-verifies at any time and exits 1 on drift.
+**Name `rust`, not `common`.** The sets nest — `rust` includes `common`, which
+includes `secrets` — so naming `rust` alone gets all eight. Naming `common`
+gets five, and the five are the wrong five: `bolt.rust-std-quality.yaml`,
+`adapters/rust/coverage.py` and `config/rust/clippy.toml` are not among them, so
+the second of the two gate runs below has no jig to run and fails as an
+unreadable file. This document said `common` until 2026-09-04, which is the
+whole of that mistake.
+
+    common   bolt.secrets.yaml, bolt.common-quality.yaml,
+             bin/test-traceability.py, bin/suppression-register.py,
+             adapters/common/bolt-result.py
+    rust     the five above, plus bolt.rust-std-quality.yaml,
+             adapters/rust/coverage.py, config/rust/clippy.toml
+
+`--plan` shows the list and stops; `--check` re-verifies at any time and exits 1
+on drift.
 Nothing is ever overwritten, so a real file where a link belongs is reported and
 left alone. The links are gitignored, and `git status` being clean afterwards is
 how you know the set is complete rather than partly ignored.
@@ -70,13 +84,16 @@ how you know the set is complete rather than partly ignored.
 
 ```console
 $ cargo build --release
-$ ./target/release/bolt rust-quality . --output-dir .bolt-gate
+$ ./target/release/bolt common-quality . --output-dir .bolt-gate
+$ ./target/release/bolt rust-std-quality . --output-dir .bolt-gate-rust
 /home/you/bolt/.bolt-gate/result.yaml
 ```
 
-Eight tasks. Bolt exits 0 whenever it could carry the run out, so `success` in
-`result.yaml` is the answer and the exit status is not. `traceability` fails on
-purpose; `CONTRIBUTING.md` says why and how to read its count.
+Two runs against toolbox's jigs; this repository carries none of its own since
+2026-09-03. Three tasks in `common-quality`, six in `rust-std-quality`. Bolt
+exits 0 whenever it could carry the run out, so `success` in `result.yaml` is
+the answer and the exit status is not. `traceability` fails on purpose;
+`CONTRIBUTING.md` says why and how to read its count.
 
 The secret scan is its own run, over the working tree and the history:
 
