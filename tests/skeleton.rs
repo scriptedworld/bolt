@@ -15,6 +15,7 @@ use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use tempfile::TempDir;
@@ -4694,4 +4695,89 @@ fn every_statement_of_the_licence_agrees() {
             "a comment cites NFR-12.3 and does not name {declared}: {line}",
         );
     }
+}
+
+// COVERS: FR-4.12 | property
+/// The deadline arithmetic, which every timed task depends on and no test reached.
+///
+/// These are three pure functions and the run path exercises them only through a
+/// task that actually times out, which is slow and asserts something else. So
+/// the arithmetic itself went unmeasured: `src/limit.rs` read 77.4% of lines
+/// until 2026-09-04, when the gate began judging coverage per file.
+///
+/// **`soonest` taking a set deadline over none is the arm worth having a test
+/// for.** A run's budget and a task's own limit are each optional, and the
+/// wrong fold there — `None` winning, or the later of the two — is a limit that
+/// silently does not bind, which is the failure mode a time limit exists to
+/// prevent and the one nothing would report.
+#[test]
+fn a_deadline_is_the_soonest_of_the_limits_that_are_set() {
+    let now = Instant::now();
+    let second = Duration::from_secs(1);
+    let minute = Duration::from_secs(60);
+
+    assert_eq!(
+        bolt::limit::deadline(None, now),
+        None,
+        "no limit sets no deadline"
+    );
+    assert_eq!(
+        bolt::limit::deadline(Some(second), now),
+        Some(now + second),
+        "a limit set now runs out a limit from now",
+    );
+
+    let soon = now + second;
+    let later = now + minute;
+    assert_eq!(bolt::limit::soonest(Some(soon), Some(later)), Some(soon));
+    assert_eq!(bolt::limit::soonest(Some(later), Some(soon)), Some(soon));
+    assert_eq!(
+        bolt::limit::soonest(Some(soon), None),
+        Some(soon),
+        "a set deadline wins over none, in either position",
+    );
+    assert_eq!(bolt::limit::soonest(None, Some(soon)), Some(soon));
+    assert_eq!(bolt::limit::soonest(None, None), None);
+
+    assert!(
+        !bolt::limit::passed(None, later),
+        "no deadline has not passed"
+    );
+    assert!(!bolt::limit::passed(Some(later), now));
+    assert!(
+        bolt::limit::passed(Some(now), now),
+        "a deadline reached has passed"
+    );
+    assert!(bolt::limit::passed(Some(soon), later));
+}
+
+// COVERS: FR-10.9c | edge
+/// The one refusal bolt names and never writes.
+///
+/// `OutputDirectoryInUse` is documented in `src/error.rs` as "named for
+/// completeness and never written", because FR-2.6b returns before anything is
+/// written: the directory holds a completed run, and a refusal put there
+/// replaces a verdict with `kind: bolt-refused` while the per-task evidence
+/// still says otherwise.
+///
+/// **A variant nothing constructs still has a contract.** Its kind is in the
+/// open vocabulary consumers match on and its message is what a person reads,
+/// and neither was exercised by anything: both arms went uncovered while the
+/// rest of the enum was reached through real refusals. Constructed directly
+/// here, which is the only way to reach a case the runner is built not to
+/// produce.
+#[test]
+fn the_refusal_that_never_writes_still_names_itself() {
+    let refusal = bolt::Error::OutputDirectoryInUse(PathBuf::from("/somewhere/.bolt-gate"));
+
+    assert_eq!(refusal.kind(), "output-directory-in-use");
+    assert!(
+        refusal.never_writes_a_result(),
+        "the one refusal that must not write is the one this test is about",
+    );
+    assert_eq!(
+        refusal.to_string(),
+        "/somewhere/.bolt-gate already holds a run",
+        "the message names the directory, because a refusal that does not is one nobody can act on",
+    );
 }
