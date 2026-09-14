@@ -60,8 +60,8 @@ linked 8 file(s)
 all 8 link(s) present and correct
 ```
 
-**Name `rust`, not `common`.** The sets nest — `rust` includes `common`, which
-includes `secrets` — so naming `rust` alone gets all eight. Naming `common`
+**Name `rust`, not `common`.** The sets nest, `rust` includes `common`, which
+includes `secrets`, so naming `rust` alone gets all eight. Naming `common`
 gets five, and the five are the wrong five: `bolt.rust-std-quality.yaml`,
 `adapters/rust/coverage.py` and `config/rust/clippy.toml` are not among them, so
 the second of the two gate runs below has no jig to run and fails as an

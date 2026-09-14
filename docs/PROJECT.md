@@ -121,8 +121,8 @@ Bolt gates itself, so gating this repository is a bolt run over it:
 lived here while toolbox shipped no Rust jig, and it was written to be moved:
 its header named which of its tasks belonged to a shared rust-std jig and which
 to the common one. It moved on 2026-09-03 and this repository keeps no jig and
-no definitions file, because every value it used to set — `REQUIREMENTS.md` and
-`deny: warnings` — is the shared default.
+no definitions file, because every value it used to set, `REQUIREMENTS.md` and
+`deny: warnings`, is the shared default.
 
 `CONTRIBUTING.md` has the commands and the conventions a change is held to.
 

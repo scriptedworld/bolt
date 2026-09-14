@@ -15,8 +15,8 @@ The remaining implementation work is:
   recorded once the single file is gone, and the retired rows are counted by the command in README.md. See
   `docs/DECISIONS/requirements-are-a-directory.md`.
 - ~~Lift `src/error.rs` and `src/limit.rs` over the coverage line.~~ **Done
-  2026-09-04.** `limit.rs` had no test for `deadline`, `soonest` or `passed` —
-  the run path reaches them only through a task that actually times out — and
+  2026-09-04.** `limit.rs` had no test for `deadline`, `soonest` or `passed` -
+  the run path reaches them only through a task that actually times out, and
   `error.rs` never constructed `OutputDirectoryInUse`, the one refusal bolt
   names and never writes. `rust-std-quality` reports `success: true`.
 

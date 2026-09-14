@@ -33,7 +33,7 @@ file: every value it set is the shared default.
 
 `rust-std-quality` is six tasks: format, lint, build, tests, vuln, licences.
 `common-quality` is three: traceability, suppressions, secrets. Complexity is no
-longer a task of its own — the four numbers it produced now come from clippy
+longer a task of its own, the four numbers it produced now come from clippy
 inside `lint`, which is why that task's description says so.
 
 Read the verdict in `result.yaml` and each task's own output under `work/`. A
