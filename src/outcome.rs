@@ -14,8 +14,8 @@ use crate::Error;
 ///
 /// `result` is `None` for a refusal that deliberately wrote nothing. FR-10.7a's
 /// missing base and FR-2.6b's occupied directory are both that case, and a
-/// caller is told so rather than left to read an absent file as a bolt that
-/// died.
+/// caller is told so, instead of being left to read an absent file as a bolt
+/// that died.
 #[derive(Debug)]
 pub struct Refusal {
     /// Why the run was refused.
@@ -54,8 +54,8 @@ pub struct Outcome {
 
     /// Tasks a short-circuit kept from running, in declaration order.
     ///
-    /// FR-4.9. A reader sees what was not attempted rather than inferring it
-    /// from what is absent, which is not the same thing: a task missing from
+    /// FR-4.9. A reader sees what was not attempted without inferring it from
+    /// what is absent, which would be ambiguous: a task missing from
     /// the evidence could equally have skipped an empty selection under
     /// FR-4.4c.
     ///

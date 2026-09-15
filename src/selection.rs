@@ -17,8 +17,8 @@ fn compile(patterns: &[String]) -> Result<GlobSet, Error> {
         // FR-3.4 distinguishes `**`, which matches zero or more directory
         // levels, from `*`, which does not. globset's default is the opposite:
         // `*` matches `/` too, which makes the two operators the same and a
-        // narrow pattern silently broad. Measured 2026-08-28 before this line
-        // existed: `matching: ["*.txt"]` selected `nested/deep.txt`.
+        // narrow pattern silently broad. Without this line,
+        // `matching: ["*.txt"]` selects `nested/deep.txt`.
         let glob = GlobBuilder::new(pattern)
             .literal_separator(true)
             .build()
@@ -49,7 +49,7 @@ fn compile(patterns: &[String]) -> Result<GlobSet, Error> {
 /// # Errors
 ///
 /// [`Error::JigUnreadable`] when a pattern will not compile, which is a
-/// property of the jig rather than of the tree.
+/// property of the jig and not of the tree.
 pub fn select(
     base: &Path,
     paths: &[PathBuf],
@@ -96,7 +96,7 @@ pub const PATH_VARIABLES: [&str; 2] = ["each_path", "all_paths"];
 ///
 /// FR-4.3 quotes every path bolt substitutes individually, so a path carrying a
 /// space, a quote or a semicolon can neither split the command line nor inject
-/// into it. Both words are load-bearing. *Individually*, because quoting the
+/// into it. Both words matter. *Individually*, because quoting the
 /// joined list leaves the separators outside the quotes; and *a quote*, because
 /// wrapping in single quotes is the obvious implementation and a path
 /// containing one escapes it.
@@ -114,7 +114,7 @@ pub fn quote(path: &Path) -> String {
 ///
 /// A definition's value is a scalar by FR-4.16c and is quoted like a location,
 /// which is what makes it one argument: a value carrying a space arrives as one
-/// word rather than splitting into two.
+/// word and does not split into two.
 #[must_use]
 pub fn quote_str(value: &str) -> String {
     format!("'{}'", value.replace('\'', r"'\''"))

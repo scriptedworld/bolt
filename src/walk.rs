@@ -16,9 +16,9 @@ use crate::Error;
 /// FR-2.2b bounds how that is done. Honouring `.gitignore` means reading those
 /// files as text: bolt does not invoke git, read anything under `.git/`, or
 /// require a repository. The `ignore` crate reads git's own excludes at its
-/// defaults, so each is turned off against the row rather than taken as it
-/// comes, and `parents` with them, because a `.gitignore` above the base is a
-/// file outside it changing the run's input, which FR-2.3 forbids.
+/// defaults, so each is turned off against the row, and `parents` with them,
+/// because a `.gitignore` above the base is a file outside it changing the
+/// run's input, which FR-2.3 forbids.
 ///
 /// Paths come back sorted, by FR-2.2d, which is what makes the matched list the
 /// same list on every run over the same tree. FR-9.4's identical work directory
@@ -40,16 +40,16 @@ pub fn walk(base: &Path) -> Result<Vec<PathBuf>, Error> {
         .parents(false)
         // FR-2.2e. Following one leaves the base and breaks FR-2.3's
         // containment. This is the crate's default and is set anyway, because
-        // the row is the reason rather than the default being convenient.
+        // the row requires it, whatever the crate's default happens to be.
         .follow_links(false)
         .build()
         .filter_map(Result::ok)
         .filter(|entry| {
             // Files, not directories: FR-2.2 is about the files tasks act on.
             //
-            // A symlink is excluded here too, and that is PROVISIONAL. Measured
-            // 2026-08-27: with `follow_links` off, `ignore` yields the link
-            // itself, so a task handed one reads through it to outside the base.
+            // A symlink is excluded here too, provisionally. With `follow_links`
+            // off, `ignore` still yields the link itself, so a task handed one
+            // reads through it to outside the base.
             // FR-2.2e forbids following and does not say whether returning is
             // also forbidden, which is question 38's neighbour, question 40.
             // Excluding is the containment-preserving direction and is reversed

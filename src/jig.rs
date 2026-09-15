@@ -3,7 +3,7 @@
 //! FR-3.4d makes a jig YAML, read through wrench by FR-1.12 and validated
 //! against its schema on the way in by FR-1.5. Bolt takes the parsed value as
 //! `serde_json::Value` from wrench and derives these types off it, so a jig is
-//! a struct rather than eighty lines of map digging.
+//! a struct and not eighty lines of map digging.
 
 use std::path::Path;
 
@@ -16,17 +16,17 @@ use crate::Error;
 pub struct Jig {
     /// The version of the format this jig claims to conform to.
     ///
-    /// Optional, because wrench's schema requires only `tasks`. Making it
-    /// mandatory here was stricter than the contract and refused six of the
-    /// estate's jigs, including bolt's own, which is how it was found: the
-    /// first time the Rust bolt was pointed at its own gate by NFR-12.1.
+    /// Optional, because wrench's schema requires only `tasks`. A mandatory
+    /// version is stricter than the contract and refuses six of the estate's
+    /// jigs, bolt's own among them; that showed up the first time the Rust bolt
+    /// was pointed at its own gate by NFR-12.1.
     #[serde(default)]
     pub version: Option<String>,
 
     /// Every executable this jig invokes, by FR-3.10.
     ///
     /// The tools its commands run, the adapters its tasks name, any checker it
-    /// calls: the jig's whole inventory rather than a note about unusual tools.
+    /// calls: the jig's whole inventory, not a note about unusual tools.
     /// FR-3.10b resolves every entry before any task executes.
     #[serde(default)]
     pub requires: Vec<String>,
@@ -49,7 +49,7 @@ pub struct Jig {
     /// exists to confine to definitions, and nothing has asked for it.
     ///
     /// Held as written and read by [`crate::limit::parse`], because FR-4.11e's
-    /// spelling is bolt's rather than the schema's: wrench validates a jig's
+    /// spelling is bolt's and not the schema's: wrench validates a jig's
     /// shape and a duration is a string to it.
     #[serde(default, rename = "time-limit")]
     pub time_limit: Option<String>,
@@ -70,13 +70,13 @@ pub struct Task {
 
     /// The command line, carrying whichever path form the task takes.
     ///
-    /// FR-4.2 reads the shape off this rather than off a field beside it:
+    /// FR-4.2 reads the shape off this, not off a field beside it:
     /// `{each_path}` is one execution per matched path, `{all_paths}` is one
     /// execution with the selection substituted, and naming both is a jig
     /// error.
     ///
     /// Optional in the type so that a task carrying none is refused by name
-    /// rather than by serde. `missing field command` reads as a malformed task
+    /// and not by serde. `missing field command` reads as a malformed task
     /// and invites somebody to add a command to one that meant something else,
     /// where [`Error::TaskNamesNoCommand`](crate::Error::TaskNamesNoCommand)
     /// says what is wrong.
@@ -101,8 +101,8 @@ pub struct Task {
 
     /// Patterns or literal paths removed from what `matching` selected.
     ///
-    /// FR-3.4a. It removes from the selection rather than being a second way
-    /// to select.
+    /// FR-3.4a. It removes from the selection and is not a second way to
+    /// select.
     #[serde(default)]
     pub excluding: Vec<String>,
 
@@ -115,11 +115,11 @@ pub struct Task {
     /// nothing in a given project.
     ///
     /// FR-4.4d and FR-4.4h make it a jig error on a task naming no path
-    /// variable, enforced by the schema rather than here.
+    /// variable, enforced by the schema and not here.
     ///
     /// Spelled `allow-empty` until wrench `dbc3570`. The new name is the one
     /// that answers FR-10.8d's question: `optional` says what an empty selection
-    /// resolves to, where `allow-empty` described the permission rather than the
+    /// resolves to, where `allow-empty` described the permission and not the
     /// outcome. No jig in the estate carried the field, so the rename cost
     /// nothing.
     #[serde(default)]
@@ -130,8 +130,8 @@ pub struct Task {
     /// Defaulting to false, because FR-4.8 is the rule: a failing task does not
     /// stop the run, since stopping throws away the evidence the tasks after it
     /// would have produced and leaves a reader unable to tell what else was
-    /// wrong. Stopping is what a jig asks for rather than what it gets, and
-    /// this field is the asking.
+    /// wrong. A jig only stops early when it asks to, and this field is how it
+    /// asks.
     #[serde(default, rename = "short-circuit-failure")]
     pub short_circuit_failure: bool,
 
@@ -175,8 +175,8 @@ impl Task {
     /// Whether this task carries the retired `jig` field, by FR-5.22.
     ///
     /// Read off the field being named at all. There is one kind of task now, so
-    /// this asks whether a jig is written against the retired mechanism rather
-    /// than which kind of task it is looking at.
+    /// this asks whether a jig is written against the retired mechanism, not
+    /// which kind of task it is looking at.
     #[must_use]
     pub fn names_a_jig(&self) -> bool {
         self.jig.is_some()
@@ -186,13 +186,12 @@ impl Task {
 /// Read the jig named `name` from `config_dir` and validate it.
 ///
 /// FR-3.9 makes a jig file `bolt.<name>.yaml` and has a jig spoken of by its
-/// name rather than by a path. FR-2.8 says where those files are found.
+/// name, never by a path. FR-2.8 says where those files are found.
 ///
 /// # Errors
 ///
 /// [`Error::JigUnreadable`] when the file is absent, will not parse, or does
-/// not meet the schema, which FR-10.5 makes a refusal rather than a failed
-/// task.
+/// not meet the schema, which FR-10.5 makes a refusal and not a failed task.
 pub fn read(config_dir: &Path, name: &str) -> Result<Jig, Error> {
     let path = config_dir.join(file_name(name));
     let unreadable = |reason: String| Error::JigUnreadable {
@@ -214,7 +213,7 @@ pub fn read(config_dir: &Path, name: &str) -> Result<Jig, Error> {
     .map_err(|source| unreadable(source.to_string()))?;
 
     // FR-1.9: wrench hands back a `serde_json::Value`, so a jig is a derive
-    // rather than eighty lines of map digging.
+    // and not eighty lines of map digging.
     serde_json::from_value(value).map_err(|source| unreadable(source.to_string()))
 }
 

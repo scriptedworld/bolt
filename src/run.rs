@@ -74,8 +74,8 @@ struct Scope<'a> {
 
 /// A limit that has been read: when it runs out, and how the jig spelled it.
 ///
-/// The written form travels with the instant so a reason quotes the jig rather
-/// than a rounding of it. A task told it passed `90s` when the jig says `1.5m`
+/// The written form travels with the instant so a reason quotes the jig, not a
+/// rounding of it. A task told it passed `90s` when the jig says `1.5m`
 /// sends a reader looking for a number that is not in the file.
 #[derive(Debug, Clone, Copy)]
 struct Limit<'a> {
@@ -182,7 +182,7 @@ impl Expired<'_> {
 ///
 /// All five are reserved to bolt's own layer, which is why each is recorded
 /// `from: "bolt"`. FR-4.16's jig and file layers merge over them and belong to
-/// `definitions/10` rather than to the skeleton.
+/// `definitions/10`, not to the skeleton.
 struct Locations {
     /// The outermost invocation's directory. No nesting here, so it is the base.
     project_root: PathBuf,
@@ -197,13 +197,13 @@ struct Locations {
 /// Run the jig named `jig` over `base`.
 ///
 /// This is the whole of an invocation, by FR-2.1 and FR-2.1a: one jig, one
-/// directory. FR-3.9 has the jig named rather than pathed, and FR-2.8 puts
+/// directory. FR-3.9 has the jig named, not pathed, and FR-2.8 puts
 /// `bolt.<jig>.yaml` in the config directory, which for this task is `base`.
 ///
 /// # Errors
 ///
-/// [`Error::BaseMissing`] when `base` is not there, by FR-2.5. **The check runs
-/// before anything is created.** The Go build made the base as a side effect of
+/// [`Error::BaseMissing`] when `base` is not there, by FR-2.5. The check runs
+/// before anything is created. The Go build made the base as a side effect of
 /// preparing the output directory, so a run over a typo'd path checked an empty
 /// tree and passed.
 ///
@@ -237,7 +237,7 @@ pub struct Invocation<'a> {
     pub output_dir: Option<&'a Path>,
     /// Where jigs are found, by FR-2.8. `None` is the base.
     ///
-    /// FR-2.8 has where jigs live told to bolt rather than inferred from the
+    /// FR-2.8 has where jigs live told to bolt, not inferred from the
     /// directory being run on, so one shared jig directory can serve a tree it
     /// does not sit in. The default stays the base, which is what makes naming
     /// it unnecessary for a project keeping its own jigs.
@@ -322,9 +322,8 @@ pub fn invoke(invocation: &Invocation) -> Result<Outcome, Refusal> {
 /// # Errors
 ///
 /// [`Error::OutputDirectoryInUse`] by FR-2.6b, for a named directory as much as
-/// for the default. **It returns before anything is written, and that ordering
-/// is the guarantee rather than an implementation detail**; `holds_a_run`
-/// carries why.
+/// for the default. It returns before anything is written, and that ordering
+/// is the guarantee, not an implementation detail; `holds_a_run` carries why.
 fn output_dir_of(
     base: &Path,
     named: Option<&Path>,
@@ -339,7 +338,7 @@ fn output_dir_of(
 
 /// A refusal that wrote nothing, by FR-10.7a.
 ///
-/// Named rather than written inline at each site so that "nothing was written"
+/// Named instead of written inline at each site so that "nothing was written"
 /// is one decision with one spelling. The two callers are FR-2.6b's occupied
 /// directory and a base that would not resolve, and both return before this run
 /// owns anywhere to write.
@@ -352,7 +351,7 @@ fn wrote_nothing(error: Error) -> Refusal {
 
 /// FR-2.5's refusal, with FR-10.7a's exemption applied to it.
 ///
-/// The exemption is about the **directory**, not the error. The default output
+/// The exemption is about the directory, not the error. The default output
 /// directory sits inside the base, so writing there would create the thing whose
 /// absence is being refused. One named outside it has no such problem, which is
 /// exactly what FR-10.7b tells a caller who wants a parseable refusal in every
@@ -409,15 +408,14 @@ pub fn wrote_a_result(refusal: &Error, base: &Path, output_dir: Option<&Path>) -
 
 /// Resolve every `requires` entry against `PATH`, by FR-3.10b.
 ///
-/// An incomplete toolchain is known in the first second rather than partway
-/// through a gate, which is the whole of what this buys. It names **every**
-/// missing entry rather than the first, so a caller fixing them does not pay a
-/// round trip per tool.
+/// An incomplete toolchain is known in the first second instead of partway
+/// through a gate, and that is all this buys. It names every missing entry, not
+/// just the first, so a caller fixing them does not pay a round trip per tool.
 ///
 /// FR-3.10c keeps this narrow: it is a guarantee about `requires`, not about
 /// every way a process fails to launch. A command invoking something the jig
 /// never declared still fails its own task by FR-4.10, and FR-4.10a says the
-/// reason names what the shell reported rather than a `requires` entry, because
+/// reason names what the shell reported and not a `requires` entry, because
 /// a declared tool cannot be the one that failed to start.
 ///
 /// # Errors
@@ -443,7 +441,7 @@ fn check_requires(jig: &jig::Jig) -> Result<(), Error> {
 
 /// Whether `PATH` resolves `entry` to something executable.
 ///
-/// An entry carrying a separator is a path rather than a name, and is taken as
+/// An entry carrying a separator is a path, not a name, and is taken as
 /// written: `requires` lists executables a jig invokes, and a command may
 /// invoke one by path.
 fn on_path(entry: &str) -> bool {
@@ -468,12 +466,12 @@ fn executable(path: &Path) -> bool {
 /// A run never walks its own output directory, whatever it was named and
 /// whatever `.gitignore` says, which is knowable because the run created it.
 /// The default `.bolt-<iso8601>` is hidden and `ignore` would skip it anyway; a
-/// named `build/qa` is not, so the exclusion is explicit rather than inherited
+/// named `build/qa` is not, so the exclusion is explicit instead of inherited
 /// from a default that happens to cover one case.
 ///
 /// Another run's output directory is not recognisable by name, which is why
-/// FR-2.6b refuses one that already holds a run rather than pretending this can
-/// spot it.
+/// FR-2.6b refuses one that already holds a run and this does not pretend it
+/// can spot one.
 fn walk_excluding(base: &Path, output_dir: &Path) -> Result<Vec<PathBuf>, Error> {
     Ok(walk::walk(base)?
         .into_iter()
@@ -485,17 +483,17 @@ fn walk_excluding(base: &Path, output_dir: &Path) -> Result<Vec<PathBuf>, Error>
 ///
 /// A directory bolt would create is not one that holds a run, and FR-2.6a has
 /// `--output-dir` created if it is not there. So the question is whether there
-/// is a result or a work directory in it rather than whether the path exists: a
+/// is a result or a work directory in it, not whether the path exists: a
 /// caller pointing two runs at an existing empty `build/qa` is doing what
 /// FR-2.6a describes, not what FR-2.6b refuses.
 ///
-/// **Refusing here rather than writing is the whole guarantee.** Writing into
+/// The whole guarantee is that this refuses instead of writing. Writing into
 /// one interleaves two runs' evidence, and the default stamp is second-granular
 /// so two runs started in one second resolve to the same directory. Reproduced
-/// 2026-08-28 against the Go build: a second jig's refusal replaced the first's
-/// completed verdict while its per-task evidence still said otherwise.
+/// against the Go build, a second jig's refusal replaced the first's completed
+/// verdict while its per-task evidence still said otherwise.
 /// `a_refusal_does_not_write_into_the_directory_it_refused` holds it, and
-/// removing the directory is the caller's decision rather than bolt's.
+/// removing the directory is the caller's decision, not bolt's.
 fn holds_a_run(output_dir: &Path) -> bool {
     output_dir.join(RESULT_FILE).exists() || output_dir.join(WORK_DIR).exists()
 }
@@ -564,12 +562,11 @@ fn carry_out(
 
     // Everything a jig can be refused for, checked before any task executes.
     // FR-3.10b makes that the shape: an incomplete jig is known before half a
-    // gate has run rather than partway through it. FR-4.18a puts the unknown
-    // placeholder check here for the same reason, so a jig run where nothing
-    // defines what it needs refuses in the first second rather than partway
-    // through a gate. FR-4.11e joins them: a limit that is not a duration is a
-    // jig error, and finding it two tasks in would waste the run it was meant
-    // to bound.
+    // gate has run. FR-4.18a puts the unknown placeholder check here for the
+    // same reason, so a jig run where nothing defines what it needs refuses in
+    // the first second, not partway through a gate. FR-4.11e joins them: a
+    // limit that is not a duration is a jig error, and finding it two tasks in
+    // would waste the run it was meant to bound.
     let plans = validate(&jig, &definitions)?;
     let run_limit = read_limit(jig.time_limit.as_deref(), None)?;
     check_requires(&jig)?;
@@ -579,8 +576,8 @@ fn carry_out(
     // tree, spends it like anything else does.
     let started = Instant::now();
 
-    // Created before the walk. Creating it afterwards made FR-2.2c's exclusion
-    // below true by accident, for a directory bolt had not made yet.
+    // Created before the walk. Created afterwards, FR-2.2c's exclusion below
+    // would hold only by accident, for a directory bolt had not made yet.
     create_dir(&output_dir.join(WORK_DIR))?;
 
     let walked = walk_excluding(base, &output_dir)?;
@@ -607,7 +604,7 @@ fn carry_out(
 
 /// The reasons a run carries in its own right, by FR-4.13.
 ///
-/// Handed to the merge rather than left on disk for it to find, because a passed
+/// Handed to the merge instead of left on disk for it to find, because a passed
 /// run limit is a property of the run and no constituent can carry it. FR-4.14
 /// is why the merge still runs at all: a run that times out carries what
 /// completed.
@@ -645,8 +642,8 @@ fn locations_for(base: &Path, config_dir: &Path, output_dir: &Path) -> Locations
 ///
 /// Checked before the jig is read, so a run too deep does no work and opens no
 /// files. FR-5.8 still has it write a result, which [`invoke`] arranges for
-/// every refusal, so the run that spawned it folds an ordinary failure rather
-/// than meeting a hole.
+/// every refusal, so the run that spawned it folds an ordinary failure and does
+/// not meet a hole.
 fn within_ceiling() -> Result<depth::Depth, Error> {
     let depth = depth::Depth::from_environment();
     if depth.exceeded() {
@@ -690,7 +687,7 @@ fn read_limit<'a>(
 /// else was wrong. FR-4.9 is the exception a jig asks for.
 ///
 /// The verdict a short-circuit reads is taken back off the envelope the task
-/// just wrote rather than tracked alongside. The envelope is the authoritative
+/// just wrote, not tracked alongside. The envelope is the authoritative
 /// result by FR-6.1, and a second copy in bookkeeping is a second thing that can
 /// disagree with the evidence on disk.
 fn run_tasks<'a>(
@@ -769,7 +766,7 @@ struct TaskRun<'a> {
 /// Whether every execution of `task` passed, read back off what it wrote.
 ///
 /// FR-4.9's short-circuit needs a verdict, and this takes it from the envelopes
-/// on disk rather than from a boolean carried alongside the run. The envelope is
+/// on disk, not from a boolean carried alongside the run. The envelope is
 /// the authoritative result by FR-6.1, so a second copy in bookkeeping is a
 /// second thing that can disagree with the evidence, and the evidence is what a
 /// reader will have.
@@ -802,9 +799,9 @@ fn task_passed(output_dir: &Path, task: &str) -> bool {
 ///
 /// # Errors
 ///
-/// [`Error::TaskNamesAJig`] by FR-5.22, **checked first**, so a jig written
-/// against the retired nesting mechanism is told what replaced it rather than
-/// told it forgot a field. [`Error::TaskNamesNoCommand`] for a task with
+/// [`Error::TaskNamesAJig`] by FR-5.22, checked first, so a jig written
+/// against the retired nesting mechanism is told what replaced it instead of
+/// being told it forgot a field. [`Error::TaskNamesNoCommand`] for a task with
 /// nothing to run at all, and [`Error::CommandNamesBothPathForms`] by FR-4.2,
 /// since a command cannot be one execution per path and one execution over all
 /// of them at once.
@@ -838,7 +835,7 @@ struct Plan<'a> {
 /// Everything a jig is refused for, checked before any task executes.
 ///
 /// FR-3.10b makes that the shape: an incomplete jig is known before half a gate
-/// has run rather than partway through it. Returns each task's plan, so the run
+/// has run. Returns each task's plan, so the run
 /// loop does not re-derive what this already proved.
 fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<Plan<'a>>, Error> {
     let mut commands = Vec::with_capacity(jig.tasks.len());
@@ -858,7 +855,8 @@ fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<Plan
 
         // The name becomes a path component, so it must stay one. Without this
         // a task named `../../victim` writes a full evidence directory outside
-        // the base, which is FR-2.3's containment rather than a naming nicety.
+        // the base. That breaks FR-2.3's containment, so this is more than a
+        // naming nicety.
         if Path::new(&task.name).components().count() != 1
             || task.name.contains(std::path::MAIN_SEPARATOR)
         {
@@ -867,7 +865,7 @@ fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<Plan
 
         let command = command_of(task, &named)?;
 
-        // FR-4.18a. Checked here rather than at substitution, which happens per
+        // FR-4.18a. Checked here and not at substitution, which happens per
         // execution, so a jig whose second task names a placeholder nothing
         // defines refuses before the first task runs instead of partway through
         // a gate.
@@ -892,7 +890,7 @@ fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<Plan
 
 /// Every `{name}` a command line spells, in the order they appear.
 ///
-/// An unmatched brace is literal text rather than a placeholder, which is the
+/// An unmatched brace is literal text, not a placeholder, which is the
 /// same reading `substitute` takes, and the two have to agree or a command
 /// passes validation and then fails to substitute.
 fn placeholders(command: &str) -> Vec<&str> {
@@ -921,7 +919,7 @@ fn run_task<'a>(
 
     if plan.wants_paths && selection.selected.is_empty() {
         // FR-4.4c: an allowed empty selection produces no constituent at all,
-        // which is what FR-4.4 alone used to mean for every task.
+        // which is what FR-4.4 alone would mean for every task.
         if task.optional {
             return Ok(TaskRun {
                 executions: 0,
@@ -954,7 +952,7 @@ fn execute_batches<'a>(
 
     // FR-9.6: a task naming no path variable was handed no list, so its
     // manifest claims none. Recording one would say the command saw files it
-    // never received, so the key is absent rather than empty.
+    // never received, so the key is absent, not empty.
     let recorded = plan.wants_paths.then_some(selection);
 
     let deadlines = deadlines_for(scope, plan);
@@ -968,7 +966,7 @@ fn execute_batches<'a>(
         create_dir(&work_dir)?;
 
         // Substituted before the manifest is written, because FR-9.5's
-        // manifest records the command AS EXECUTED and FR-9.5a writes it before
+        // manifest records the command as executed and FR-9.5a writes it before
         // the command runs. Both hold only if substitution comes first.
         let execution = Execution {
             task: &task.name,
@@ -979,7 +977,7 @@ fn execute_batches<'a>(
         write_manifest(scope, &execution, recorded)?;
 
         // FR-4.11b: the executions after a killed one do not start. This is the
-        // case where the limit fell between two of them rather than during one,
+        // case where the limit fell between two of them and not during one,
         // so nothing was killed and nothing would otherwise record that the
         // task ran out. FR-9.5a's manifest is already written above, which is
         // that row's "never got started" clause doing its work.
@@ -1001,7 +999,7 @@ fn execute_batches<'a>(
 /// The limits governing one task, taken as it starts.
 ///
 /// FR-4.11f measures the task's from here, so it is wall clock from the moment
-/// the task starts rather than a total of what its commands spent.
+/// the task starts, not a total of what its commands spent.
 fn deadlines_for<'a>(scope: &Scope<'a>, plan: &Plan<'a>) -> Deadlines<'a> {
     Deadlines {
         run: scope.run_limit,
@@ -1085,7 +1083,7 @@ fn batches_for(command: &str, wants_paths: bool, selection: &Selection) -> Vec<V
 
 /// FR-4.4b's failing constituent for a task that matched nothing.
 ///
-/// It has to be a constituent rather than a skip, or FR-8.3 folds a run that
+/// It has to be a constituent and not a skip, or FR-8.3 folds a run that
 /// checked nothing into a pass, which is FR-8.3a's argument one level down.
 fn empty_selection(
     scope: &Scope,
@@ -1150,7 +1148,7 @@ fn execute<'a>(
         deadlines.command(),
     )?;
 
-    // Read at the kill rather than after the adapter, because both limits keep
+    // Read at the kill and not after the adapter, because both limits keep
     // running while the adapter does and the answer would drift.
     let expired = if ran.killed {
         deadlines.expired(Instant::now())
@@ -1198,7 +1196,7 @@ struct Output<'a> {
 struct Ran {
     /// Its exit status, or -1 where a signal ended it.
     status: i32,
-    /// Whether a limit killed it rather than it finishing on its own.
+    /// Whether a limit killed it before it finished on its own.
     killed: bool,
 }
 
@@ -1212,11 +1210,11 @@ const POLL_CEILING: Duration = Duration::from_millis(50);
 /// Run a command line to completion, or to `deadline` where one is set.
 ///
 /// FR-4.15 runs it as a subprocess, so the streams and the status FR-9.2 keeps
-/// come from the process boundary rather than from bookkeeping bolt would
-/// otherwise have to trust.
+/// come from the process boundary, not from bookkeeping bolt would otherwise
+/// have to trust.
 ///
-/// **The streams go straight to their files rather than through a pipe**, which
-/// is what makes FR-4.12a hold: a killed command's partial output is already on
+/// The streams go straight to their files and not through a pipe, which is
+/// what makes FR-4.12a hold: a killed command's partial output is already on
 /// disk, with nothing left to drain from a pipe its own death closed. It also
 /// removes the deadlock a polled wait would otherwise invite, where a child
 /// blocks filling a pipe nobody is reading while bolt waits for it to exit.
@@ -1276,7 +1274,7 @@ fn streams(output: &Output) -> Result<(Stdio, Stdio), Error> {
 
 /// Wait for a child, killing it and its group where `deadline` passes first.
 ///
-/// Polled rather than blocked, because a blocking wait cannot be interrupted by
+/// Polled, not blocked, because a blocking wait cannot be interrupted by
 /// a clock and bolt has no other thread to hold one.
 fn wait_for(child: &mut Child, deadline: Option<Instant>) -> std::io::Result<Ran> {
     let code = |status: std::process::ExitStatus| status.code().unwrap_or(-1);
@@ -1377,7 +1375,7 @@ fn adapt<'a>(
         // Only where no adapter is declared, because FR-6.9 makes bolt the
         // generic exit-code adapter there and FR-6.3 keeps the judgement an
         // adapter's everywhere else. FR-6.9a excludes a killed command, whose
-        // status is bolt's own signal rather than an answer the tool gave.
+        // status is bolt's own signal and not an answer the tool gave.
         if task.adapter.is_none() && !ran.killed && ran.status != 0 {
             reasons.push((
                 "nonzero-exit".to_owned(),
@@ -1390,8 +1388,8 @@ fn adapt<'a>(
 
     let Some(name) = task.adapter.as_deref() else {
         // FR-6.9a: the generic exit-code adapter does not run on a command a
-        // limit killed. That status is bolt's own signal rather than an answer
-        // the tool gave, so `timed_out` writes the envelope and FR-4.12b's
+        // limit killed. That status is bolt's own signal, not an answer the
+        // tool gave, so `timed_out` writes the envelope and FR-4.12b's
         // reason is the verdict.
         if ran.killed {
             return Ok(None);
@@ -1410,7 +1408,7 @@ fn adapt<'a>(
 
 /// Run a named adapter and take its verdict, or say why bolt could not.
 ///
-/// **The envelope is removed before the adapter runs.** An `output.yaml` left by
+/// The envelope is removed before the adapter runs. An `output.yaml` left by
 /// an earlier fold would otherwise satisfy "the adapter wrote one", and a silent
 /// adapter would inherit the previous run's verdict. Carried over from the Go
 /// build, which found it.
@@ -1507,25 +1505,24 @@ fn unauthoritative(ran: &Ran, envelope: &Path) -> Option<adapter::Unauthoritativ
     }
 }
 
-/// Substitute a command's template variables, in ONE left-to-right pass.
+/// Substitute a command's template variables, in one left-to-right pass.
 ///
-/// **Chained `str::replace` is a command injection, and it was one here.**
-/// Measured 2026-08-28 against the built binary by a cold-read reviewer: a file
-/// named `p{all_paths};id #`, selected by a `{each_path}` task, was quoted
-/// correctly by [`quote`] and then had the literal `{all_paths}` *inside its own
-/// name* expanded by the next `replace`. That spliced a fresh `'…'` string into
+/// Chained `str::replace` is a command injection, and it was one here. Against
+/// the built binary, a file named `p{all_paths};id #`, selected by a
+/// `{each_path}` task, was quoted correctly by [`quote`] and then had the
+/// literal `{all_paths}` *inside its own name* expanded by the next `replace`. That spliced a fresh `'…'` string into
 /// the middle of the already-quoted region, broke the quoting, and put the rest
 /// of the filename on the command line unquoted. `id` executed. A second fixture
 /// escaped the base and created a file beside it while the run reported success.
 ///
-/// So FR-4.3's guarantee is not a property of the quoting alone. It is a
-/// property of the quoting AND of never reading substituted bytes again, which
-/// is what a single pass gives and what chaining cannot.
+/// So FR-4.3's guarantee needs both the quoting and never reading substituted
+/// bytes again. A single pass gives the second and chaining cannot.
+/// `docs/LESSONS/chained-substitution-is-a-command-injection.md` has the lesson.
 ///
 /// # Errors
 ///
 /// [`Error::UnknownPlaceholder`] for a `{name}` no layer supplies, by FR-4.18.
-/// Chained replace left an unknown placeholder in the string and handed it to
+/// Chained replace leaves an unknown placeholder in the string and hands it to
 /// the shell; the row wants a refusal naming it before anything executes.
 fn substitute(
     command: &str,
@@ -1545,13 +1542,13 @@ fn substitute(
         .collect::<Vec<_>>()
         .join(" ");
     // Bolt's layer first and unconditionally, by FR-4.16d: the locations and
-    // path variables are reserved rather than overridable, so nothing above
+    // path variables are reserved, not overridable, so nothing above
     // them can win. FR-4.19 already refused any layer that named one, so this
     // ordering and that refusal say the same thing twice on purpose.
     //
     // A defined value is quoted like a location, which is what makes it one
     // argument. FR-4.16c settles it as a scalar, so a value carrying a space
-    // arrives as one word rather than splitting into two.
+    // arrives as one word instead of splitting into two.
     let value = |name: &str| match name {
         "each_path" | "all_paths" => Some(joined.clone()),
         "work_dir" => Some(quote(work_dir)),
@@ -1568,7 +1565,7 @@ fn substitute(
         out.push_str(&rest[..open]);
         let after = &rest[open + 1..];
         let Some(close) = after.find('}') else {
-            // An unmatched brace is literal text rather than a placeholder.
+            // An unmatched brace is literal text, not a placeholder.
             out.push_str(&rest[open..]);
             return Ok(out);
         };
@@ -1608,7 +1605,7 @@ pub fn work_dir_name(task: &str, ordinal: usize, executions: usize) -> String {
 /// removed, for a task that consumes paths, so what the task saw and what it
 /// was kept from seeing sit on disk beside what it did.
 ///
-/// FR-9.5a writes it **before** the command runs, so an execution that was
+/// FR-9.5a writes it before the command runs, so an execution that was
 /// killed, or that never got started, still records what was going to be
 /// attempted. FR-9.6 has a task naming no path variable claim none, because
 /// recording one would say the command saw files it never received.
@@ -1645,7 +1642,7 @@ fn write_manifest(
     // The key names are wrench's, not bolt's. FR-9.5 says a manifest records
     // what was selected and what was removed; `selection.matched` and
     // `selection.excluded` are what the shipped schema calls them, and writing
-    // through wrench refused the pair this first invented.
+    // through wrench refuses any other pair of names.
     if let Some(selection) = selection {
         manifest["selection"] = json!({
             "matched": names(&selection.selected),

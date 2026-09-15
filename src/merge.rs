@@ -19,15 +19,15 @@ use crate::{Error, Outcome};
 /// enforced is a check not in the jig.
 ///
 /// `reasons` are the run's own, which no constituent can carry: FR-4.13's
-/// passed run limit is a property of the run rather than of any one execution.
+/// passed run limit is a property of the run, not of any one execution.
 /// FR-8.1's repeatability is unaffected, because it is about the fold being
 /// mechanical over what it is given: the same directory and the same reasons
 /// produce the same file every time.
 ///
 /// # Errors
 ///
-/// [`Error::NoConstituents`] when the fold finds none **and the run has no
-/// reason of its own**, by FR-8.3a. FR-8.3 alone would pass such a run, because
+/// [`Error::NoConstituents`] when the fold finds none and the run has no
+/// reason of its own, by FR-8.3a. FR-8.3 alone would pass such a run, because
 /// every constituent passing holds vacuously when there are none, and a green
 /// result over zero checks is read as checked and fine. A run carrying a reason
 /// is not that case: it reports a failure with the reason for it, which is what
@@ -47,7 +47,7 @@ pub fn merge(output_dir: &Path, base: &Path, reasons: &[Value]) -> Result<Outcom
         .collect();
 
     // Sorted, so the evidence mapping is the same on every fold over one
-    // directory. FR-8.1's repeatability is about the file rather than about the
+    // directory. FR-8.1's repeatability is about the file, not only the
     // verdict, and a directory read order is not stable.
     entries.sort();
 
@@ -101,20 +101,20 @@ struct Folded {
 /// Read every constituent and collect what the result is built from.
 ///
 /// FR-8.4 has the merged result carry the reasons its constituents produced, so
-/// what failed **and why** is readable from the merged file alone. Synthesising
+/// what failed and why is readable from the merged file alone. Synthesising
 /// one reason per failure satisfies the first half and loses the second: every
 /// failure arrives as the same kind with the same message, and a reader is sent
 /// back to the work directories this exists to summarise. It also makes FR-7.10
 /// unsatisfiable, since that row distinguishes a task that could not execute
-/// from one that executed and failed **by the kind**, and there is only one kind
+/// from one that executed and failed by the kind, and there is only one kind
 /// left to read.
 ///
 /// A constituent that failed while carrying no reason of its own still
 /// contributes one, because the envelope schema requires `reasons` whenever
 /// success is false and a fold that only flipped the boolean would not
 /// validate. That case is an adapter that wrote an envelope FR-6.11 would have
-/// caught, so the reason says the constituent failed without saying why rather
-/// than pretending to know.
+/// caught, so the reason says the constituent failed and does not pretend to
+/// know why.
 fn fold(entries: &[std::path::PathBuf]) -> Result<Folded, Error> {
     let mut evidence = serde_json::Map::new();
     let mut reasons = Vec::new();
@@ -143,16 +143,16 @@ fn fold(entries: &[std::path::PathBuf]) -> Result<Folded, Error> {
 
 /// One execution's entry in FR-8.2's evidence mapping.
 ///
-/// FR-8.2 wants a mapping keyed by task rather than a list of paths, each entry
+/// FR-8.2 wants a mapping keyed by task, not a list of paths, each entry
 /// carrying that task's args and the filepath of its own result. FR-8.2a settles
-/// where each half comes from and **neither is the envelope**: the key from the
+/// where each half comes from, and neither is the envelope: the key from the
 /// work directory name, which FR-3.3 prefixes with the task, and the args from
 /// that execution's manifest, which FR-9.5c already records. That keeps FR-6.2's
 /// adapter contract as narrow as it is, since an adapter never has to know what
 /// task it was run for.
 ///
-/// FR-8.8 makes `args` the argv **as executed, after substitution**, so the
-/// merged file says what ran rather than what was written. The manifest's
+/// FR-8.8 makes `args` the argv as executed, after substitution, so the
+/// merged file says what ran and not what was written. The manifest's
 /// `command` is exactly that.
 ///
 /// A work directory with no readable manifest still gets an entry, carrying its
@@ -199,7 +199,7 @@ pub(crate) fn read(path: &Path, schema: &dyn wrench::Schema) -> Result<Value, Er
 ///
 /// The constituent's own reasons where it produced any, so its `kind` and
 /// `message` reach the merged file unaltered. FR-8.5 keeps the envelope on disk
-/// too, so this is a copy rather than a move, and a reader who wants the
+/// too, so this is a copy and not a move, and a reader who wants the
 /// untouched original still has it.
 fn carried(envelope: &Value, name: &str) -> Vec<Value> {
     let own: Vec<Value> = envelope

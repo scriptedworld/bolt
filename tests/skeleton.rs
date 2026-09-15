@@ -1,15 +1,16 @@
 //! The walking skeleton: one jig, one directory, end to end.
 //!
-//! One file rather than one per concern, because a shared `tests/common/mod.rs`
-//! compiles into every test binary separately and its helpers are then dead
-//! code in each binary that does not call them. Under `-D warnings` that fails
-//! the gate, and the usual fix is an `allow` attribute, which hard rule 4 makes
-//! a question rather than an edit.
+//! One file, not one per concern. A shared `tests/common/mod.rs` compiles into
+//! every test binary separately, and its helpers are then dead code in each
+//! binary that does not call them. Under `-D warnings` that fails the gate, and
+//! the usual fix is an `allow` attribute, which hard rule 4 turns into a
+//! question instead of an edit.
 //!
-//! **Envelopes and manifests are read through wrench**, by FR-1.12, which also
+//! Envelopes and manifests are read through wrench, by FR-1.12, which also
 //! validates them against their schemas on the way in. A substring check over
 //! the raw text cannot tell `success: true` from a command whose name happens
-//! to be `true`, and three cold reads found exactly that in the first draft.
+//! to be `true`, and the first draft had exactly that defect, found on three
+//! separate reads.
 
 use std::fs;
 use std::os::unix::fs as unix_fs;
@@ -216,9 +217,9 @@ fn a_jig_that_will_not_parse_is_refused() {
 // COVERS: FR-1.5, FR-3.9 | edge
 /// A jig with no `version` is valid, because the schema requires only `tasks`.
 ///
-/// Bolt validates what wrench's schema says and not what it would have chosen.
-/// Requiring `version` here refused six of the estate's jigs including bolt's
-/// own, and nothing said so until the Rust bolt was pointed at its own gate.
+/// Bolt validates what wrench's schema says, not what bolt would have chosen.
+/// Requiring `version` here refuses six of the estate's jigs, bolt's own among
+/// them, and nothing showed it until the Rust bolt was pointed at its own gate.
 #[test]
 fn a_jig_without_a_version_is_read() {
     let root = tree();
@@ -238,15 +239,15 @@ fn a_jig_without_a_version_is_read() {
 /// A task carrying the retired `jig` field is refused by name, and told what
 /// replaced it.
 ///
-/// **The message is the whole point of the row.** Serde's `missing field
-/// command` reads as a malformed task and invites somebody to add a command to
-/// one that already meant to run a jig, which is the wrong repair. FR-5.18
-/// makes the right one a command line, so the refusal spells it.
+/// The message is the whole point of the row. Serde's `missing field command`
+/// reads as a malformed task and invites somebody to add a command to one that
+/// already meant to run a jig, which is the wrong repair. FR-5.18 makes the
+/// right one a command line, so the refusal spells it out.
 ///
-/// **Asserted on the text and not only on the variant**, because a reader
-/// meeting this has a jig written against a mechanism that no longer exists and
-/// the variant name reaches nobody. Found against wrench's real jig, whose gate
-/// has two of these.
+/// Asserted on the text as well as the variant. A reader meeting this has a jig
+/// written against a mechanism that no longer exists, and the variant name
+/// reaches nobody. Wrench's real jig has two of these in its gate, which is
+/// where the case turned up.
 #[test]
 fn a_task_carrying_the_retired_jig_field_is_refused_by_name() {
     let root = tree();
@@ -274,14 +275,15 @@ fn a_task_carrying_the_retired_jig_field_is_refused_by_name() {
 /// A filename containing a template token is not re-expanded into its own
 /// substitution.
 ///
-/// **This was a working remote code execution.** Substitution chained
-/// `str::replace` once per variable, so a path spliced in for `{each_path}` that
+/// Bolt had a working remote code execution here, from substitution chaining
+/// `str::replace` once per variable. A path spliced in for `{each_path}` that
 /// contained the literal text `{all_paths}` had that token expanded by the next
 /// replace. The second expansion spliced a fresh quoted string into the middle
 /// of the already-quoted region, broke the quoting, and put the rest of the
-/// filename on the command line unquoted. A cold-read reviewer ran `id` with it
+/// filename on the command line unquoted. A filename built that way ran `id`
 /// and escaped the base to write a file beside it, while the run reported
 /// success.
+/// `docs/LESSONS/chained-substitution-is-a-command-injection.md` has the rest.
 ///
 /// `quote` was correct throughout. FR-4.3 is not a property of the quoting
 /// alone; it needs substituted bytes never to be read again.
@@ -386,7 +388,7 @@ fn a_task_name_that_leaves_the_work_directory_is_refused() {
 // COVERS: FR-2.5, FR-10.7a | negative
 /// A base that is not there is refused, and nothing is created.
 ///
-/// FR-2.5a is deliberately **not** cited. It gives every refusal a
+/// FR-2.5a is deliberately not cited. It gives every refusal a
 /// `result.yaml`, and FR-10.7a exempts exactly this case: the default output
 /// directory sits at the base, so writing the result would create the base
 /// whose absence is being refused. Bolt says so on stderr and writes none.
@@ -558,9 +560,9 @@ fn the_walk_is_sorted_and_repeatable() {
 /// The row says the walk does not *follow* a symlink, and this asserts exactly
 /// that: the file behind a directory symlink does not appear.
 ///
-/// **It deliberately does not assert what happens to a symlink to a FILE.**
-/// Measured 2026-08-27: `ignore` with `follow_links(false)` returns the link
-/// itself, so a task handed it reads through to outside the base. Whether
+/// It deliberately does not assert what happens to a symlink to a file.
+/// Measured: `ignore` with `follow_links(false)` returns the link itself, so a
+/// task handed it reads through to outside the base. Whether
 /// FR-2.2e forbids that is question 40 and is open, and a test here would
 /// answer it by accident.
 #[test]
@@ -591,10 +593,10 @@ fn a_symlink_is_not_followed() {
 /// `matching` selects, `excluding` removes from what it selected, and both are
 /// matched relative to the base.
 ///
-/// The paths come from a real walk and are therefore absolute. The first draft
-/// passed bare relative names, which hid the whole defect: measured, the glob
-/// `generated.py` does not match `/abs/tmp/x/generated.py`, so a literal
-/// `excluding` entry silently removes nothing while `**/*.py` keeps working.
+/// The paths come from a real walk and are therefore absolute. Bare relative
+/// names hide the whole defect: measured, the glob `generated.py` does not
+/// match `/abs/tmp/x/generated.py`, so a literal `excluding` entry silently
+/// removes nothing while `**/*.py` keeps working.
 #[test]
 fn matching_selects_and_excluding_removes_relative_to_the_base() {
     let root = tree();
@@ -627,11 +629,10 @@ fn matching_selects_and_excluding_removes_relative_to_the_base() {
 // COVERS: FR-4.3 | negative
 /// Every substituted path is quoted individually, against a shell.
 ///
-/// Asserted by round trip rather than by shape. `format!("'{}'", path)` is the
-/// obvious implementation and passes any starts-with/ends-with check, and a
-/// path containing a single quote escapes it: an adversarial review built
-/// `'a'; touch <path>/PWNED; '.txt'` against the first draft and the injected
-/// command ran.
+/// Asserted by round trip, not by shape. `format!("'{}'", path)` is the obvious
+/// implementation and passes any starts-with/ends-with check, and a path
+/// containing a single quote escapes it: against the first draft, a file named
+/// `'a'; touch <path>/PWNED; '.txt'` ran the injected command.
 #[test]
 fn every_substituted_path_is_quoted_individually() {
     let root = tree();
@@ -736,9 +737,9 @@ fn a_command_naming_both_path_forms_is_a_jig_error() {
 // COVERS: FR-4.4, FR-4.4b | negative
 /// A path-consuming task whose selection is empty fails, and says so.
 ///
-/// FR-4.4b changed this on 2026-08-27. It used to be a silent skip, which left
-/// a typo'd pattern green forever. The task still does not execute; what is new
-/// is that it produces a failing constituent rather than nothing.
+/// FR-4.4b makes this a failure. A silent skip would leave a typo'd pattern
+/// green forever. The task still does not execute; it produces a failing
+/// constituent instead of nothing.
 #[test]
 fn a_path_consuming_task_with_an_empty_selection_fails() {
     let root = tree();
@@ -830,7 +831,7 @@ fn a_command_naming_no_path_variable_always_executes() {
 /// Tasks execute serially: no two executions overlap in time.
 ///
 /// The row says serially and says nothing about order. FR-4.5a calls serial the
-/// simplest thing rather than something required, and FR-4.7 says the merged
+/// simplest thing, not something required, and FR-4.7 says the merged
 /// result does not vary with the order tasks ran in, so this asserts non-overlap
 /// and not declaration order, which no row states and which is question 38.
 ///
@@ -896,7 +897,7 @@ fn an_execution_keeps_its_native_results() {
         // the base, and FR-9.2 keeps what the command wrote *there*, meaning in
         // its work directory, so a command wanting an artifact kept says where.
         // Declaring `evidence` is how a task names files bolt did not see it
-        // write, and that is `runner/30`'s rather than the skeleton's.
+        // write, and that belongs to `runner/30`, not the skeleton.
         concat!(
             "  - name: noisy\n",
             "    command: \"sh -c 'echo out; echo err >&2; echo made > {work_dir}/artifact.txt'\"\n",
@@ -941,8 +942,8 @@ fn an_execution_keeps_its_native_results() {
 /// absent instead of half written, and FR-7.5b keeps the temporary beside its
 /// target because a rename across filesystems is a copy.
 ///
-/// Asserted as the absence of a leftover rather than by killing a run midway,
-/// which cannot be made deterministic. A write that skipped the rename fails
+/// Asserted as the absence of a leftover. Killing a run midway cannot be made
+/// deterministic. A write that skipped the rename fails
 /// this twice over: the temporary survives and the target is not there.
 ///
 /// Every structured file goes through wrench, which renames for itself. What
@@ -1056,9 +1057,9 @@ fn each_task_numbers_its_own_executions_from_one() {
 /// The manifest records what `matching` selected and what `excluding` removed.
 ///
 /// The jig is valid: `matching` and `excluding` sit on a task that names a path
-/// variable, which FR-3.4b requires. The first draft put them on a task whose
-/// command was `false`, a jig the specification refuses, and then asserted the
-/// manifest carried both paths, which is the negation of FR-9.6.
+/// variable, which FR-3.4b requires. Putting them on a task whose command is
+/// `false` builds a jig the specification refuses, and asserting that such a
+/// manifest carries both paths is the negation of FR-9.6.
 #[test]
 fn the_manifest_records_what_was_selected_and_removed() {
     let root = tree();
@@ -1082,9 +1083,9 @@ fn the_manifest_records_what_was_selected_and_removed() {
     );
 
     // `selection.matched` and `selection.excluded` are wrench's names for the
-    // two lists FR-9.5 requires. This first invented `selected` and `removed`,
-    // and writing the manifest through wrench refused them, which is what
-    // reading a structured file through a schema is for.
+    // two lists FR-9.5 requires. Invented names such as `selected` and
+    // `removed` are refused when the manifest is written through wrench, which
+    // is what reading a structured file through a schema is for.
     let listed = |key: &str| -> Vec<String> {
         manifest
             .get("selection")
@@ -1167,7 +1168,7 @@ fn a_task_naming_no_path_variable_claims_no_paths() {
     );
 
     // wrench's schema says `selection` is "present for a task that consumes
-    // paths", so absent is the claim rather than an empty pair of lists.
+    // paths", so absent is the claim, not an empty pair of lists.
     assert!(
         manifest.get("selection").is_none(),
         "a task handed no list has a manifest claiming a selection: {manifest}",
@@ -1179,9 +1180,9 @@ fn a_task_naming_no_path_variable_claims_no_paths() {
 // COVERS: FR-6.9 | positive
 /// A task naming no adapter gets the generic exit-code adapter.
 ///
-/// The commands are `exit 0` and `exit 3` rather than `true` and `false`, so no
+/// The commands are `exit 0` and `exit 3`, not `true` and `false`, so no
 /// envelope can satisfy the assertion by echoing the command line it ran, and
-/// the verdict is read as a boolean rather than matched as a substring.
+/// the verdict is read as a boolean instead of matched as a substring.
 #[test]
 fn a_task_naming_no_adapter_gets_the_exit_code_one() {
     let root = tree();
@@ -1289,8 +1290,8 @@ fn the_merge_passes_only_when_every_constituent_passes() {
     // Asserted on `result.yaml` and not only on the returned struct. FR-8.3 is
     // about the merged result, FR-10.3 makes the envelope the verdict, and
     // every gate in the estate reads the file. The two are computed from one
-    // value today, so a mutation writing `success: true` into the document
-    // while the struct stayed false passed both assertions above.
+    // value, so a mutation writing `success: true` into the document while the
+    // struct stays false passes both assertions above.
     for (outcome, expected) in [(&passing, true), (&failing, false)] {
         let written = read_validated(
             &outcome.output_dir.join(bolt::run::RESULT_FILE),
@@ -1333,8 +1334,8 @@ fn a_merge_finding_no_constituent_fails() {
 /// A refusal writes a `result.yaml` in the shape every refusal takes.
 ///
 /// FR-10.7 has bolt write one whenever it is alive and in control when it
-/// stops, so a caller finding none knows the process was killed rather than
-/// that the run never started. FR-2.5a fixes the shape: `success: false` and a
+/// stops, so a caller finding none knows the process was killed, not that the
+/// run never started. FR-2.5a fixes the shape: `success: false` and a
 /// reason, then a non-zero exit.
 ///
 /// The refusal chosen is an unparseable jig, because it happens once the base
@@ -1388,14 +1389,13 @@ fn a_refusal_writes_a_result() {
 /// FR-2.5a's shape, asserted where a refusal wrote a result.
 ///
 /// One reason, the `kind` this sort of refusal carries by FR-10.9, and a message
-/// carrying `says`. A helper rather than a copy per caller, since several tests
-/// want the same three assertions and differ only in which refusal produced the
-/// file and therefore in what it should say.
+/// carrying `says`. One helper, not a copy per caller, since several tests want
+/// the same three assertions and differ only in which refusal produced the file
+/// and therefore in what it should say.
 ///
-/// **`kind` is a parameter rather than a constant**, which is the point of
-/// FR-10.9: it was `bolt-refused` for every refusal, so this helper asserted the
-/// same string whatever produced the file and could not have noticed two
-/// situations sharing one name.
+/// `kind` is a parameter, not a constant, which is the point of FR-10.9. With
+/// `bolt-refused` for every refusal, a helper asserting one string whatever
+/// produced the file could not notice two situations sharing one name.
 fn assert_refusal_shape(result: &Path, kind: &str, says: &str) {
     let envelope = read_validated(result, &wrench::schemas::ENVELOPE);
     let reasons = envelope
@@ -1456,19 +1456,19 @@ fn the_missing_base_refusal_writes_nothing_and_says_so() {
 // COVERS: FR-10.7, FR-10.7a, FR-2.6b | regression
 /// Refusing a directory as unusable does not write into it.
 ///
-/// **This is the guarantee FR-10.7 can be satisfied without, which is why it is
-/// asserted rather than described.** An earlier Go implementation of bolt
-/// writes a conformant refusal
-/// into the run directory it resolved, and because the stamp is second-granular
-/// two runs starting in one second resolve to the same one: the second refuses,
-/// correctly, and its refusal replaces the first's completed verdict while the
-/// per-task evidence still says `nonzero-exit`. Reproduced 2026-08-28.
+/// FR-10.7 can be satisfied without this guarantee, which is why it is asserted
+/// and not just described. An earlier Go implementation of bolt writes a
+/// conformant refusal into the run directory it resolved, and because the stamp
+/// is second-granular two runs starting in one second resolve to the same one:
+/// the second refuses, correctly, and its refusal replaces the first's completed
+/// verdict while the per-task evidence still says `nonzero-exit`. Reproduced
+/// against that build.
 ///
 /// A refactor satisfying FR-10.7 by writing the refusal into the resolved
 /// directory passes every other test in this file.
 ///
-/// The directory is named rather than resolved from the stamp, which since
-/// FR-2.6e's nanoseconds no longer collides by clock. Both cases reach the
+/// The directory is named instead of resolved from the stamp, which with
+/// FR-2.6e's nanoseconds does not collide by clock. Both cases reach the
 /// same refusal through `wrote_a_result`, and a named directory constructs it
 /// without a retry loop that could pass by never exercising its own case.
 #[test]
@@ -1498,15 +1498,15 @@ fn a_refusal_does_not_write_into_the_directory_it_refused() {
 // COVERS: FR-8.4 | positive
 /// The merged result carries the reasons its constituents produced.
 ///
-/// FR-8.4 wants what failed **and why** readable from the merged file alone.
+/// FR-8.4 wants what failed and why readable from the merged file alone.
 /// Synthesising one reason per failing constituent satisfies "what failed" and
 /// loses "why": every failure then arrives as the same kind with the same
 /// message, and a reader is sent back to the work directories the merge exists
 /// to summarise.
 ///
-/// Asserted on the constituent's own `kind` and `message` rather than on the
-/// count, because a merge that renamed its synthesised kind would satisfy a
-/// count and still carry nothing.
+/// Asserted on the constituent's own `kind` and `message`, not on the count,
+/// because a merge that renamed its synthesised kind would satisfy a count and
+/// still carry nothing.
 #[test]
 fn the_merge_carries_its_constituents_reasons() {
     let root = tree();
@@ -1567,15 +1567,15 @@ fn the_merge_carries_its_constituents_reasons() {
 // COVERS: FR-2.4 | positive
 /// Paths are resolved to absolute before anything runs.
 ///
-/// Driven through the built binary with a **relative** base, because that is
-/// the case the row is about and the one an in-process call cannot reach: a
-/// test passing `root.path()` hands bolt an absolute path already and would
-/// pass against an implementation that resolves nothing.
+/// Driven through the built binary with a relative base, because that is the
+/// case the row is about and the one an in-process call cannot reach: a test
+/// passing `root.path()` hands bolt an absolute path already and would pass
+/// against an implementation that resolves nothing.
 ///
-/// `bolt gate .` recorded `"base_dir": {"value": "."}` in every manifest and
-/// substituted relative paths into command lines. `strip_prefix` survives that,
-/// so nothing failed; every recorded path was simply wrong for a reader not
-/// standing where bolt stood.
+/// Without resolution, `bolt gate .` records `"base_dir": {"value": "."}` in
+/// every manifest and substitutes relative paths into command lines.
+/// `strip_prefix` survives that, so nothing fails; every recorded path is
+/// simply wrong for a reader not standing where bolt stood.
 #[test]
 fn paths_are_resolved_to_absolute_before_anything_runs() {
     let root = tree();
@@ -1644,18 +1644,18 @@ fn paths_are_resolved_to_absolute_before_anything_runs() {
 ///
 /// FR-8.2 wants the merge to rewrite `evidence` from a list of paths into a
 /// mapping whose entries each carry that task's args and the filepath of its own
-/// result. Bolt wrote bare strings, so `args` was absent entirely.
+/// result. Bare strings leave `args` absent entirely.
 ///
 /// FR-8.2a settles where each half comes from and neither is the envelope: the
 /// key from the work directory name, the args from that execution's manifest.
 /// That keeps FR-6.2's adapter contract narrow, since an adapter never has to
 /// know what task it was run for.
 ///
-/// FR-8.8 makes `args` the argv **as executed, after substitution**, so the
-/// merged file says what ran rather than what was written. Asserted by putting a
-/// path variable in the command and requiring the substituted filename to appear.
+/// FR-8.8 makes `args` the argv as executed, after substitution, so the merged
+/// file says what ran and not what was written. Asserted by putting a path
+/// variable in the command and requiring the substituted filename to appear.
 ///
-/// **The envelope schema does not constrain `metadata.evidence`**, so nothing
+/// The envelope schema does not constrain `metadata.evidence`, so nothing
 /// catches the shape on the way out and this test is the only check.
 #[test]
 fn evidence_is_keyed_by_execution_and_carries_args_and_result() {
@@ -1723,10 +1723,10 @@ fn write_adapter(root: &Path, name: &str, body: &str) {
 // COVERS: FR-6.1, FR-6.4, FR-6.10, FR-6.12 | positive
 /// An adapter's verdict is the verdict, whatever the exit status said.
 ///
-/// FR-6.1: where an adapter reached an authoritative result, that result **is**
-/// the verdict and bolt does not second-guess it. Asserted the hard way round,
-/// with a command that **exits 0** and an adapter that reads its output and says
-/// the run failed. Under FR-6.9's exit-code adapter that task passes, so a bolt
+/// FR-6.1: where an adapter reached an authoritative result, that result is the
+/// verdict and bolt does not second-guess it. Asserted the hard way round, with
+/// a command that exits 0 and an adapter that reads its output and says the run
+/// failed. Under FR-6.9's exit-code adapter that task passes, so a bolt
 /// ignoring the adapter would produce the opposite verdict.
 ///
 /// FR-6.4: the adapter is chosen by the format it reads, not by the tool. This
@@ -1786,8 +1786,8 @@ fn an_adapters_verdict_is_the_verdict() {
 /// The default invocation names the captures, the locations and the evidence.
 ///
 /// FR-6.2 fixes the flags. FR-6.2a hands over the same locations every task
-/// gets. FR-6.3 passes the exit code **as a file**, because whether that number
-/// explains anything is the adapter's judgement rather than bolt's.
+/// gets. FR-6.3 passes the exit code as a file, because whether that number
+/// explains anything is the adapter's judgement, not bolt's.
 ///
 /// FR-6.2c has `--evidence` name what the task declared and nothing else: an
 /// artifact nobody declared still sits in the work directory, it is simply not
@@ -1894,10 +1894,10 @@ fn an_explicit_adapter_invocation_is_substituted_like_a_command() {
 /// FR-6.11 keeps them apart because they have different causes: a crashing
 /// adapter, a silent one, and one whose output is not an envelope are three
 /// different things to go and fix. FR-7.6 is what makes the second and third
-/// different conditions rather than one.
+/// two different conditions.
 ///
 /// FR-7.9's kind is what lets a consumer tell them apart without reading
-/// English, so this asserts on the kinds rather than on the messages.
+/// English, so this asserts on the kinds and not on the messages.
 #[test]
 fn each_broken_adapter_case_has_its_own_kind() {
     let cases = [
@@ -1946,12 +1946,12 @@ fn each_broken_adapter_case_has_its_own_kind() {
 // COVERS: FR-6.11 | regression
 /// A silent adapter does not inherit an earlier fold's envelope.
 ///
-/// Carried over from the Go build, which found it. An `output.yaml` already in
-/// the work directory would satisfy "the adapter wrote one", so a silent adapter
-/// would be handed a verdict it did not reach and FR-6.11's
-/// `adapter-wrote-nothing` would never fire.
+/// Carried over from the Go build, where the case first showed up. An
+/// `output.yaml` already in the work directory would satisfy "the adapter wrote
+/// one", so a silent adapter would be handed a verdict it did not reach and
+/// FR-6.11's `adapter-wrote-nothing` would never fire.
 ///
-/// The command plants the envelope rather than an earlier run, which reaches the
+/// The command plants the envelope, not an earlier run, which reaches the
 /// same condition inside one run: FR-2.6b refuses a second run into the same
 /// directory, so two runs cannot set this up.
 #[test]
@@ -2036,8 +2036,8 @@ fn declared_evidence_that_was_not_produced_fails_the_task() {
 // COVERS: FR-6.14, FR-6.9, FR-7.2 | regression
 /// Missing evidence and a non-zero exit are two reasons, not one.
 ///
-/// The evidence check returns before the exit-code path, so the status used to
-/// be lost whenever both applied. It is the more diagnostic of the two: a
+/// The evidence check returns before the exit-code path, so the status is easy
+/// to lose whenever both apply. It is the more diagnostic of the two: a
 /// `pytest` exit of 4 is a usage error, is distinct from 1, and is usually
 /// *why* the declared file is absent at all, so reporting only the symptom
 /// sends a reader to their coverage configuration when the command line is
@@ -2108,15 +2108,15 @@ fn refolding_a_finished_run_costs_no_re_execution() {
 }
 
 // COVERS: FR-7.10 | property
-/// A task that could not execute is distinguishable in the MERGED result.
+/// A task that could not execute is distinguishable in the merged result.
 ///
 /// FR-7.10 is about the merged file, not the per-execution envelope: the kind
 /// says which, and FR-8.4 carries reasons up. So a reader with only
 /// `result.yaml` tells a tool that found problems from a task that never got
 /// far enough to have findings.
 ///
-/// This was `runner/20`'s row and stayed with `runner/30` because telling them
-/// apart needs more than one kind to exist, which only real adapters give.
+/// The row belongs to `runner/30`, not `runner/20`, because telling them apart
+/// needs more than one kind to exist, which only real adapters give.
 ///
 /// Two tasks, two different failures: one whose command ran and reported
 /// problems, one whose adapter produced nothing authoritative.
@@ -2167,11 +2167,11 @@ fn a_task_that_could_not_execute_is_distinguishable_in_the_merged_result() {
 // COVERS: FR-3.10, FR-3.10b, FR-3.10d | negative
 /// A jig requiring a tool that is not there refuses before anything executes.
 ///
-/// FR-3.10b: an incomplete toolchain is known before half a gate has run rather
-/// than partway through it. FR-3.10d is the same check from the other side, for
-/// a project jig naming a tool the base image lacks.
+/// FR-3.10b: an incomplete toolchain is known before a gate starts, not partway
+/// through it. FR-3.10d is the same check from the other side, for a project
+/// jig naming a tool the base image lacks.
 ///
-/// Asserted on evidence rather than on the status, because a refusal that
+/// Asserted on evidence, not on the status, because a refusal that
 /// happened *after* the first task ran would exit 1 just the same. Nothing may
 /// have executed.
 #[test]
@@ -2221,8 +2221,8 @@ fn a_jig_requiring_a_missing_tool_refuses_before_executing() {
 ///
 /// A caller fixing them one at a time pays a round trip per tool, which is the
 /// cost the row exists to remove. FR-3.10a is the consistency this makes
-/// checkable: an adapter no entry covers is found before a run rather than when
-/// the task reaches it, and that only helps if the whole list is resolved.
+/// checkable: an adapter no entry covers is found before a run, not when the
+/// task reaches it, and that only helps if the whole list is resolved.
 #[test]
 fn a_refusal_names_every_missing_tool() {
     let root = tree();
@@ -2308,10 +2308,11 @@ fn a_failing_task_does_not_stop_the_run() {
 // COVERS: FR-4.9 | positive
 /// A task carrying `short-circuit-failure` stops the run when it fails.
 ///
-/// Stopping is what a jig asks for rather than what it gets. The tasks after it
-/// are reported as not reached, so a reader sees what was not attempted rather
-/// than inferring it from what is absent, which is not the same thing: a task
-/// missing from the evidence could equally have skipped an empty selection.
+/// Stopping is something a jig asks for; no jig gets it by default. The tasks
+/// after it are reported as not reached, so a reader sees what was not
+/// attempted instead of inferring it from what is absent. The two differ: a
+/// task missing from the evidence could equally have skipped an empty
+/// selection.
 #[test]
 fn short_circuit_failure_stops_the_run_and_says_what_was_not_reached() {
     let root = tree();
@@ -2343,8 +2344,8 @@ fn short_circuit_failure_stops_the_run_and_says_what_was_not_reached() {
 /// `short-circuit-failure` on a task that passes stops nothing.
 ///
 /// The field asks for stopping *on failure*, so a run where the carrying task
-/// passes is an ordinary run. Worth asserting because reading the field rather
-/// than the verdict would pass every other test here.
+/// passes is an ordinary run. A bolt reading the field and ignoring the verdict
+/// would pass every other test here.
 #[test]
 fn short_circuit_failure_stops_nothing_when_the_task_passes() {
     let root = tree();
@@ -2380,8 +2381,8 @@ fn short_circuit_failure_stops_nothing_when_the_task_passes() {
 /// about `requires`, not about every way a process fails to launch.
 ///
 /// FR-4.10a settles what the reason may say. Once every declared entry is
-/// resolved before anything executes, **a declared tool cannot be the one that
-/// failed to start**, so the reachable case is a command invoking something the
+/// resolved before anything executes, a declared tool cannot be the one that
+/// failed to start, so the reachable case is a command invoking something the
 /// jig never declared and there is no entry to name. The reason carries what the
 /// shell reported instead.
 ///
@@ -2508,11 +2509,11 @@ fn the_default_output_directory_is_a_filesystem_safe_stamp_at_the_base() {
 // COVERS: FR-2.6e | regression
 /// The default run directory ends in the process id of the run that wrote it.
 ///
-/// The stamp is second-granular, so two invocations starting in one second
-/// resolved to one directory and FR-2.6b refused the second. Whether they did
-/// depended on where the wall clock fell, which is why the id is asserted from
-/// the child's own pid: a pair straddling a second boundary would pass on
-/// difference alone, against the old code as well as this one.
+/// The stamp is second-granular, so without the id two invocations starting in
+/// one second resolve to one directory and FR-2.6b refuses the second. Whether
+/// they collide depends on where the wall clock falls, which is why the id is
+/// asserted from the child's own pid: a pair straddling a second boundary would
+/// pass on difference alone, against a bolt with no id as well as this one.
 ///
 /// Through the binary, because one invocation is one process and the process is
 /// what the id separates.
@@ -2576,10 +2577,10 @@ fn run_the_binary(base: &Path) -> (String, u32) {
 ///
 /// FR-2.6b: writing into one interleaves two runs' evidence, and FR-2.2c's
 /// exclusion cannot recognise a directory it did not name. Removing it is the
-/// caller's decision, so bolt refuses rather than clearing it.
+/// caller's decision, so bolt refuses instead of clearing it.
 ///
-/// An existing but **empty** directory is not one that holds a run, which is
-/// what FR-2.6a describes rather than what FR-2.6b refuses.
+/// An existing but empty directory is not one that holds a run. FR-2.6a
+/// describes that case, and FR-2.6b does not refuse it.
 #[test]
 fn a_named_output_directory_holding_a_run_is_refused() {
     let root = tree();
@@ -2608,8 +2609,8 @@ fn a_named_output_directory_holding_a_run_is_refused() {
 /// and would be skipped anyway, so this names one that is not: `evidence/` sits
 /// in the base, is not hidden, and is not in any `.gitignore`.
 ///
-/// Asserted through the manifest's selection rather than through the exit
-/// status, because a task that matched its own evidence would still pass.
+/// Asserted through the manifest's selection, not the exit status, because a
+/// task that matched its own evidence would still pass.
 #[test]
 fn a_run_does_not_walk_its_own_output_directory() {
     let root = tree();
@@ -2621,8 +2622,8 @@ fn a_run_does_not_walk_its_own_output_directory() {
     );
     // Populated before the run, so the walk would find it if nothing excluded
     // it. Without this the directory does not exist when the walk happens and
-    // the exclusion is true by accident, which is how this test first passed
-    // against an implementation that did not exclude anything.
+    // the exclusion is true by accident, so the test passes against an
+    // implementation that excludes nothing.
     let named = root.path().join("evidence");
     write(
         root.path(),
@@ -2733,12 +2734,12 @@ fn a_named_directory_outside_the_base_gets_a_result_for_a_missing_base() {
 }
 
 // COVERS: FR-10.6 | edge
-/// A bolt killed by a signal dies of the signal rather than choosing a status.
+/// A bolt killed by a signal dies of the signal instead of choosing a status.
 ///
 /// FR-10.6 is the one case where bolt does not pick its own exit status: the
 /// shell's convention is 128 plus the signal number, and it is the shell that
-/// applies it. So what bolt owes is to **not** intercept the signal and exit a
-/// number of its own, which is what this asserts.
+/// applies it. So bolt must not intercept the signal and exit a number of its
+/// own, which is what this asserts.
 ///
 /// The row is about what a shell sees, so a test calling the entry point in
 /// process cannot reach it: a signal delivered to the test harness kills the
@@ -2765,7 +2766,7 @@ fn a_bolt_killed_by_a_signal_dies_of_the_signal() {
         .spawn()
         .expect("bolt starts");
 
-    // Wait for the command to be running rather than sleeping a fixed time: the
+    // Wait for the command to be running, not for a fixed sleep: the
     // work directory appears once the task has started, so polling for it makes
     // the test wait exactly as long as it needs to.
     // A timeout here would leave the rest of the test signalling a bolt that had
@@ -2818,9 +2819,9 @@ fn run_with(jig: &str, base: &Path, definitions: &str) -> Result<bolt::Outcome, 
 
 /// Wait until `entry`'s work directory appears under a run at `base`.
 ///
-/// Polls rather than sleeping a fixed time, so a test waits exactly as long as
-/// it needs to. Returns whether it appeared, so a caller can fail rather than
-/// carry on against a run that never started.
+/// Polls instead of sleeping a fixed time, so a test waits exactly as long as
+/// it needs to. Returns whether it appeared, so a caller can fail and not carry
+/// on against a run that never started.
 fn wait_for_execution(base: &Path, entry: &str) -> bool {
     let began = std::time::Instant::now();
     while began.elapsed() < std::time::Duration::from_secs(10) {
@@ -2858,8 +2859,8 @@ fn run_into(jig: &str, base: &Path, output_dir: &Path) -> Result<bolt::Outcome, 
 /// own: no file named, so a jig whose defaults cover its placeholders runs
 /// without one, which FR-4.16b calls the ordinary case.
 ///
-/// Asserted through the recorded argv rather than through the exit status,
-/// because a command whose placeholder vanished would still exit 0.
+/// Asserted through the recorded argv, not the exit status, because a command
+/// whose placeholder vanished would still exit 0.
 #[test]
 fn a_jigs_definitions_block_supplies_its_placeholders() {
     let root = tree();
@@ -3033,9 +3034,9 @@ fn a_definition_naming_a_reserved_variable_is_refused() {
 // COVERS: FR-4.18b | edge
 /// A definition holding an empty value is defined.
 ///
-/// FR-4.18 refuses a placeholder no layer holds **at all**, which is a different
+/// FR-4.18 refuses a placeholder no layer holds at all, which is a different
 /// state from a layer holding the empty string. A jig wanting a flag to carry
-/// nothing says so by defining it rather than by leaving it out.
+/// nothing says so by defining it, not by leaving it out.
 #[test]
 fn a_definition_holding_an_empty_value_is_defined() {
     let root = tree();
@@ -3058,8 +3059,8 @@ fn a_definition_holding_an_empty_value_is_defined() {
 ///
 /// FR-4.17a settles every value on reading the file. FR-4.17c is what rests on
 /// it: a definition cannot introduce `{each_path}`, so FR-4.2 still reads how a
-/// task runs off the command **as written**, and substitution changes what a
-/// command says rather than how many times it runs.
+/// task runs off the command as written, and substitution changes what a
+/// command says, never how many times it runs.
 ///
 /// This is the same single-pass property `7e3198f` fixed for paths, reached from
 /// the other side. A definition whose value spells a path variable must arrive
@@ -3144,8 +3145,8 @@ fn a_definitions_file_that_will_not_validate_is_refused() {
 /// An unknown placeholder refuses before any task executes.
 ///
 /// FR-4.18a puts the check where `requires` is, under FR-3.10b, so a jig run
-/// where nothing defines what it needs refuses in the first second rather than
-/// partway through a gate. Asserted by putting the offending task **second** and
+/// where nothing defines what it needs refuses in the first second, not
+/// partway through a gate. Asserted by putting the offending task second and
 /// requiring that the first one left no evidence behind.
 #[test]
 fn an_unknown_placeholder_refuses_before_anything_executes() {
@@ -3256,8 +3257,8 @@ fn executed_anything(base: &Path) -> bool {
 ///
 /// The command sleeps for longer than every limit this file sets, so a bolt that
 /// applied a ceiling of its own, or that read an absent field as zero, kills it
-/// here. Asserted on the command's last line rather than on the verdict, because
-/// a killed `sleep` also reports failure and the two would be indistinguishable.
+/// here. Asserted on the command's last line, not on the verdict, because a
+/// killed `sleep` also reports failure and the two would be indistinguishable.
 #[test]
 fn a_jig_setting_no_limit_lets_a_slow_command_finish() {
     let root = tree();
@@ -3281,16 +3282,16 @@ fn a_jig_setting_no_limit_lets_a_slow_command_finish() {
 // COVERS: FR-4.11a, FR-4.11b, FR-4.12f, FR-6.9a | property
 /// A task's limit covers all of its executions taken together.
 ///
-/// **Each command finishes well inside the limit and the task still runs out**,
+/// Each command finishes well inside the limit and the task still runs out,
 /// which is the whole of the difference between the two readings. Four paths at
 /// a tenth of a second each against a quarter of a second: under a per-execution
 /// budget every path has more than twice what it needs and all four pass, and
 /// under FR-4.11a the third is killed partway and FR-4.11b stops the fourth.
 ///
-/// An earlier version used commands that each outran the limit on their own. It
-/// passed against a bolt that restarted the budget every execution, because the
-/// first execution is killed either way and FR-4.11b then stops the rest, so
-/// nothing downstream could tell the two apart. Found by mutation.
+/// Commands that each outrun the limit on their own cannot separate the two. A
+/// bolt that restarts the budget every execution passes that version, because
+/// the first execution is killed either way and FR-4.11b then stops the rest,
+/// so nothing downstream can tell the two apart. Found by mutation.
 #[test]
 fn a_tasks_limit_covers_all_its_executions_together() {
     let root = tree();
@@ -3304,9 +3305,9 @@ fn a_tasks_limit_covers_all_its_executions_together() {
             "  - name: slow\n",
             // Four executions of 0.3s against a budget of 0.7s. Each finishes
             // inside the limit on its own, which is what makes the two readings
-            // separable, and four of them cannot. Started at 0.1s against 0.25s
-            // and was flaky under a loaded suite, because a tenth of a second is
-            // the same order as process startup when eighty tests are running.
+            // separable, and four of them cannot. 0.1s against 0.25s is flaky
+            // under a loaded suite, because a tenth of a second is the same
+            // order as process startup when eighty tests are running.
             "    time-limit: \"0.7s\"\n",
             "    matching: [\"**/*.txt\"]\n",
             "    command: \"sh -c 'sleep 0.3; echo {each_path}'\"\n",
@@ -3327,7 +3328,7 @@ fn a_tasks_limit_covers_all_its_executions_together() {
     assert!(!outcome.success, "a task that ran out of budget passed");
 
     // The killed execution is whichever one the budget ran out under, so the
-    // reason is read off the last work directory rather than a fixed one.
+    // reason is read off the last work directory, not a fixed one.
     let last = format!("slow-{}", outcome.executions);
     let carried = reasons_in(&envelope_of(&outcome, &last));
     // FR-6.9a: the limit is the only reason. Bolt's exit-code adapter does not
@@ -3351,10 +3352,10 @@ fn a_tasks_limit_covers_all_its_executions_together() {
 /// A run whose budget is gone before it starts runs nothing, and says so.
 ///
 /// A limit of `0s` puts the deadline in the past at the first check, which is
-/// the reachable case for the test bolt makes **before** each task rather than
-/// only after one. Without that check the first task starts and is killed a
-/// moment later; that looks similar and is not, because it leaves a work
-/// directory, an execution and a killed process behind.
+/// the reachable case for the test bolt makes before each task as well as after
+/// one. Without that check the first task starts and is killed a moment later.
+/// That looks similar and is not, because it leaves a work directory, an
+/// execution and a killed process behind.
 ///
 /// It is also the one shape where the merge finds no constituent at all and must
 /// still write a result, so it is where FR-4.14a is separable from FR-8.3a. That
@@ -3362,9 +3363,10 @@ fn a_tasks_limit_covers_all_its_executions_together() {
 /// checks reads as checked and fine; a run carrying its own reason is not green.
 ///
 /// And it is the only place the run's own reason can be told apart from the ones
-/// its executions carry, since there are no executions. The earlier test for
-/// FR-4.13 passed against a merge that dropped the run's reason entirely, having
-/// found the same words on a killed execution's envelope. Found by mutation.
+/// its executions carry, since there are no executions. A test for FR-4.13 with
+/// a killed execution passes against a merge that drops the run's reason
+/// entirely, because it finds the same words on that execution's envelope.
+/// Found by mutation.
 #[test]
 fn a_run_with_no_budget_left_executes_nothing_and_still_writes_a_result() {
     let root = tree();
@@ -3414,7 +3416,7 @@ fn a_run_with_no_budget_left_executes_nothing_and_still_writes_a_result() {
 /// FR-4.12a: a tool that reported a problem before it hung reported a real
 /// problem. FR-4.12b: the execution fails anyway.
 ///
-/// The adapter concludes **success** and leaves a note of what it read, so the
+/// The adapter concludes success and leaves a note of what it read, so the
 /// two halves are separable. The note proves it ran and saw the partial output;
 /// the verdict proves bolt overrode what it concluded. A test asserting only the
 /// verdict cannot tell those apart, because a bolt that never ran the adapter
@@ -3436,12 +3438,12 @@ fn a_killed_command_keeps_its_output_and_its_adapter_still_runs() {
         "hangs",
         concat!(
             "  - name: reporting\n",
-            // Half a second, not the fifty milliseconds this started with. The
-            // command has to reach its `echo` before the limit fires, and under
-            // a suite running eighty tests at once fifty was not enough process
-            // startup: measured flaky, roughly one run in five, reporting an
-            // empty capture. The sleep is a hundredfold the limit either way,
-            // so nothing about what is being tested changed.
+            // Half a second. The command has to reach its `echo` before the
+            // limit fires, and under a suite running eighty tests at once fifty
+            // milliseconds is not enough for process startup: measured flaky,
+            // roughly one run in five, reporting an empty capture. The sleep is
+            // a hundredfold the limit either way, so the choice does not change
+            // what is being tested.
             "    time-limit: \"0.5s\"\n",
             "    adapter: noting-adapter\n",
             "    command: \"sh -c 'echo forty-problems; sleep 5'\"\n",
@@ -3476,8 +3478,8 @@ fn a_killed_command_keeps_its_output_and_its_adapter_still_runs() {
 /// executions. A 0.05s limit can expire during the task's own setup, and
 /// FR-4.11b's check then reports the task as having run nothing where a limit
 /// expiring during the command reports one. Both discharge FR-4.12, so a count
-/// asserts which of two legal paths the clock took: measured 2026-08-29, it gave
-/// 1 under an instrumented build inside a gate run and 2 everywhere else.
+/// asserts which of two legal paths the clock took. Measured, it gives 1 under
+/// an instrumented build inside a gate run and 2 everywhere else.
 #[test]
 fn a_slow_task_fails_and_the_run_carries_on() {
     let root = tree();
@@ -3567,7 +3569,7 @@ fn the_runs_limit_catching_an_adapter_leaves_bolt_to_write_the_envelope() {
 // COVERS: FR-4.13, FR-4.14, FR-4.14a, FR-4.11d | negative
 /// A run that passes its limit fails, and still writes what it managed.
 ///
-/// FR-4.14a is the half worth asserting hardest: the task that finished before
+/// FR-4.14a is the half that most needs asserting: the task that finished before
 /// the limit is still in the evidence mapping with its own verdict. A run that
 /// reported only the timeout would discard evidence already written and paid
 /// for.
@@ -3630,7 +3632,7 @@ fn a_run_that_times_out_writes_a_result_carrying_what_completed() {
 /// into the tree after bolt has finished with it, so the file goes on growing
 /// once the run has returned. `SIGKILL` to the process group stops it.
 ///
-/// Asserted as quiescence rather than as a process lookup: the file not growing
+/// Asserted as quiescence, not as a process lookup: the file not growing
 /// is the property the row is about, and a pid check would pass against a child
 /// that was reparented and still writing.
 #[test]
@@ -3670,20 +3672,20 @@ fn a_timed_out_command_leaves_no_children_running() {
 // COVERS: FR-4.11e | negative
 /// A limit that is not a duration refuses the run before anything executes.
 ///
-/// Declared on the **second** task, so a bolt reading limits as it reached them
+/// Declared on the second task, so a bolt reading limits as it reached them
 /// would run the first one first. The assertion is that no work directory
 /// exists, which is what separates a check made up front from one made in
 /// passing; the exit status is the same either way.
 ///
-/// **The refusal now arrives from wrench's schema rather than from bolt.** The
-/// `time-limit` pattern landed in `jig.schema.json` at wrench `dbc3570`, so a
-/// jig writing `30` is refused at validation one layer before the runner reads
-/// it. That is FR-1.5 doing its job and is the better place for it: bolt never
-/// sees a jig the schema would not accept.
+/// The refusal arrives from wrench's schema, not from bolt. The `time-limit`
+/// pattern is in `jig.schema.json` from wrench `dbc3570`, so a jig writing `30`
+/// is refused at validation one layer before the runner reads it. That is
+/// FR-1.5 doing its job and is the better place for it: bolt never sees a jig
+/// the schema would not accept.
 ///
-/// **`Error::MalformedTimeLimit` is kept and is not dead.** It is what catches
+/// `Error::MalformedTimeLimit` is kept and is not dead. It is what catches
 /// wrench's pattern and `limit::parse` drifting apart, and the two are the same
-/// regex today by agreement rather than by construction. The grammar half is
+/// regex by agreement, not by construction. The grammar half is
 /// asserted directly against `limit::parse` by the property test below, so the
 /// pair still covers both layers: that one checks bolt agrees, this one checks
 /// the document is stopped.
@@ -3721,7 +3723,7 @@ fn a_time_limit_that_is_not_a_duration_refuses_the_run() {
     );
 
     // The jig's own limit is refused the same way, and the reason points at the
-    // jig's field rather than a task's. In a tree of its own, because the
+    // jig's field instead of a task's. In a tree of its own, because the
     // refusal above wrote its result into this one's default output directory
     // and FR-2.6b refuses a second run that lands on the same second.
     let other = tree();
@@ -3750,7 +3752,7 @@ fn a_time_limit_that_is_not_a_duration_refuses_the_run() {
 /// The rejected column is the point. `f64` parsing on its own takes `1e3`, `+5`,
 /// `inf` and `NaN`, none of which anybody writes in a jig on purpose, and
 /// accepting them would make the grammar something a second implementation has
-/// to discover rather than read.
+/// to discover instead of read.
 #[test]
 fn a_time_limit_is_a_decimal_and_a_unit() {
     use std::time::Duration;
@@ -3771,8 +3773,8 @@ fn a_time_limit_is_a_decimal_and_a_unit() {
     }
 
     // `5.s` is the one Rust would parse and this does not. The whole grammar is
-    // then `^[0-9]*\.?[0-9]+[smh]$`, which a schema can carry in one line rather
-    // than restating the reference implementation's judgement.
+    // then `^[0-9]*\.?[0-9]+[smh]$`, which a schema can carry in one line
+    // without restating the reference implementation's judgement.
     for written in [
         "30", "", "s", "30x", "1e3s", "+5s", "-1s", "1.2.3s", "infs", "NaNs", " 30s", "30 s",
         "5.s", ".s",
@@ -3894,8 +3896,8 @@ fn every_timed_out_execution_has_a_valid_envelope() {
 
 /// Write a jig whose one task runs bolt again on the jig named `next`.
 ///
-/// The chain FR-5.6 and FR-5.7a describe: a task command invoking bolt directly
-/// rather than through a jig task. The binary's own path comes from Cargo, and
+/// The chain FR-5.6 and FR-5.7a describe: a task command invoking bolt directly,
+/// not through a jig task. The binary's own path comes from Cargo, and
 /// each link names its own output directory so the runs do not collide under
 /// FR-2.6b when two land in the same second.
 fn write_recursing_jig(root: &Path, name: &str, next: &str) {
@@ -3916,17 +3918,17 @@ fn write_recursing_jig(root: &Path, name: &str, next: &str) {
 /// A chain of bolts, each running the next, until one is past the ceiling. It
 /// never reads a jig: it refuses, writes its own result, and exits non-zero.
 ///
-/// **This needs no nested jigs.** FR-5.6 carries the depth in the environment of
-/// every process bolt spawns rather than of child jigs alone, precisely so a
-/// task command invoking bolt is at depth too. A test waiting for jig tasks
-/// would be testing a narrower rule than the one written.
+/// This needs no nested jigs. FR-5.6 carries the depth in the environment of
+/// every process bolt spawns, not only of child jigs, precisely so a task
+/// command invoking bolt is at depth too. A test waiting for jig tasks would be
+/// testing a narrower rule than the one written.
 ///
-/// **The first link clears the depth and sets the ceiling to two**, so the chain
-/// is the same length however deep this suite is already running. Without that
-/// it passes for a person and fails under `bolt rust-quality .`, because the
-/// gate exports its own depth into the `tests` command and every link shifts by
-/// one. NFR-12.1 makes the suite reachable from the gate, which the Go build's
-/// `runner/60` discharge records as the trap it is: any test that invokes the
+/// The first link clears the depth and sets the ceiling to two, so the chain is
+/// the same length however deep this suite is already running. Without that it
+/// passes for a person and fails under `bolt rust-quality .`, because the gate
+/// exports its own depth into the `tests` command and every link shifts by one.
+/// NFR-12.1 makes the suite reachable from the gate, and the Go build's
+/// `runner/60` discharge records the trap in that: any test that invokes the
 /// gate is reachable from the gate.
 ///
 /// Setting the ceiling also asserts more than the default would: FR-5.7 has it
@@ -3989,8 +3991,8 @@ fn bolt_inside_bolt_is_stopped_at_the_ceiling() {
 // COVERS: FR-5.7a, FR-5.7c | edge
 /// The ceiling is a guard against accident, and the row says so.
 ///
-/// A command can unset the variable and be believed outermost. Asserted rather
-/// than left implied, because a reader meeting the depth code could reasonably
+/// A command can unset the variable and be believed outermost. Asserted, not
+/// left implied, because a reader meeting the depth code could reasonably
 /// take it for a security boundary and build on it as though it held.
 ///
 /// Closing this needs the ancestry cross-check, which is question 24 and not a
@@ -4073,11 +4075,11 @@ fn every_spawned_process_is_told_the_depth() {
 
     let outcome = bolt::run::run("reports", root.path()).expect("the run completes");
 
-    // Against what this run's own depth is, not against 1. **The suite is
-    // reachable from the gate**: bolt running its own jig exports the variables
+    // Against what this run's own depth is, not against 1. The suite is
+    // reachable from the gate: bolt running its own jig exports the variables
     // to the `tests` command, so the depth here is 1 for a person and 2 under
-    // `bolt rust-quality .`. NFR-12.1 makes that the ordinary case rather than
-    // an oddity, and a test hard-coding 1 fails only in the run that matters.
+    // `bolt rust-quality .`. NFR-12.1 makes that the ordinary case, and a test
+    // hard-coding 1 fails only in the run that matters.
     let mine = bolt::depth::Depth::from_environment();
     let said = fs::read_to_string(work(&outcome, "says-1").join("stdout")).expect("stdout");
     assert_eq!(
@@ -4090,7 +4092,7 @@ fn every_spawned_process_is_told_the_depth() {
 // ---- the jig task, and where jigs are found ---------------------------------
 
 // COVERS: FR-2.8 | positive
-/// A config directory says where jigs are found, rather than it being inferred.
+/// A config directory says where jigs are found, so nothing has to infer it.
 ///
 /// Asserted with the jig in a tree the run never touches, so a bolt still
 /// deriving the config directory from the base cannot find it at all. The
@@ -4208,9 +4210,9 @@ fn composing_tree() -> TempDir {
 /// terminal is doing the identical thing, so there is one code path because
 /// there was never a second one to keep in step.
 ///
-/// **Measured rather than asserted.** The composed run's child result and this
-/// one are compared on the reason text, so a bolt that treated an invocation
-/// from a jig differently would show it here rather than in a comment.
+/// Measured, not just claimed. The composed run's child result and this one
+/// are compared on the reason text, so a bolt that treated an invocation from a
+/// jig differently would show it here and not only in a comment.
 ///
 /// Run into a directory of its own, because FR-2.6c would otherwise put a
 /// second `.bolt-…` inside the tree the first run walked.
@@ -4243,20 +4245,20 @@ fn a_jig_run_by_hand_reaches_what_composition_reached() {
 /// This is the whole of composition. A task runs `bolt` the way it runs any
 /// tool, an adapter reads the result path bolt printed and turns the child's
 /// verdict into an envelope, and the merge folds it as a constituent like any
-/// other. **Nothing in the runner knows one command is bolt**, which is FR-5.18,
+/// other. Nothing in the runner knows one command is bolt, which is FR-5.18,
 /// and the way to see it is that this test adds no bolt code at all.
 ///
-/// **The child fails and the parent's command succeeds**, which is the pairing
-/// that matters. FR-10.1 has bolt exit 0 whenever it carried the run out, so a
+/// The child fails and the parent's command succeeds, which is the pairing that
+/// matters. FR-10.1 has bolt exit 0 whenever it carried the run out, so a
 /// parent reading the exit status would call this green. The adapter is what
 /// makes the verdict travel, and a bolt whose composition rested on `&&` would
 /// pass a weaker test than this one.
 ///
-/// **The child's tree lands under the parent's work directory** because the
+/// The child's tree lands under the parent's work directory because the
 /// command says `--output-dir {work_dir}/child`, which is FR-5.20: a line in a
 /// jig, not a rule in the runner.
 ///
-/// **The depth is cleared and the ceiling set**, as
+/// The depth is cleared and the ceiling set, as
 /// `bolt_inside_bolt_is_stopped_at_the_ceiling` does and for the reason it
 /// records: this suite is reachable from `bolt rust-quality .`, so a chain
 /// measured from the ambient depth is a different length under the gate than
@@ -4281,7 +4283,7 @@ fn bolt_composes_as_a_command_and_the_childs_verdict_folds_in() {
     );
 
     // FR-5.19: what the adapter carried up is the child's own reason, reached
-    // through the path bolt printed rather than through an exit status.
+    // through the path bolt printed and not through an exit status.
     let folded = fs::read_to_string(outcome.output_dir.join("result.yaml")).expect("the result");
     assert!(
         folded.contains("child-failed"),
@@ -4297,15 +4299,16 @@ fn bolt_composes_as_a_command_and_the_childs_verdict_folds_in() {
 // COVERS: FR-10.3a | negative
 /// A refusal prints where it recorded itself, on stdout, like any other run.
 ///
-/// FR-10.3 tells a caller where to read the verdict rather than what it says,
-/// and FR-10.3a makes that unconditional. **Asserted on a refusal**, because
-/// that is the case that used to go quiet: the reason went to stderr, stdout
-/// stayed empty, and FR-5.19's adapter would have read an empty file. FR-10.7
-/// has a caller read an absent result as a bolt that died, so a silent refusal
-/// is the one failure that misreports itself.
+/// FR-10.3 tells a caller where to read the verdict, not what it says, and
+/// FR-10.3a makes that unconditional. Asserted on a refusal, because that is
+/// the case that goes quiet without it: the reason goes to stderr, stdout stays
+/// empty, and FR-5.19's adapter reads an empty file. FR-10.7 has a caller read
+/// an absent result as a bolt that died, so a silent refusal is the one failure
+/// that misreports itself.
 ///
-/// FACT 2026-08-28, before this landed: `bolt nosuchjig <dir> --output-dir
-/// <out>` wrote `out/result.yaml` and printed zero bytes on stdout.
+/// Measured before FR-10.3a was implemented: `bolt nosuchjig <dir>
+/// --output-dir <out>` wrote `out/result.yaml` and printed zero bytes on
+/// stdout.
 #[test]
 fn a_refusal_prints_where_it_recorded_itself() {
     let root = tree();
@@ -4354,7 +4357,7 @@ fn exiting_tree(code: u8) -> TempDir {
 ///
 /// FR-10.8's default is the whole of its safety: every caller written against
 /// FR-10.1 sees what it always saw, so nothing already in the estate changes
-/// meaning on the day this lands. **Asserted as a pair on one failing run**,
+/// meaning when the flag arrives. Asserted as a pair on one failing run,
 /// because a test of the flag alone would pass against a bolt that had simply
 /// changed its default.
 ///
@@ -4442,22 +4445,22 @@ fn a_passing_run_under_the_flag_is_zero() {
 /// **This is the row a later reader is most likely to undo**, and the wrong
 /// answer is the attractive one. Bolt writes `kind: bolt-refused` alongside
 /// `success: false`, so reading the kind and reporting "no check ran, so nothing
-/// was found wrong" as a third status looks like extra care. It is not: the
-/// envelope schema calls `success` the authoritative verdict, and overruling it
+/// was found wrong" as a third status looks like extra care. The envelope
+/// schema calls `success` the authoritative verdict, though, and overruling it
 /// with a neighbouring field is exactly the drift wrench exists to prevent.
 ///
-/// **The deeper reason there is no third status is that there is no third
-/// state.** A task set always resolves. A task that matched nothing and was
-/// declared optional is satisfied; a required one that never ran has failed.
-/// Neither is an absent verdict, so nothing is being collapsed.
+/// The deeper reason there is no third status is that there is no third state.
+/// A task set always resolves. A task that matched nothing and was declared
+/// optional is satisfied; a required one that never ran has failed. Neither is
+/// an absent verdict, so nothing is being collapsed.
 ///
-/// This was built the wrong way first, in wrench's prototype and then here,
-/// and corrected by our user. Kept as a test rather than a comment because the
-/// reasoning that produced the wrong version is genuinely persuasive.
+/// Wrench's prototype and then bolt were both built with the third status
+/// first, and I corrected both. It is kept as a test, not a comment, because
+/// the reasoning that produced the wrong version is genuinely persuasive.
 ///
-/// **Asserted as a pair on one refusal**, flag and no flag, which is what makes
-/// it a claim about the flag rather than about refusals: the numbers being equal
-/// is the assertion.
+/// Asserted as a pair on one refusal, flag and no flag, which makes it a claim
+/// about the flag and not about refusals: the numbers being equal is the
+/// assertion.
 #[test]
 fn a_refusal_under_the_flag_is_still_one() {
     let root = tree();
@@ -4508,11 +4511,11 @@ fn a_refusal_under_the_flag_is_still_one() {
 // COVERS: FR-10.9, FR-10.9a, FR-10.9b | property
 /// Four refusals with four different fixes carry four different kinds.
 ///
-/// **The claim is that they differ, so the test is that they differ**, not that
-/// each equals a string. Every one of these carried `bolt-refused` before
-/// FR-10.9, so a per-refusal assertion would have passed against the defect for
+/// The claim is that they differ, so the test is that they differ, not that
+/// each equals a string. Without FR-10.9 every one of these carries
+/// `bolt-refused`, so a per-refusal assertion would pass against the defect for
 /// three of the four while looking thorough. Collecting them and counting the
-/// distinct values is what could not.
+/// distinct values cannot.
 ///
 /// FR-10.9a: each is validated against wrench's envelope schema on the way out,
 /// which is what makes the open vocabulary usable. A closed list would have made
@@ -4576,18 +4579,18 @@ fn refusals_that_need_different_fixes_carry_different_kinds() {
 /// A reused output directory writes no kind, and the file already there is not
 /// its refusal.
 ///
-/// FR-10.7c makes that the rule rather than a gap: a bolt declining to start
-/// returns 1 with its reason on stderr, because it has nothing to report about
-/// a tree it did not read and the file it would write to is somebody else's.
-/// **A change making this case write a result would reintroduce the overwrite**
-/// the Go build performs, measured by checksum on 2026-08-29, so this test is
-/// what such a change has to get past.
+/// FR-10.7c makes that the rule, not a gap: a bolt declining to start returns 1
+/// with its reason on stderr, because it has nothing to report about a tree it
+/// did not read and the file it would write to is somebody else's. A change
+/// making this case write a result would reintroduce the overwrite the Go build
+/// performs, measured there by checksum, so this test is what such a change has
+/// to get past.
 ///
-/// **This is the limit on reading a refusal's kind, and it reads as the opposite
-/// of what it is.** FR-2.6b returns before writing, because the directory holds
-/// a completed run and a refusal put there would replace a verdict. So a caller
-/// testing whether a `result.yaml` exists gets `true` about **the previous
-/// run**, and one reading its `success` gets that run's answer.
+/// **This is the limit on reading a refusal's kind, and it looks like the
+/// opposite.** FR-2.6b returns before writing, because the directory holds a
+/// completed run and a refusal put there would replace a verdict. So a caller
+/// testing whether a `result.yaml` exists gets `true` about the previous run,
+/// and one reading its `success` gets that run's answer.
 ///
 /// Asserted the way it would actually mislead: the file is present, and it says
 /// the earlier run passed.
@@ -4627,9 +4630,9 @@ fn a_reused_output_directory_leaves_the_earlier_result_alone() {
 // ---- the project's own claims about itself ----------------------------------
 
 /// This repository's root, for the tests that assert something about bolt
-/// rather than about a run.
+/// itself instead of about a run.
 ///
-/// `CARGO_MANIFEST_DIR` rather than the working directory, because a test's cwd
+/// `CARGO_MANIFEST_DIR`, not the working directory, because a test's cwd
 /// is not promised and FR-4.1a moves it for anything running under a gate.
 fn repository() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -4638,7 +4641,7 @@ fn repository() -> &'static Path {
 // COVERS: NFR-12.3 | property
 /// Every place that names bolt's licence names the same one.
 ///
-/// **The assertion is agreement, not a value.** Four files state the licence and
+/// The assertion is agreement, not a value. Four files state the licence and
 /// each can be edited alone, so checking each against a literal `Apache-2.0`
 /// would pass with three correct and one stale. What has to hold is that no
 /// place naming a licence names a different one, which is why the manifest is
@@ -4653,7 +4656,7 @@ fn every_statement_of_the_licence_agrees() {
         .expect("the manifest declares a licence");
 
     // The manifest carries an SPDX identifier and the prose files spell it out,
-    // so the comparison is on both halves rather than on the identifier. A
+    // so the comparison is on both halves and not only the identifier. A
     // NOTICE reading "Apache License, Version 2.0" agrees with `Apache-2.0` and
     // does not contain it.
     let (family, version) = declared.split_once('-').expect("an SPDX identifier");
@@ -4675,11 +4678,11 @@ fn every_statement_of_the_licence_agrees() {
     );
 
     // `deny.toml` is prose about the licence as well as configuration, and the
-    // prose is what went stale. **The discriminator is citing the requirement**:
-    // a comment naming NFR-12.3 is making a claim about what that row says, so
-    // it has to agree with it. Matching on "bolt is" instead was tried and
-    // caught "the targets bolt is built for", which is the kind of false
-    // positive that gets a check deleted rather than fixed.
+    // prose is the part that goes stale. The discriminator is citing the
+    // requirement: a comment naming NFR-12.3 is making a claim about what that
+    // row says, so it has to agree with it. Matching on "bolt is" instead
+    // catches "the targets bolt is built for", the kind of false positive that
+    // gets a check deleted instead of fixed.
     let deny = fs::read_to_string(repository().join("deny.toml")).expect("deny.toml");
     let citing: Vec<&str> = deny
         .lines()
@@ -4698,18 +4701,19 @@ fn every_statement_of_the_licence_agrees() {
 }
 
 // COVERS: FR-4.12 | property
-/// The deadline arithmetic, which every timed task depends on and no test reached.
+/// The deadline arithmetic, which every timed task depends on and no other test reaches.
 ///
 /// These are three pure functions and the run path exercises them only through a
-/// task that actually times out, which is slow and asserts something else. So
-/// the arithmetic itself went unmeasured: `src/limit.rs` read 77.4% of lines
-/// until 2026-09-04, when the gate began judging coverage per file.
+/// task that actually times out, which is slow and asserts something else.
+/// Without these tests the arithmetic itself goes unmeasured, and
+/// `src/limit.rs` sat at 77.4% of lines, under the gate's per-file coverage
+/// line.
 ///
-/// **`soonest` taking a set deadline over none is the arm worth having a test
-/// for.** A run's budget and a task's own limit are each optional, and the
-/// wrong fold there — `None` winning, or the later of the two — is a limit that
-/// silently does not bind, which is the failure mode a time limit exists to
-/// prevent and the one nothing would report.
+/// `soonest` taking a set deadline over none is the arm that most needs a test.
+/// A run's budget and a task's own limit are each optional, and the wrong fold
+/// there (`None` winning, or the later of the two) is a limit that silently
+/// does not bind. That is the failure a time limit exists to prevent, and
+/// nothing would report it.
 #[test]
 fn a_deadline_is_the_soonest_of_the_limits_that_are_set() {
     let now = Instant::now();
@@ -4760,12 +4764,11 @@ fn a_deadline_is_the_soonest_of_the_limits_that_are_set() {
 /// replaces a verdict with `kind: bolt-refused` while the per-task evidence
 /// still says otherwise.
 ///
-/// **A variant nothing constructs still has a contract.** Its kind is in the
-/// open vocabulary consumers match on and its message is what a person reads,
-/// and neither was exercised by anything: both arms went uncovered while the
-/// rest of the enum was reached through real refusals. Constructed directly
-/// here, which is the only way to reach a case the runner is built not to
-/// produce.
+/// A variant nothing constructs still has a contract. Its kind is in the open
+/// vocabulary consumers match on and its message is what a person reads, and
+/// no refusal exercises either: both arms stay uncovered while the rest of the
+/// enum is reached through real refusals. Constructed directly here, which is
+/// the only way to reach a case the runner is built not to produce.
 #[test]
 fn the_refusal_that_never_writes_still_names_itself() {
     let refusal = bolt::Error::OutputDirectoryInUse(PathBuf::from("/somewhere/.bolt-gate"));

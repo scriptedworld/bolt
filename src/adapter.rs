@@ -1,14 +1,13 @@
 //! Turning one execution's captured output into a verdict.
 //!
 //! FR-6.1: an adapter is a separate process, and where it reached an
-//! authoritative result that result **is** the verdict. Bolt does not
-//! second-guess one.
+//! authoritative result that result is the verdict. Bolt does not second-guess
+//! one.
 //!
-//! FR-6.1a says when bolt writes an envelope itself, and says it as a rule
-//! rather than a count: only where no adapter's result is available to take.
-//! FR-6.1b records why it stopped counting, which is that counting was wrong
-//! twice and a list claiming completeness invites the next reader to trust the
-//! number rather than the rule.
+//! FR-6.1a says when bolt writes an envelope itself, and says it as a rule, not
+//! a count: only where no adapter's result is available to take. A count was
+//! wrong twice, and a list claiming completeness invites the next reader to
+//! trust the number over the rule.
 
 use std::path::{Path, PathBuf};
 
@@ -79,7 +78,7 @@ pub fn path(config_dir: &Path, name: &str) -> PathBuf {
 /// gives it the same three locations every task gets; FR-6.2c has `--evidence`
 /// name what the task declared and nothing it did not.
 ///
-/// FR-6.3 hands the exit code over as a file rather than as a verdict: whether
+/// FR-6.3 hands the exit code over as a file, not as a verdict: whether
 /// that number explains anything is the adapter's judgement, not bolt's.
 ///
 /// No flag says where the envelope goes, by FR-6.2b. The path is the work
@@ -106,7 +105,7 @@ pub fn default_invocation(adapter: &str, evidence: &[String]) -> String {
 ///
 /// The adapter name and the evidence filenames come from a jig, which is the
 /// project's own file, but they still reach a shell. FR-4.3's reasoning applies
-/// wherever bolt builds a command line rather than only where a *path* is
+/// wherever bolt builds a command line, not only where a *path* is
 /// substituted, and the substitution pass this line goes through afterwards is
 /// single-pass by design, so a quoted word stays one word.
 fn shell_word(value: &str) -> String {

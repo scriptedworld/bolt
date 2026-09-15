@@ -1,9 +1,9 @@
 //! The timestamp a run directory is named for.
 //!
 //! FR-2.6c puts `.bolt-<iso8601>` at the run's base, in the filesystem-safe
-//! form rather than the strict one, so a directory listing sorts by run.
+//! form and not the strict one, so a directory listing sorts by run.
 //!
-//! UTC, and written out here rather than taken from a crate. A local offset
+//! UTC, and computed here instead of taken from a crate. A local offset
 //! cannot be had from the standard library, and the alternative was a
 //! dependency whose only job is one filename. Whether a run directory should
 //! carry a local offset belongs with FR-2.6's other questions in `runner/10`.
@@ -16,7 +16,7 @@ const DAY: u64 = 86_400;
 /// `YYYY-MM-DDTHH-MM-SSZ` for `at`, colons replaced so a path can hold it.
 ///
 /// A time before the epoch is not representable and returns the epoch itself,
-/// which cannot arise from a run and is not worth a refusal.
+/// which cannot arise from a run and does not justify a refusal.
 #[must_use]
 pub fn iso8601(at: SystemTime) -> String {
     let seconds = at.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();

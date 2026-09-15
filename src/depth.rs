@@ -1,7 +1,7 @@
 //! How deep a run is nested, and how deep it may go.
 //!
-//! FR-5.6 carries the depth in the environment of **every** process bolt spawns
-//! rather than passing it to child jigs alone. That is what makes it survive
+//! FR-5.6 carries the depth in the environment of every process bolt spawns,
+//! not only in what it passes to child jigs. That is what makes it survive
 //! reparenting, backgrounding, and a task command that invokes bolt directly
 //! instead of through a jig task, which is the case FR-5.7a builds on and the
 //! case this can be tested against before nested jigs exist.
@@ -32,10 +32,10 @@ impl Depth {
     /// The outermost invocation finds nothing set and is depth 1. Anything
     /// deeper finds what its parent exported and increments it, by FR-5.6.
     ///
-    /// **A value that will not parse is treated as absent**, which reads the run
-    /// as outermost rather than refusing it. A caller's environment is not a
+    /// A value that will not parse is treated as absent, which reads the run as
+    /// outermost instead of refusing it. A caller's environment is not a
     /// document bolt was asked to validate, and FR-5.7a already says the ceiling
-    /// guards against accident rather than evasion, so refusing here would fail
+    /// guards against accident and not evasion, so refusing here would fail
     /// runs over stray shell state while stopping nobody who meant it.
     #[must_use]
     pub fn from_environment() -> Self {
@@ -55,8 +55,8 @@ impl Depth {
     /// What every process this run spawns is told, by FR-5.6.
     ///
     /// FR-5.7 says the ceiling is read from the environment only at the
-    /// outermost invocation, and **this is the mechanism rather than a check**:
-    /// bolt overwrites both variables on every spawn, so a nested bolt reading
+    /// outermost invocation. This function is how that holds, with no check
+    /// involved: bolt overwrites both variables on every spawn, so a nested bolt reading
     /// them gets what the bolt above it set and never what a jig wrote. There
     /// is no branch on being outermost, and adding one would only matter for a
     /// command deliberately rewriting the variable, which FR-5.7a puts out of

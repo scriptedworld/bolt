@@ -6,7 +6,7 @@
 //! and a location bolt exposed are written and read the same way.
 //!
 //! FR-4.16d makes bolt's layer the exception to that ordering. The locations
-//! and path variables are reserved by FR-4.19 rather than overridable, so
+//! and path variables are reserved by FR-4.19 and cannot be overridden, so
 //! nothing above them can win and the precedence rule only ever settles a key
 //! two files both set.
 
@@ -79,7 +79,7 @@ impl Definitions {
     /// # Errors
     ///
     /// [`Error::ReservedDefinition`] when either layer names one of [`RESERVED`],
-    /// by FR-4.19. Checked per layer rather than after merging, so the reason can
+    /// by FR-4.19. Checked per layer, before merging, so the reason can
     /// say which file to edit.
     ///
     /// [`Error::DefinitionsUnreadable`] when a named file is absent, will not

@@ -23,10 +23,10 @@ pub const KIND: &str = "time-limit";
 /// Deliberately narrower than `f64::from_str`, which would take `1e3s`, `+5s`
 /// and `infs`. Those are things a person did not mean to write, and accepting
 /// them would make the grammar something a second implementation has to
-/// discover rather than read.
+/// discover instead of read.
 ///
 /// Returns `None` for anything else, which FR-4.11e makes a refusal before any
-/// task executes rather than a task that fails partway through a gate.
+/// task executes, so no task fails partway through a gate over it.
 #[must_use]
 pub fn parse(value: &str) -> Option<Duration> {
     let (quantity, per_unit) = if let Some(rest) = value.strip_suffix('s') {

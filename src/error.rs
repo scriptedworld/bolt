@@ -32,8 +32,8 @@ pub enum Error {
     /// FR-5.18 makes composition a command line, so a jig running another jig
     /// invokes `bolt` like any other tool. The refusal names the field and says
     /// what replaced it, because a jig written against the retired mechanism is
-    /// not malformed and its author needs the new spelling rather than a
-    /// complaint about a missing field.
+    /// not malformed and its author needs the new spelling, not a complaint
+    /// about a missing field.
     TaskNamesAJig {
         /// The task carrying the field.
         task: String,
@@ -41,7 +41,7 @@ pub enum Error {
 
     /// A task carries no command at all.
     ///
-    /// Refused by name rather than by serde, so the reason says the task has
+    /// Refused by name and not left to serde, so the reason says the task has
     /// nothing to run instead of naming a field the reader has to map back to a
     /// task.
     TaskNamesNoCommand {
@@ -64,9 +64,9 @@ pub enum Error {
     /// Two tasks in one jig share a name.
     ///
     /// FR-3.3a: the name prefixes a task's work directories by FR-3.3, so a
-    /// duplicate puts two tasks' executions in the same place. Reproduced
-    /// 2026-08-28: the second overwrote the first's evidence, the fold saw one
-    /// constituent, and a failing task vanished into a green result.
+    /// duplicate puts two tasks' executions in the same place. In a reproduction,
+    /// the second overwrote the first's evidence, the fold saw one constituent,
+    /// and a failing task vanished into a green result.
     DuplicateTaskName {
         /// The name used twice.
         task: String,
@@ -75,8 +75,8 @@ pub enum Error {
     /// A task's name would not stay inside the run's work directory.
     ///
     /// The name becomes a path component by FR-3.3, so `..` in one climbs out.
-    /// Reproduced 2026-08-28: a task named `../../../victim/EVIL` wrote a full
-    /// evidence directory outside the base, which is FR-2.3's containment.
+    /// In a reproduction, a task named `../../../victim/EVIL` wrote a full
+    /// evidence directory outside the base, which breaks FR-2.3's containment.
     UnsafeTaskName {
         /// The name that would leave the work directory.
         task: String,
@@ -85,8 +85,8 @@ pub enum Error {
     /// The run's output directory already holds a run.
     ///
     /// FR-2.6b. Writing into a directory that already holds a run interleaves
-    /// two runs' evidence. Measured 2026-08-28, before the default directory
-    /// carried a process id: a second jig's result reported a failing task
+    /// two runs' evidence. In a measurement taken before the default directory
+    /// carried a process id, a second jig's result reported a failing task
     /// belonging to the first, and both callers were handed the same conflated
     /// file. FR-2.6e separates two invocations, so what reaches this is an
     /// `--output-dir` named twice, a rerun into a directory kept from before,
@@ -118,7 +118,7 @@ pub enum Error {
     ///
     /// FR-4.19. `{base_dir}` redefined would substitute something other than
     /// where FR-4.1a stands the command, so the jig would say one thing while
-    /// the process did another. FR-4.16d is why this is a refusal rather than a
+    /// the process did another. FR-4.16d is why this is a refusal and not a
     /// precedence question: bolt's layer is reserved, not merely first.
     ReservedDefinition {
         /// The reserved name the layer tried to define.
@@ -143,11 +143,11 @@ pub enum Error {
     /// The jig requires executables that are not on `PATH`, by FR-3.10b.
     ///
     /// Resolved before any task executes, so an incomplete toolchain is known
-    /// in the first second rather than partway through a gate.
+    /// in the first second and not partway through a gate.
     ///
-    /// **Every missing entry, not the first.** A caller fixing them one at a
-    /// time pays a round trip per tool, which is the cost the row exists to
-    /// remove.
+    /// It lists every missing entry, not the first. A caller fixing them one at
+    /// a time pays a round trip per tool, and the row exists to remove that
+    /// cost.
     RequiresMissing {
         /// The entries `PATH` does not resolve, sorted.
         tools: Vec<String>,
@@ -156,8 +156,8 @@ pub enum Error {
     /// A `time-limit` is not a duration, by FR-4.11e.
     ///
     /// Refused before anything executes, for FR-4.18a's reason: a jig whose
-    /// third task spells its limit `30` refuses in the first second rather than
-    /// two tasks into a gate. Reading it as no limit is the alternative that
+    /// third task spells its limit `30` refuses in the first second, not two
+    /// tasks into a gate. Reading it as no limit is the alternative that
     /// fails silently, running unbounded exactly where somebody asked for a
     /// ceiling.
     MalformedTimeLimit {
@@ -170,7 +170,7 @@ pub enum Error {
     /// The run is nested deeper than the ceiling allows, by FR-5.7.
     ///
     /// FR-5.8 makes this an ordinary refusal: a result carrying the reason, then
-    /// a non-zero exit, so the run above folds a failing constituent rather than
+    /// a non-zero exit, so the run above folds a failing constituent instead of
     /// meeting a hole where one should be.
     ///
     /// A guard against accident and runaway, not against a jig trying to defeat
@@ -195,10 +195,10 @@ pub enum Error {
 impl Error {
     /// What sort of refusal this is, for the `kind` of the reason it writes.
     ///
-    /// FR-10.9. **One kind for every refusal was the defect**: a reused output
-    /// directory, a base that is not there, a jig that will not parse and a task
-    /// carrying a retired field are four situations with four different fixes,
-    /// and a consumer that can tell them apart will.
+    /// FR-10.9. A single kind for every refusal would hide which fix applies. A
+    /// reused output directory, a base that is not there, a jig that will not
+    /// parse and a task carrying a retired field are four situations with four
+    /// different fixes, and a consumer that can tell them apart will.
     ///
     /// FR-10.9a is why this vocabulary is bolt's alone. wrench's envelope schema
     /// takes any non-empty string and says why it does not enumerate them: "a
@@ -237,15 +237,15 @@ impl Error {
     ///
     /// FR-10.7 has bolt write one whenever it is alive and in control when it
     /// stops, so a caller finding none knows the process was killed. FR-10.7a
-    /// exempts refusals about the directory the result would go in, and
-    /// **whether that exemption applies depends on where the directory is, not
-    /// on which refusal it was.**
+    /// exempts refusals about the directory the result would go in. Whether
+    /// that exemption applies depends on where the directory is, not on which
+    /// refusal it was.
     ///
     /// [`Self::OutputDirectoryInUse`] is the one that never writes, whatever
     /// the caller named. The directory holds a previous run, so writing a
     /// refusal into it replaces a completed verdict with `kind: bolt-refused`
-    /// while the per-task evidence still says otherwise. An earlier Go
-    /// implementation of bolt does exactly that, reproduced 2026-08-28. Writing
+    /// while the per-task evidence still says otherwise. The earlier Go
+    /// implementation of bolt does exactly that, and it was reproduced. Writing
     /// it anywhere else would invent a location no caller was told about.
     ///
     /// [`Self::BaseMissing`] is the one that depends: with the default output
@@ -336,7 +336,7 @@ fn too_deep(level: u32, ceiling: u32) -> String {
     format!("this run is {level} deep and the limit is {ceiling}")
 }
 
-/// FR-3.3a's reason, which says why a duplicate matters rather than that it is.
+/// FR-3.3a's reason, which says why a duplicate matters, not only that it is one.
 fn duplicate_name(task: &str) -> String {
     format!("two tasks are named {task}; a name is a work directory prefix")
 }

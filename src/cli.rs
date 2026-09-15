@@ -1,6 +1,6 @@
 //! The command line, which is the only interface bolt has today.
 //!
-//! This lives here rather than in `main.rs` so that the entry point carries no
+//! This lives here and not in `main.rs` so that the entry point carries no
 //! command functionality and the interface is reachable from an external test
 //! package.
 
@@ -34,7 +34,7 @@ struct Parsed {
 /// have and does not need.
 ///
 /// FR-4.16b allows at most one definitions file, so naming it twice is refused
-/// rather than the last one silently winning. There is no ordering to settle
+/// instead of letting the last one silently win. There is no ordering to settle
 /// between two files because there is never more than one.
 fn parse(arguments: &[OsString]) -> Option<Parsed> {
     let mut positional = Vec::with_capacity(2);
@@ -52,8 +52,8 @@ fn parse(arguments: &[OsString]) -> Option<Parsed> {
                 }
                 definitions = Some(rest.next()?.to_string_lossy().into_owned());
             }
-            // FR-2.6. Named twice is refused rather than the last one silently
-            // winning, for the same reason as `--definitions`: a caller who
+            // FR-2.6. Named twice is refused, not left for the last one to win
+            // silently, for the same reason as `--definitions`: a caller who
             // wrote it twice meant something, and neither reading is safe to
             // guess.
             Some("--output-dir") => {
@@ -62,7 +62,7 @@ fn parse(arguments: &[OsString]) -> Option<Parsed> {
                 }
                 output_dir = Some(PathBuf::from(rest.next()?));
             }
-            // FR-2.8. Where jigs live is told to bolt rather than inferred from
+            // FR-2.8. Bolt is told where jigs live and does not infer it from
             // the directory being run on, which is what lets one shared jig
             // directory serve a tree it does not sit in. Refused twice for the
             // same reason as the other two.
@@ -105,8 +105,8 @@ pub const COMPLETED: u8 = 0;
 
 /// Under FR-10.8's flag, the envelope said the run did not pass.
 ///
-/// **The same number as [`REFUSED`], and deliberately so.** FR-10.8c makes a
-/// refusal a verdict bolt reached rather than a question left open, so there is
+/// This is deliberately the same number as [`REFUSED`]. FR-10.8c makes a
+/// refusal a verdict bolt reached, not a question left open, so there is
 /// nothing for a third status to mean and the refusal path needs no branch on
 /// the flag at all.
 pub const ENVELOPE_FAILED: u8 = 1;
@@ -116,7 +116,7 @@ pub const ENVELOPE_FAILED: u8 = 1;
 /// Without the flag the answer is FR-10.1's and does not depend on the verdict
 /// at all: bolt executed the ETL, so 0. With it, `0 if success else 1`.
 ///
-/// **FR-10.8b has no third case and this has no third branch.** A task set
+/// FR-10.8b has no third case, so this has no third branch. A task set
 /// always resolves, by FR-10.8d: one that matched nothing and was declared
 /// optional is satisfied, and a required one that never ran has failed. Neither
 /// is an absent verdict, so there is nothing a third status could mean.
@@ -167,7 +167,7 @@ where
     }) {
         Ok(outcome) => {
             // FR-10.3: the verdict is in the envelope, so what a caller is told
-            // here is where to read it rather than what it says. FR-10.8e keeps
+            // here is where to read it, not what it says. FR-10.8e keeps
             // that true under the flag: the number changes and the line does
             // not, so a caller gets both readings from one run.
             println!("{}", outcome.output_dir.join(run::RESULT_FILE).display());
@@ -183,15 +183,15 @@ where
 /// otherwise reads as a bolt that was killed, which is exactly what FR-10.7 has
 /// a caller conclude from an absent file. FR-10.7b points a caller wanting one
 /// in every case at an output directory outside the tree, so the advice is
-/// worth giving here rather than leaving them to find the row.
+/// given here and nobody has to go and find the row.
 ///
-/// **FR-10.8's flag is not a parameter here, and that is the row rather than an
-/// omission.** FR-10.8c makes a refusal a verdict bolt reached, so `success:
-/// false` is 1 whether or not the caller asked for the envelope to decide.
-/// Reading the reason's `kind` to call it "no verdict" would overrule an
-/// authoritative field with its neighbour. FR-10.9 puts that `kind` to its
-/// proper use instead: it says which refusal this was, for a consumer reading
-/// the envelope rather than the status.
+/// FR-10.8's flag is deliberately not a parameter here, as the row requires.
+/// FR-10.8c makes a refusal a verdict bolt reached, so `success: false`
+/// is 1 whether or not the caller asked for the envelope to decide. Reading the
+/// reason's `kind` to call it "no verdict" would overrule an authoritative field
+/// with its neighbour. FR-10.9 puts that `kind` to its proper use instead: it
+/// says which refusal this was, for a consumer reading the envelope and not the
+/// status.
 fn report_refusal(refusal: &crate::Refusal) -> ExitCode {
     eprintln!("bolt: {}", refusal.error);
     if let Some(result) = &refusal.result {
