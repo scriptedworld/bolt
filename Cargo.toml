@@ -38,5 +38,5 @@ pedantic = { level = "warn", priority = -1 }
 [profile.release]
 # One file that runs where it is put. NFR-12.4 wants no C toolchain in the
 # picture, which Rust does not give for free the way CGO_ENABLED=0 does, and
-# NEXT_STEPS records that as a decision rather than a detail.
+# NEXT_STEPS records that as a decision.
 strip = true

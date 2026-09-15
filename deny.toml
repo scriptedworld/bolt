@@ -2,17 +2,17 @@
 # bolt.rust-std-quality.yaml, which this repository adopts as a link.
 #
 # Without this the check fails on bolt's own Apache-2.0 licence, because an
-# empty allow list allows nothing. That is the tool working, not a nuisance:
-# a licence policy nobody wrote is a licence policy nobody agreed.
+# empty allow list allows nothing, which is the tool working as intended: a
+# licence policy nobody wrote is one nobody agreed to.
 
 # The targets bolt is built for. Without this cargo-deny reads every target's
 # dependencies, including ones that never reach a binary here.
 #
-# It is not a way of hiding an inconvenient licence. `r-efi` is LGPL-2.1-or-later
-# and reaches this tree only through a wasi and uefi path: measured 2026-08-27,
+# This does not hide an inconvenient licence. `r-efi` is LGPL-2.1-or-later and
+# reaches this tree only through a wasi and uefi path;
 # `cargo tree --target x86_64-unknown-linux-gnu` contains it zero times. A
-# licence that does not ship is not a licence bolt is under, and scoping says
-# that where an allow entry would have claimed the opposite.
+# licence that does not ship is not one bolt is under. Scoping the targets says
+# so, where an allow entry would have claimed the opposite.
 targets = [
     { triple = "x86_64-unknown-linux-gnu" },
     { triple = "x86_64-unknown-linux-musl" },
@@ -44,23 +44,22 @@ allow = [
     "Unicode-3.0",
     "Zlib",
 ]
-# A dependency whose licence is unstated is refused rather than assumed. The
-# assumption is the failure mode: a crate with no licence field is not
-# permissively licensed, it is unlicensed.
+# A dependency whose licence is unstated is refused, never assumed permissive.
+# A crate with no licence field is unlicensed.
 unused-allowed-license = "allow"
 
 [bans]
 # Two versions of one crate is usually a lockfile that has not been reconciled,
-# and it doubles what a vulnerability check has to reason about. A warning
-# rather than a failure, because a transitive duplicate is often not the
-# adopter's to fix.
+# and it doubles what a vulnerability check has to reason about. It warns and
+# does not fail, because a transitive duplicate is often not the adopter's to
+# fix.
 multiple-versions = "warn"
 wildcards = "deny"
 
 [advisories]
 # The `vuln` task runs `cargo audit`, which is the tool that owns this question.
-# Leaving advisories on here as well is deliberate: the two read the same
-# database and disagreeing is worth knowing about.
+# Advisories stay on here as well, deliberately: the two read the same database,
+# and a disagreement between them is something to look into.
 yanked = "deny"
 
 [sources]

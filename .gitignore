@@ -1,4 +1,4 @@
-# Session entry point: ephemeral by design, rewritten each session.
+# The working handoff note: untracked, and rewritten each time work resumes.
 START_HERE.md
 
 # In-process and working files, including the message a commit is given with
@@ -7,47 +7,47 @@ START_HERE.md
 .ephemera/
 
 # Run directories. A tree accumulating them would otherwise feed each run the
-# last one's evidence, and only THIS run's output is excluded structurally.
+# last one's evidence, and only the current run's output is excluded structurally.
 .bolt-*
 
-# The installed binary. `~/bin/bolt` resolves HERE as of 2026-08-29, so this is
-# what every gate in the estate runs.
+# The installed binary. `~/bin/bolt` resolves to this file, so this is what
+# every gate in the estate runs.
 #
-# Ignored rather than committed, which is what bolt.go did before it: a built
+# Ignored, not committed, which is what bolt.go did before it: a built
 # artefact is not source, and committing 6MB per rebuild would make the history
-# the binary's rather than the code's. Install it with
+# the binary's instead of the code's. Install it with
 #
 #     cargo build --release && cp target/release/bolt bin/bolt
 #
 # and note that nothing rebuilds it for you. A stale `bin/bolt` answers as of
 # when it was built, which is `docs/LESSONS/a-second-build-answers-for-the-tree.md`
-# with the whole estate downstream instead of one session.
+# with the whole estate downstream of it.
 /bin/bolt
 target/
 Cargo.lock
 
 # The adopted jig links. `toolbox/jigs.yaml` declares the set and `link-toolbox`
-# makes them, so adoption is a step a clone performs rather than content this
+# makes them, so adoption is a step a clone performs, not content this
 # repository ships. In a built image the same files arrive from the layer
 # beneath, so a committed copy would be a third statement of one thing.
 #
 # A tracked symlink stores its target path as content, so committing one encodes
 # where ../toolbox happens to sit and dangles in any clone without that sibling.
 #
-# MATCHED BY SHAPE RATHER THAN NAMED ONE AT A TIME. `bolt.*-quality.yaml` is
-# narrow enough to be safe: it cannot match a `*.definitions.yaml`, and this
+# The links are matched by shape, not named one at a time. `bolt.*-quality.yaml`
+# is narrow enough to be safe: it cannot match a `*.definitions.yaml`, and this
 # repository carries no jig of its own in any case, since `bolt.rust-quality.yaml`
 # moved to toolbox on 2026-09-03.
 #
-# THE LIST IS WHAT WENT WRONG. Adopting toolbox's `rust` set added
+# A list of names is what failed. Adopting toolbox's `rust` set added
 # `bolt.rust-std-quality.yaml` and `config/rust/clippy.toml`; neither was added
-# here, so both sat untracked where `git add -A` would have committed them as
-# symlinks — the exact failure the paragraph above describes. A pattern covers a
-# set that grows and a list does not.
+# to the list, so both sat untracked where `git add -A` would have committed them
+# as symlinks, which is the failure the paragraph above describes. A pattern
+# covers a set that grows and a list does not.
 #
-# `bin/count-selection.py` was the other reason given for naming files here and
-# it no longer exists, so `bin/` now holds nothing of this project's but the
-# built binary named above.
+# The other reason for naming files here was `bin/count-selection.py`, which no
+# longer exists, so `bin/` holds nothing of this project's but the built binary
+# named above.
 bolt.*-quality.yaml
 bolt.secrets.yaml
 bin/*.py

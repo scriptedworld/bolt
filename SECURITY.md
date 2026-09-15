@@ -11,12 +11,12 @@ treat a jig from somewhere else the way you would treat a shell script from
 somewhere else. The same goes for the adapters a jig names, which travel with it
 and are resolved relative to it.
 
-That is the design and not an oversight. Bolt knows nothing about any tool it
+This is by design. Bolt knows nothing about any tool it
 runs, which is what lets a project change its gate by editing a jig.
 
 ## What bolt does defend
 
-**A filename cannot become a command.** Every substituted path is quoted, and
+A filename cannot become a command. Every substituted path is quoted, and
 substitution is a single left-to-right pass over the command line: bytes that
 have been substituted are never read again, so a filename containing what looks
 like a placeholder stays a filename.
@@ -29,11 +29,11 @@ covered by `a_filename_containing_a_template_token_is_not_re_expanded` in
 `docs/LESSONS/chained-substitution-is-a-command-injection.md` has the
 measurement.
 
-**A timed-out command does not outlive its run.** A time limit kills the process
+A timed-out command does not outlive its run. A time limit kills the process
 group, so a command that spawned children does not leave them writing into a
 directory bolt has finished with.
 
-**A run refuses a directory that already holds a run**, so two runs cannot
+A run refuses a directory that already holds a run, so two runs cannot
 interleave their evidence.
 
 ## What is not a vulnerability here
