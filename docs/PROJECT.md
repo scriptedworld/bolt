@@ -1,6 +1,6 @@
 # bolt, the project
 
-## What it is FOR
+## What it is for
 
 Bolt executes a declared set of command lines over a directory and records what
 happened, as evidence on disk and as one envelope.
@@ -74,19 +74,17 @@ discharged by a test asserting the refusal arrives, with no code here.
 
 ## Where the requirements come from
 
-**Every requirement here derives from the architecture and from answers
-recorded against `NEXT_STEPS.md`, and none of it from an earlier
-implementation.** That is deliberate: the provenance of the first tree's
-requirements was unresolved, so this one was written to establish that they
-stand on the architecture alone.
+Every requirement here derives from the architecture and from answers recorded
+against `NEXT_STEPS.md`, and none of it from an earlier implementation. That is
+deliberate: the provenance of the first tree's requirements was unresolved, so
+this one was written to establish that they stand on the architecture alone.
 
 Two earlier implementations existed and neither is available. The first is
 sealed for the provenance reason above. The second was Go, and it was deleted
-once this tree reached parity rather than kept as a fallback.
+once this tree reached parity instead of being kept as a fallback.
 
-**So a claim here is checkable against this repository or it is not checkable
-at all.** There is no older tree to appeal to, which is the point rather than a
-gap.
+So a claim here can be checked against this repository or not at all. There is
+no older tree to appeal to, and that is intended.
 
 ## Layout
 
@@ -106,6 +104,7 @@ gap.
     tests/skeleton.rs   the whole suite, one external test package
     REQUIREMENTS.md     what must be true, and the only source for a COVERS mark
     NEXT_STEPS.md       what is not done, the open questions, defaults taken
+
 `src/main.rs` carries no command functionality, so the interface is reachable
 from an external test package. `tests/` is one file on purpose: it is the
 project's whole observable surface in the order the requirements state it.
@@ -117,12 +116,12 @@ Bolt gates itself, so gating this repository is a bolt run over it:
     bolt common-quality .
     bolt rust-std-quality .
 
-**BOTH JIGS ARE TOOLBOX'S, and bolt carries neither.** `bolt.rust-quality.yaml`
+Both jigs are toolbox's, and bolt carries neither. `bolt.rust-quality.yaml`
 lived here while toolbox shipped no Rust jig, and it was written to be moved:
 its header named which of its tasks belonged to a shared rust-std jig and which
 to the common one. It moved on 2026-09-03 and this repository keeps no jig and
-no definitions file, because every value it used to set, `REQUIREMENTS.md` and
-`deny: warnings`, is the shared default.
+no definitions file, because every value it used to set (`REQUIREMENTS.md` and
+`deny: warnings`) is the shared default.
 
 `CONTRIBUTING.md` has the commands and the conventions a change is held to.
 
@@ -158,11 +157,11 @@ divergence, but it breaks anything naming a directory and the failure presents a
     Go build   out/work/composed-0/stdout
     this one   out/work/composed-1/stdout
 
-`metadata.evidence` differs in three ways. A task's key carries
-the ordinal, `complexity-1` rather than `complexity`; the value is one mapping
-rather than a list of them; and `result` is absolute rather than relative to the
-base. A consumer looking a task up by bare name and indexing `[0]` breaks on all
-three, and breaks by raising rather than by reading a wrong value. This
+`metadata.evidence` differs in three ways. A task's key carries the ordinal
+(`complexity-1`, where Go wrote `complexity`); the value is one mapping, not a
+list of them; and `result` is absolute, not relative to the base. A consumer
+looking a task up by bare name and indexing `[0]` breaks on all three, and it
+breaks by raising, not by reading a wrong value. This
 repository has no production reader of that block. Bolt's tests read it, while
 the composition adapter folds a child's `reasons` and `success` without touching
 it.
@@ -232,8 +231,8 @@ misses the branch the row lives on looks exactly like a weak test, and three of
 eight did. `LESSONS/a-result-that-flatters-you-needs-more-checking.md` has all
 three and what each one actually hit.
 
-Expect the gate to catch the change you are making, and fix the code rather than
-the threshold. `complexity` is the task that catches it, and each time the answer
+Expect the gate to catch the change you are making, and fix the code, not the
+threshold. `complexity` is the task that catches it, and each time the answer
 has been to split the function.
 
 ## What is decided
@@ -243,9 +242,10 @@ has been to split the function.
 - Composition is a command line and there is no second mechanism. A task
   running another jig names `bolt` in its command, like any other tool, and an
   adapter reads the result path bolt printed. Nesting as a task kind, with its
-  own fields and inheritance, is retired, 26 rows. What it bought
-  was a schema-checkable grant, which FR-5.21 records as given up, leaving
-  FR-5.7's depth ceiling as the guard.
+  own fields and inheritance, is retired, and the 26 requirement rows that
+  specified it are retired with it. What it bought was a schema-checkable
+  grant, which FR-5.21 records as given up, leaving FR-5.7's depth ceiling as
+  the guard.
 - The exit status says whether bolt could carry out the run, never whether the
   tools passed. The verdict is in the envelope. `--result-to-exitcode` opts
   out, making the exit code `0 if success else 1`, because a Justfile recipe
@@ -257,12 +257,12 @@ has been to split the function.
   to "no verdict" would overrule an authoritative field with its neighbour. The
   deeper reason is that a task set always resolves: an optional task matching
   nothing is satisfied, a required one that never ran has failed, and neither is
-  an absent verdict. Built two other ways first, a no-verdict code and then a
-  code per remedy, and corrected both times.
+  an absent verdict. Two other designs were built and both were corrected: a
+  no-verdict code, and then a code per remedy.
 - Discrimination between refusals lives in the envelope's `kind`, not in the
   exit status. Every refusal names its own, so a base that is not there is
   `base-missing` where a task carrying a retired field is `jig-task-retired`.
-  One kind, `bolt-refused`, covered all of them: one name across
+  A single kind such as `bolt-refused` for all of them would put one name on
   sixteen situations with sixteen different fixes. The exit status has the
   verdict to carry, and a consumer reads the envelope anyway.
 - A failing task does not stop the run; a jig asks for the opposite with

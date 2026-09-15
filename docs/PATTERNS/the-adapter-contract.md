@@ -1,22 +1,22 @@
 # The adapter contract
 
-What bolt hands an adapter, and what it expects back. Written down here because
-**it was written down nowhere**: a port had to derive it by reading the Go
-build's `internal/adapter/adapter.go`, and three of toolbox's four adapters had
-drifted onto a retired version of it with nothing detecting the drift.
+What bolt hands an adapter, and what it expects back. It is written down here
+because it was written down nowhere else: a port had to derive it by reading the
+Go build's `internal/adapter/adapter.go`, and three of toolbox's four adapters
+had drifted onto a retired version of it with nothing detecting the drift.
 
 Verified against `src/adapter.rs` and `src/run.rs` at bolt `1a77e4e`.
 
 ## What an adapter is
 
 A separate program that reads one execution's captured output and writes an
-envelope saying whether it passed. It is chosen by **the format it reads, not by
-the tool that produced it**: an adapter that reads a count off stdout serves any
+envelope saying whether it passed. It is chosen by the format it reads, not by
+the tool that produced it: an adapter that reads a count off stdout serves any
 tool emitting one.
 
-Where an adapter reaches a result, **that result is the verdict** and bolt does
-not second-guess it. A task naming no adapter gets the generic exit-code one,
-which is the single adapter that needs to know nothing about what it is reading.
+Where an adapter reaches a result, that result is the verdict and bolt does not
+second-guess it. A task naming no adapter gets the generic exit-code one, which
+is the single adapter that needs to know nothing about what it is reading.
 
 ## The invocation
 
@@ -27,15 +27,16 @@ Bolt builds this line, substitutes it like a command, and runs it through `sh`:
               --project-root <root> --base-dir <base> --work-dir <work>
               [--evidence <work>/<file>]...
 
-**Flags, always, and all of them, every time.** Nothing is positional and nothing
-is omitted when empty. The three locations are the same three every task gets.
+Every argument is a flag, and every flag is passed every time. Nothing is
+positional and nothing is omitted when empty. The three locations are the same
+three every task gets.
 
-`--evidence` appears once per file the task **declared**, and never for anything
+`--evidence` appears once per file the task declared, and never for anything
 else the tool happened to leave in the work directory. Declared, never
 discovered: discovery would hand an adapter whatever was lying around and let
 something irrelevant decide a run.
 
-**Variables are underscored and flags are hyphenated**, as a rule rather than an
+Variables are underscored and flags are hyphenated, and that is a rule, not an
 accident: `{work_dir}` in a jig, `--work-dir` on a command line.
 
 ## What it gets
@@ -43,19 +44,18 @@ accident: `{work_dir}` in a jig, `--work-dir` on a command line.
 **Nothing on stdin.** It is `/dev/null`. An adapter reading stdin is on the
 retired contract and will block or read nothing.
 
-**The exit code as a file**, not as an argument and not as a verdict. Whether
-that number means anything is the adapter's judgement, which is the whole reason
-the exit-code adapter is one adapter among several rather than a special case in
-bolt.
+The exit code arrives as a file, not as an argument and not as a verdict.
+Whether that number means anything is the adapter's judgement, which is why the
+exit-code adapter is one adapter among several and not a special case in bolt.
 
-**Its own stdout and stderr are discarded.** The envelope is the channel. Chatter
-is not collected anywhere, so an adapter that prints instead of writing the
+Its own stdout and stderr are discarded. The envelope is the channel. Chatter is
+not collected anywhere, so an adapter that prints instead of writing the
 envelope reports nothing.
 
 ## What it must produce
 
-An envelope at **`<work_dir>/output.yaml`**. The path is the work directory it
-was handed and the name never varies; no flag says where it goes.
+An envelope at `<work_dir>/output.yaml`. The path is the work directory it was
+handed and the name never varies; no flag says where it goes.
 
     success: false
     reasons:
@@ -67,7 +67,7 @@ success is false, and each reason needs both `kind` and `message`: the kind so a
 consumer can tell one sort of failure from another without reading English, the
 message so any consumer can render it.
 
-**Bolt validates it against wrench's envelope schema on the way in** and does not
+Bolt validates it against wrench's envelope schema on the way in and does not
 reparse to compare formatting. An adapter is free to write whatever canonical
 form it likes.
 
@@ -77,21 +77,23 @@ form it likes.
     adapter-wrote-nothing   it exited 0 and left no output.yaml
     adapter-wrote-invalid   it left one that will not parse or validate
 
-Kept apart because they have different causes and different fixes. Bolt writes
-the envelope itself in each case, because none of them left a result to take.
+They are kept apart because they have different causes and different fixes.
+Bolt writes the envelope itself in each case, because none of them left a result
+to take.
 
 **The envelope is removed before the adapter runs.** One left by an earlier fold
 would otherwise satisfy "the adapter wrote one" and hand a silent adapter the
-previous run's verdict. The Go build found that; it is mutation-tested here.
+previous run's verdict. The Go build found that case; it is mutation-tested
+here.
 
 ## Two things that are not the adapter's problem
 
-**A killed command.** When a time limit fires, the adapter still runs, over
-whatever the tool managed to gather: forty problems reported before hanging are
-forty real problems. The execution fails regardless of what the adapter
-concluded, and bolt adds that reason itself.
+A killed command. When a time limit fires, the adapter still runs, over whatever
+the tool managed to gather: forty problems reported before hanging are forty
+real problems. The execution fails regardless of what the adapter concluded, and
+bolt adds that reason itself.
 
-**Being told which task it served.** An adapter never learns the task name. The
+Being told which task it served. An adapter never learns the task name. The
 merge takes that from the work directory, which keeps this contract as narrow as
 it is.
 
@@ -100,20 +102,20 @@ it is.
 FR-10.3a says bolt prints where the result is on stdout and prints nothing else
 there, so the path is the only line and reading it needs no parsing.
 
-**Adapters take the last non-empty line anyway, and that is deliberate.** An
-earlier implementation printed a transcript first and the path last, so reading
-the first line got a task name rather than a path. Taking the last non-empty
-line was correct against both. toolbox's `bolt-result` still does this.
+Adapters take the last non-empty line anyway, on purpose. An earlier
+implementation printed a transcript first and the path last, so reading the
+first line got a task name instead of a path. Taking the last non-empty line was
+correct against both. toolbox's `bolt-result` still does this.
 
 That implementation is gone, and the habit is kept because the cost is one line
 and the failure it prevents is silent: an adapter reading the wrong line gets a
-plausible string rather than an error.
+plausible string, not an error.
 
 The contract is not weakened to match. "Prints nothing else there" is the
-property worth having, and relaxing it to "the last line" would license bolt to
+property bolt needs, and relaxing it to "the last line" would license bolt to
 print other things on stdout, which is the summary line FR-10.3's note exists to
 keep out. The strict rule is what bolt promises; last-line is how a consumer
-stays robust against an implementation that does not.
+stays robust against an implementation that does not keep it.
 
 ## Writing one
 

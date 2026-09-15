@@ -27,11 +27,10 @@ uv tool install detect-secrets
 mise use --global gitleaks@latest
 ```
 
-**PyYAML has to be importable by the `python3` that runs the adapters**, and
-nothing declares it. `adapters/common/bolt-result.py` and
-`adapters/rust/coverage.py` both import `yaml`, so a machine without it fails
-the `secrets` composition and the coverage judgement with an ImportError rather
-than with a verdict.
+PyYAML has to be importable by the `python3` that runs the adapters, and nothing
+declares it. `adapters/common/bolt-result.py` and `adapters/rust/coverage.py`
+both import `yaml`, so on a machine without it the `secrets` composition and the
+coverage judgement fail with an ImportError instead of a verdict.
 
 ```sh
 python3 -c "import yaml"   # must succeed for the gate to run
@@ -60,13 +59,12 @@ linked 8 file(s)
 all 8 link(s) present and correct
 ```
 
-**Name `rust`, not `common`.** The sets nest, `rust` includes `common`, which
-includes `secrets`, so naming `rust` alone gets all eight. Naming `common`
+**Name `rust`, not `common`.** The sets nest (`rust` includes `common`, which
+includes `secrets`), so naming `rust` alone gets all eight. Naming `common`
 gets five, and the five are the wrong five: `bolt.rust-std-quality.yaml`,
 `adapters/rust/coverage.py` and `config/rust/clippy.toml` are not among them, so
 the second of the two gate runs below has no jig to run and fails as an
-unreadable file. This document said `common` until 2026-09-04, which is the
-whole of that mistake.
+unreadable file.
 
     common   bolt.secrets.yaml, bolt.common-quality.yaml,
              bin/test-traceability.py, bin/suppression-register.py,
@@ -89,11 +87,12 @@ $ ./target/release/bolt rust-std-quality . --output-dir .bolt-gate-rust
 /home/you/bolt/.bolt-gate/result.yaml
 ```
 
-Two runs against toolbox's jigs; this repository carries none of its own since
-2026-09-03. Three tasks in `common-quality`, six in `rust-std-quality`. Bolt
-exits 0 whenever it could carry the run out, so `success` in `result.yaml` is
-the answer and the exit status is not. `traceability` fails on purpose;
-`CONTRIBUTING.md` says why and how to read its count.
+Two runs against toolbox's jigs; this repository has carried none of its own
+since they moved to toolbox on 2026-09-03. Three tasks in `common-quality`, six
+in `rust-std-quality`. Bolt exits 0 whenever it could carry the run out, so
+`success` in `result.yaml` is the answer and the exit status is not.
+`traceability` fails on purpose; `CONTRIBUTING.md` says why and how to read its
+count.
 
 The secret scan is its own run, over the working tree and the history:
 
@@ -108,8 +107,8 @@ $ ./target/release/bolt secrets .
     bolt: the jig /home/you/bolt/bolt.secrets.yaml is unreadable: wrench:
     reading /home/you/bolt/bolt.secrets.yaml: No such file or directory
 
-The links are absent. Run the linking step. It reads like a corrupt checkout
-rather than like a step that has not been done yet.
+The links are absent. Run the linking step. The message reads like a corrupt
+checkout, when all it means is a step that has not been done yet.
 
 **`traceability exited 2`**, which looks like a coverage failure and is not. The
 task's own `stderr` under `.bolt-gate/work/traceability-1/` carries the cause:

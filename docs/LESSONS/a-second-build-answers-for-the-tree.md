@@ -37,11 +37,11 @@ that looks like the tool is not the tool the tree describes.
 
 ## What catches it is disagreement, not measurement
 
-The wrench session hit the release binary first, because it was the obvious one
-to reach for, and only tried `target/debug` because the wording did not match
-what had been quoted at them.
+The release binary was reached for first from wrench, because it was the obvious
+one, and `target/debug` was tried only because the wording did not match what
+had been quoted from this tree.
 
-So the mechanism was measuring **and having something to disagree with**. Either
+So the mechanism was measuring and having something to disagree with. Either
 alone fails here: a message with no measurement is one unverified claim, and a
 measurement with no second source returns whatever the artefact says and reports
 it as fact.

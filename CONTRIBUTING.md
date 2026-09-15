@@ -25,34 +25,34 @@ $ ./target/release/bolt rust-std-quality . --output-dir .bolt-gate-rust
 /home/you/bolt/.bolt-gate/result.yaml
 ```
 
-**Two runs, and neither jig is bolt's.** `bolt.rust-quality.yaml` lived here
-while toolbox shipped no Rust jig; it moved to toolbox on 2026-09-03 as
+Two runs, and neither jig is bolt's. `bolt.rust-quality.yaml` lived here while
+toolbox shipped no Rust jig. It moved to toolbox on 2026-09-03 as
 `bolt.rust-std-quality.yaml`, and the tasks it marked as belonging to the common
-jig were already there. This repository now carries no jig and no definitions
-file: every value it set is the shared default.
+jig were already there. This repository carries no jig and no definitions file:
+every value it set is the shared default.
 
 `rust-std-quality` is six tasks: format, lint, build, tests, vuln, licences.
 `common-quality` is three: traceability, suppressions, secrets. Complexity is no
-longer a task of its own, the four numbers it produced now come from clippy
-inside `lint`, which is why that task's description says so.
+longer a task of its own. The four numbers it produced come from clippy inside
+`lint`, which is why that task's description says so.
 
 Read the verdict in `result.yaml` and each task's own output under `work/`. A
 run exits 0 whenever it could be carried out, so the exit status is not the
 answer; `success` in the result is.
 
-**The tests task judges that profile per file at 80% of lines**, as of
-toolbox's 2026-09-04 change. `coverage.lcov` lands in the work directory as
-evidence and `adapters/rust/coverage.py` reads it, so a file falling below the
-line fails the run and names itself. There is no aggregate threshold, because an
-aggregate is what lets a well-tested file carry an untested one.
+The tests task judges that profile per file at 80% of lines, since toolbox's
+2026-09-04 change. `coverage.lcov` lands in the work directory as evidence and
+`adapters/rust/coverage.py` reads it, so a file falling below the line fails the
+run and names itself. There is no aggregate threshold, because an aggregate is
+what lets a well-tested file carry an untested one.
 
-**Lines and not branches, and that is the toolchain rather than a choice.**
+Coverage is judged on lines and not branches, because of the toolchain.
 cargo-llvm-cov writes `BRF:0` and no `BRDA` records at all without `--branch`,
 which is unstable and needs a nightly compiler. The adapter reads branch records
 where they exist and reports `branch_measured: false` where they do not, so
-nothing here passes a threshold that had nothing to judge.
-That is a gap rather than a decision: the shared Go jig judges coverage per
-file and this one does not yet.
+nothing here passes a threshold that had nothing to judge. That is a gap and not
+a decision: the shared Go jig judges coverage per file and this one does not
+yet.
 
 Build before you gate. A stale binary answers for the tree it was built from,
 and a change to the runner, the adapters or the fold will not be in it.
@@ -119,7 +119,7 @@ the gate under `-D warnings`.
 Tests are held to the same bar as the code, with no exemption from length,
 duplication or complexity. `complexity` is the task that catches a change
 growing a function past 15 cyclomatic complexity, 60 lines or 5 parameters, and
-it reads the whole tree rather than `src`.
+it reads the whole tree, not only `src`.
 
 ## When a check fails
 

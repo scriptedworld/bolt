@@ -17,27 +17,27 @@ that does not have to change.
 
 ## Where this stands, and what is not done
 
-**Active, and in daily use.** Bolt gates its own repository and five others.
+Active, and in daily use. Bolt gates its own repository and five others.
 
 Rust, replacing an earlier Go implementation that was retired once this one
-reached parity rather than kept as a fallback. `docs/DECISIONS/` carries what
-the retired task kind did and why every capability of it has a command-line
-spelling now.
+reached parity instead of being kept as a fallback. `docs/DECISIONS/` carries
+what the retired task kind did and why every capability of it has a
+command-line spelling now.
 
 Apache-2.0 licensed because somebody else might want it, not run as an open-source
 project: no release cadence and no compatibility promise. The command line is
 the interface.
 
-**Working today:** the walk and per-task filtering, both path forms, single-pass
+Working today: the walk and per-task filtering, both path forms, single-pass
 substitution with three-layer definitions, `requires` resolved up front,
 adapters and declared evidence, per-task and whole-run time limits, the depth
 ceiling, short-circuit, the fold, and refusals that write a parseable result.
 
-**Not done, and the gate reports it rather than hiding it:**
+Not done, and the gate reports it instead of hiding it:
 
-- **Settled requirements without a test citing them.** The traceability task
-  fails until there are none, and prints the count rather than this file
-  claiming one:
+- Settled requirements without a test citing them. The traceability task fails
+  until there are none, and it prints the count so this file does not have to
+  claim one:
 
       bolt common-quality .   # or run the checker directly, see CONTRIBUTING
 - Requirements describing design constraints no test can observe need
@@ -53,7 +53,7 @@ ceiling, short-circuit, the fold, and refusals that write a parseable result.
   offers the same checks.
 - Definitions files and the jig's `definitions` block have no schema yet.
 
-**Setup takes three repositories.** bolt runs the gates, toolbox supplies the
+Setup takes three repositories. bolt runs the gates, toolbox supplies the
 jigs and checkers, wrench validates the structured files. `docs/runbook.md`
 covers cloning them as siblings and linking them, and a fresh clone has no gate
 until you do.

@@ -20,7 +20,7 @@ trust boundary and how to report a vulnerability.
 
 ## Lessons
 
-Each one is a mistake worth not repeating, written once.
+Each one is a mistake written up once so it is not repeated.
 
     the-installed-binary-gates-everything.md   a self-hosted gate run with a
                                stale binary reports on the tree it was built

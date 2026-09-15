@@ -4,7 +4,7 @@
 the thing. This is about having the right instrument, knowing the rule, running
 it twice, and then not running it on the case that mattered.
 
-Both instances below are from one session, 2026-08-30.
+Both instances below come from the same stretch of work.
 
 ## Skipping the check on the third of three
 
@@ -21,14 +21,14 @@ Three rows survived. The rule got applied to two.
     FR-8.3    probe rewrote the verdict on its way into the file and left
               the fold alone.                               NOT CHECKED
 
-The third was the one that confirmed a defect with estate-wide reach, on a day
-this estate had been told that standing debt is a dent in the resume armour. It
-was written into a commit, into `docs/PROJECT.md`, and sent to two other
-sessions before the correction landed: the envelope it produced was valid and
-said exactly what that build concluded. Retracted at `25fc253`.
+The third looked like confirmation of a defect with estate-wide reach, at a time
+when standing debt had just been called a dent in the resume armour. It went
+into a commit and into `docs/PROJECT.md`, and was passed to two other projects,
+before the correction landed. The envelope the probe produced was valid and said
+exactly what that mutated build concluded. It was retracted at `25fc253`.
 
-The two that got checked were unwelcome. The one that got shipped was welcome.
-That is the whole pattern.
+The two survivals that got checked were unwelcome results. The one that went out
+unchecked was the one I wanted.
 
 ## A count that reconciles is not evidence the edit was clean
 
@@ -41,21 +41,21 @@ row away and then tidied the leftover blank with a document-wide
     every row       3 cells        correct
     no id both live and retired    correct
 
-Four checks, all passing, none of them looking at the file. The replace had run
-once per merge over the whole document and eaten the blank line before every
-table in it, fourteen of them. It surfaced because 465 minus 15 plus 15 is 465
-and the file was 451.
+Four checks passed and none of them looked at the file. The replace had run once
+per merge over the whole document and eaten the blank line before every table in
+it, fourteen of them. It surfaced because 465 minus 15 plus 15 is 465 and the
+file was 451.
 
-Deleting a matched line instead of substituting it away and tidying afterwards
-is the fix. Wanting the merge to have worked is why four green checks were
-enough.
+The fix is to delete a matched line, instead of substituting it away and tidying
+afterwards. Four green checks were accepted as enough because the merge was
+wanted to have worked.
 
 ## What to do
 
 Ask what result you were hoping for before you read the output. Where the answer
-is the one you wanted, that is the point to run the verification step you would
-have run on a result you did not want.
+is the one you wanted, run the verification step you would have run on a result
+you did not want.
 
 The two instances differ in which step went missing. One skipped a rule already
 written down; the other ran four checks that all measured the same easy thing.
-Both are the same failure to ask what a wrong answer would have looked like.
+Both come from not asking what a wrong answer would have looked like.

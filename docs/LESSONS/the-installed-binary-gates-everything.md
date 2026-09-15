@@ -10,14 +10,15 @@ That is the install, and forgetting it is silent.
 
 ## A stale binary reports green
 
-`a-second-build-answers-for-the-tree.md` records the one-session version of
+`a-second-build-answers-for-the-tree.md` records the single-worktree version of
 this: a stale `target/release` gave a wrong answer about whether a change had
-landed, caught by a peer noticing the wording differed.
+landed, caught because a second reading in another repository had different
+wording.
 
 At estate scale it does not give a wrong answer to notice. It runs the previous
 bolt over the current source and reports success. The tools still read the
 working tree, so the verdict about the *code* stays honest. What goes unreported
-is anything wrong with **bolt itself**.
+is anything wrong with bolt itself.
 
 ## Bolt cannot catch this about bolt
 
@@ -33,7 +34,7 @@ which is a true statement about code nobody is running.
 ## The estate is one instrument, so the usual remedy is unavailable
 
 Every other instance in `a-check-that-answers-a-weaker-question.md` was caught by
-two readings disagreeing: two binaries with different wordings, two sessions with
+two readings disagreeing: two binaries with different wordings, two reports with
 different counts, a row count against a denominator. The remedy that file arrives
 at is *have something to disagree with*.
 
@@ -42,8 +43,8 @@ file, so twelve green gates are one observation repeated, not twelve. Agreement
 across the estate looks identical whether the binary is current or a week old,
 and **the more projects that agree, the more convincing the wrong answer gets**.
 
-So the byte comparison below is not a nicety on top of the ordinary defences. It
-is the only defence, because the ordinary one cannot exist here.
+So the byte comparison below is the only defence here, because the ordinary one
+cannot exist.
 
 ## The check, and it can fail
 
@@ -66,10 +67,10 @@ Then the binary under test is the binary doing the testing, and the window does
 not exist instead of being one somebody has to remember.
 
 `./target/debug/bolt` and `cargo test` stay right for iterating. Only the
-installed binary gates, and that distinction is the whole of this file.
+installed binary gates.
 
 ## Why this is bolt's lesson and not the estate's
 
-The exposure is everybody's and the thing that can create it is one session's
-habit. Every other project consumes the risk and cannot cause it, and a lesson
-belongs where the cause is.
+The exposure is everybody's, and what can create it is one habit in this
+repository: building without installing. Every other project consumes the risk
+and cannot cause it, and a lesson belongs where the cause is.

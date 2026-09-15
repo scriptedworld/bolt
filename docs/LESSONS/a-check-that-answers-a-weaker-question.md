@@ -3,8 +3,8 @@
 The check runs. It reports success. It did not look at the thing.
 
 That differs from a check that fails wrongly, and is worse, because a failure
-gets investigated and this does not. From inside the session running it, a check
-that could not see the thing and a check that saw nothing wrong are the same
+gets investigated and this does not. To whoever is running it, a check that
+could not see the thing and a check that saw nothing wrong are the same
 observation.
 
 ## Twelve instances, across four repositories
@@ -27,15 +27,15 @@ one of them reads as an ordinary bug.
 | a status line's staleness flag | is the flag set, on a line nobody printed |
 | `git status --short && echo clean` | did `git status` run |
 
-Seven are this tree's, four are wrench's, one is a coordinator's. Nobody in the
-estate is better at this than anybody else, which is the argument for the
-remedies rather than for care.
+Seven are this tree's, four are wrench's, and one came from coordinating work
+across repositories. None of those places is better at this than the others,
+which is the argument for the remedies rather than for care.
 
 Five of twelve are not bolt's, so where this file should live is an open
 question: a collection spanning repositories has no obvious home inside any one
 of them. A copy in wrench drifted, in `docs/LESSONS/`, which is the last
-directory anybody would search for a stale copy. **If you are reading a version
-of this that says fewer than twelve, it is not the one being maintained.**
+directory anybody would search for a stale copy. **A version of this that says
+fewer than twelve is not the one being maintained.**
 
 ## Why the name is the trap
 
@@ -49,39 +49,39 @@ name is written in yours.
 
 ## What to do, since care is not a remedy
 
-**Reconcile two numbers that must agree.** One instrument cannot detect its own
+Reconcile two numbers that must agree. One instrument cannot detect its own
 blind spot; two disagreeing can. The requirement rows were caught this way:
 `live rows == denominator + exempt`, and 245 against 240 + 3 was the whole
 signal. `docs/PROJECT.md` carries it as a standing check.
 
-**Have something to disagree with.** The stale binary surfaced only because two
-sessions quoted the exact output and the wordings differed. A measurement with
-no second source returns whatever the artefact says and reports it as fact.
+Have something to disagree with. The stale binary surfaced only because two
+reports quoted the exact output and the wordings differed. A measurement with no
+second source returns whatever the artefact says and reports it as fact.
 
-**Quote the bytes, not the summary.** "The refusal names the field" and "task
-child carries the retired jig field" are the same claim, and only the second can
-be seen to differ from what somebody else is holding.
+Quote the bytes, not the summary. "The refusal names the field" and "task child
+carries the retired jig field" are the same claim, and only the second can be
+seen to differ from what somebody else is holding.
 
-**Pick an instrument finer than the thing measured.** Two writes inside one
-second are indistinguishable by mtime and distinct by checksum. If the
-resolution is not obviously finer, it is not.
+Pick an instrument finer than the thing measured. Two writes inside one second
+are indistinguishable by mtime and distinct by checksum. If the resolution is
+not obviously finer, it is not.
 
-**Construct the case so the thing is actually present.** A reuse test needs run
-one to have passed; against a jig that refuses for another reason it compares
-two refusals and finds no overwrite, because there was no verdict to overwrite.
-Ask what a positive result would look like before running it.
+Construct the case so the thing is actually present. A reuse test needs run one
+to have passed; against a jig that refuses for another reason it compares two
+refusals and finds no overwrite, because there was no verdict to overwrite. Ask
+what a positive result would look like before running it.
 
-**Measure at the widest scope, then narrow.** A scan of `src/` quoted as a
+Measure at the widest scope, then narrow. A scan of `src/` quoted as a
 repository total was a quarter of the real number. Run it against everything,
 then explain any exclusion.
 
-**Check whether you already wrote it down.** `ls -la` showed a 6MB executable in
+Check whether you already wrote it down. `ls -la` showed a 6MB executable in
 `bolt.go/bin/` and it went into a report as *committed*; `NEXT_STEPS.md` said
 `gitignored at .gitignore:17` three lines from where the claim landed. A file
 you own is the cheapest second source there is and the one you are least likely
 to consult.
 
-**Make the scope visible in the output.** `141 of 245 … 3 open and exempt` can be
+Make the scope visible in the output. `141 of 245 … 3 open and exempt` can be
 reconciled by a reader; `failed: 3` cannot. A check that prints only its verdict
 cannot be audited by the person reading it.
 
@@ -92,9 +92,9 @@ throwaway check, which is where they cost most.
 
 Wrench found both of its pipe-status instances in ad-hoc verification one-liners
 and none in its gate commands, which already redirect to a file and test for the
-artefact afterwards. The coordinator's was a `$?` read after a pipe while
-checking whether a peer's report was true. This tree's newest row is the same
-shape: `git status --short && echo clean` prints `clean` against a dirty tree,
+artefact afterwards. The coordinating instance was a `$?` read after a pipe
+while checking whether another project's report was true. This tree's newest
+row is the same shape: `git status --short && echo clean` prints `clean` against a dirty tree,
 because `git status` exits 0 either way, and it was written to tell somebody the
 tree was clean.
 
@@ -127,8 +127,8 @@ on the command over its output: a command re-runs and a number does not.
 
 ## The one that generalises furthest
 
-Running the wrong binary is re-running the claim. The check does not fail, it
+Running the wrong binary is re-running the claim. The check does not fail and
 does not fire, and from the inside that is indistinguishable from it passing.
-Anything that re-derives a fact from an artefact has this property, so the
-question to keep asking is not "did the check pass" but **"could this check have
-failed?"**
+Anything that re-derives a fact from an artefact has this property. So a passing
+check settles little on its own, and the question to keep asking is whether this
+check could have failed.

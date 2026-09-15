@@ -86,8 +86,8 @@ should address all forms of a task not running together.
 
 ## Rewrite-specific constraints
 
-The rewrite carries behaviour through the requirements and tests rather than
-through source translation. Rust also changes implementation constraints that a
+The rewrite carries behaviour through the requirements and tests, not through
+source translation. Rust also changes implementation constraints that a
 port within one language would not encounter.
 
 Structured output requires the Rust implementation of the shared canonical
@@ -101,7 +101,7 @@ target and is not a current requirement.
 
 Wrench is the separate structured-file library used by bolt. It parses,
 validates, and writes jigs, manifests, definitions, and envelopes against shared
-schemas. Bolt consumes that contract rather than defining a competing format.
+schemas. Bolt consumes that contract and defines no competing format.
 
 Toolbox is the separate collection of shared jigs, adapters, and quality
 checkers. Repositories can link those files into a checkout while keeping the
