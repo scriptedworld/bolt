@@ -91,6 +91,287 @@ fn work(outcome: &bolt::Outcome, entry: &str) -> PathBuf {
     outcome.output_dir.join(bolt::run::WORK_DIR).join(entry)
 }
 
+// ---- runs and files ---------------------------------------------------------
+
+// COVERS: FR-1.1 | property
+/// A failing run's outcome is in its files, and stdout says only where.
+///
+/// Asserted through the binary, since the streams are the binary's. Stdout
+/// carrying anything beyond the result path would be something a consumer could
+/// only learn by reading it, and stderr is empty for a run bolt carried out.
+#[test]
+fn what_a_run_concluded_is_in_its_files_and_not_its_streams() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: fails\n    command: \"sh -c 'echo broken; exit 3'\"\n",
+    );
+
+    let finished = bolt()
+        .arg("check")
+        .arg(root.path())
+        .output()
+        .expect("bolt runs");
+    let stdout = String::from_utf8_lossy(&finished.stdout);
+    let lines: Vec<&str> = stdout.lines().collect();
+
+    assert_eq!(lines.len(), 1, "stdout is one line: {stdout:?}");
+    assert!(
+        finished.stderr.is_empty(),
+        "a run bolt carried out writes nothing to stderr: {}",
+        String::from_utf8_lossy(&finished.stderr),
+    );
+
+    let result = Path::new(lines[0]);
+    assert!(
+        !verdict(result, &wrench::schemas::ENVELOPE),
+        "the result says the run failed",
+    );
+    let reasons = reasons_in(result);
+    assert!(
+        !reasons.is_empty(),
+        "the result says why the run failed: {reasons:?}",
+    );
+    let captured = fs::read_to_string(
+        result
+            .with_file_name(bolt::run::WORK_DIR)
+            .join("fails-1/stdout"),
+    )
+    .expect("the command's own output is on disk");
+    assert_eq!(captured, "broken\n", "the command's stdout was not kept");
+}
+
+// COVERS: FR-1.3 | positive
+/// A jig that transforms files and judges nothing is an ordinary run.
+#[test]
+fn a_jig_reaching_no_verdict_about_code_is_a_run() {
+    let root = tree();
+    write(root.path(), "a.txt", "one\ntwo\n");
+    write(root.path(), "b.txt", "three\n");
+    write_jig(
+        root.path(),
+        "count",
+        "  - name: lines\n    command: \"sh -c 'cat \\\"$@\\\" | wc -l' sh {all_paths}\"\n    matching: [\"*.txt\"]\n",
+    );
+
+    let outcome = bolt::run::run("count", root.path()).expect("the run completes");
+
+    assert!(
+        outcome.success,
+        "a run producing data and no verdict passes"
+    );
+    let counted = fs::read_to_string(work(&outcome, "lines-1").join("stdout"))
+        .expect("the extracted data is kept");
+    assert_eq!(counted.trim(), "3", "the data is what the command produced");
+}
+
+// COVERS: FR-1.6 | negative
+/// A jig that will not parse and a jig of the wrong shape fail different steps.
+///
+/// Both are refused as unreadable, and the reason says which step refused it: a
+/// parse failure names where in the text it stopped, and a schema failure names
+/// where in the decoded structure the mismatch is.
+#[test]
+fn parsing_and_validating_are_two_refusals() {
+    let unparseable = tree();
+    write(unparseable.path(), &bolt::jig::file_name("x"), "tasks: [\n");
+    let misshapen = tree();
+    write(misshapen.path(), &bolt::jig::file_name("x"), "tasks: 5\n");
+
+    let reason = |base: &Path| match bolt::run::run("x", base) {
+        Err(bolt::Error::JigUnreadable { reason, .. }) => reason,
+        other => panic!("a bad jig was not refused as unreadable: {other:?}"),
+    };
+
+    let parsing = reason(unparseable.path());
+    let validating = reason(misshapen.path());
+    assert!(
+        parsing.contains("parsing") && parsing.contains("line"),
+        "the parse step did not refuse the unparseable jig: {parsing}",
+    );
+    assert!(
+        validating.contains("validating") && validating.contains("'/tasks'"),
+        "the schema step did not refuse the misshapen jig: {validating}",
+    );
+}
+
+// COVERS: FR-1.7 | edge
+/// A command that will not parse as shell is still a string, and the jig loads.
+///
+/// The unbalanced quote is the shell's to reject when the task executes. The
+/// schema passes it, so the run is carried out and the task fails.
+#[test]
+fn a_command_the_shell_cannot_parse_still_validates() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: unbalanced\n    command: \"sh -c 'echo unterminated\"\n",
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the jig validates and runs");
+
+    assert_eq!(outcome.executions, 1, "the task executed");
+    assert!(
+        !outcome.success,
+        "the shell rejected the command at run time"
+    );
+}
+
+// COVERS: FR-1.8 | property
+/// Every structured file a run writes reads back through its schema.
+///
+/// A passing task, a failing one, and one whose adapter wrote nothing, so the
+/// envelopes bolt writes for itself are among what is read, not only the ones an
+/// adapter produced.
+#[test]
+fn every_structured_file_a_run_writes_reads_back() {
+    let root = tree();
+    write(root.path(), "a.txt", "content");
+    write_adapter(root.path(), "silent", "exit 0");
+    write_jig(
+        root.path(),
+        "mixed",
+        concat!(
+            "  - name: passes\n    command: \"sh -c 'exit 0' {each_path}\"\n    matching: [\"*.txt\"]\n",
+            "  - name: fails\n    command: \"sh -c 'exit 1'\"\n",
+            "  - name: quiet\n    command: \"sh -c 'exit 0'\"\n    adapter: silent\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("mixed", root.path()).expect("the run completes");
+
+    let mut read = 0;
+    read_validated(
+        &outcome.output_dir.join(bolt::run::RESULT_FILE),
+        &wrench::schemas::ENVELOPE,
+    );
+    for entry in fs::read_dir(outcome.output_dir.join(bolt::run::WORK_DIR)).expect("work") {
+        let dir = entry.expect("a work directory").path();
+        read_validated(
+            &dir.join(bolt::run::OUTPUT_FILE),
+            &wrench::schemas::ENVELOPE,
+        );
+        read_validated(
+            &dir.join(bolt::run::MANIFEST_FILE),
+            &wrench::schemas::MANIFEST,
+        );
+        read += 1;
+    }
+    assert_eq!(read, 3, "every execution's files were read");
+}
+
+// COVERS: FR-1.9a | edge
+/// What a command writes is kept as it was, with no schema applied to it.
+///
+/// Stdout that is broken YAML and an artifact of raw bytes would each be
+/// refused if bolt read them as data. The run passes and both are kept byte for
+/// byte.
+#[test]
+fn captured_output_and_artifacts_are_not_read_as_data() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "raw",
+        concat!(
+            "  - name: noisy\n",
+            "    command: \"sh -c 'printf \\\"tasks: [\\\\n\\\"; printf \\\"\\\\377\\\\000\\\" > {work_dir}/blob.bin'\"\n",
+            "    evidence: [\"blob.bin\"]\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("raw", root.path()).expect("the run completes");
+
+    assert!(outcome.success, "unstructured output failed the run");
+    let dir = work(&outcome, "noisy-1");
+    assert_eq!(
+        fs::read(dir.join("stdout")).expect("stdout kept"),
+        b"tasks: [\n",
+        "stdout was altered",
+    );
+    assert_eq!(
+        fs::read(dir.join("blob.bin")).expect("the artifact kept"),
+        [0o377, 0],
+        "the artifact was altered",
+    );
+}
+
+// COVERS: FR-1.10 | property
+/// Strings that look like other types are quoted, and booleans are not.
+///
+/// `no`, `1.20` and `null` pass through the manifest as definitions values, so
+/// they reach disk in a file bolt wrote. The raw text is read as well as the
+/// decoded structure, because a reader that forgives an unquoted `no` would
+/// pass a file another reader takes for `false`.
+#[test]
+fn canonical_yaml_keeps_every_scalar_its_type() {
+    let root = tree();
+    write(
+        root.path(),
+        &bolt::jig::file_name("types"),
+        concat!(
+            "definitions:\n  answer: \"no\"\n  release: \"1.20\"\n  nothing: \"null\"\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0' {answer} {release} {nothing}\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("types", root.path()).expect("the run completes");
+
+    let path = work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE);
+    let text = fs::read_to_string(&path).expect("the manifest");
+    for quoted in ["\"no\"", "\"1.20\"", "\"null\""] {
+        assert!(text.contains(quoted), "{quoted} is not quoted:\n{text}");
+    }
+    assert!(
+        !text.contains('{'),
+        "the manifest is not block style:\n{text}"
+    );
+
+    let variables = read_validated(&path, &wrench::schemas::MANIFEST)["variables"].clone();
+    for (key, value) in [("answer", "no"), ("release", "1.20"), ("nothing", "null")] {
+        assert_eq!(
+            variables[key]["value"].as_str(),
+            Some(value),
+            "{key} did not survive as a string",
+        );
+    }
+
+    let result =
+        fs::read_to_string(outcome.output_dir.join(bolt::run::RESULT_FILE)).expect("the result");
+    assert!(
+        result.lines().any(|line| line == "\"success\": true"),
+        "success is not a bare boolean:\n{result}",
+    );
+}
+
+// COVERS: FR-1.13 | positive
+/// Validation needs nothing from the machine: no `PATH`, no home, no network.
+///
+/// The schema refusal proves the schema was there to apply. Bolt ships its
+/// schemas inside the binary, so an empty environment reaches the same
+/// validating step as a full one.
+#[test]
+fn validation_needs_nothing_installed() {
+    let root = tree();
+    write(root.path(), &bolt::jig::file_name("x"), "tasks: 5\n");
+
+    let finished = bolt()
+        .env_clear()
+        .current_dir(root.path())
+        .arg("x")
+        .arg(root.path())
+        .output()
+        .expect("bolt runs");
+
+    let stderr = String::from_utf8_lossy(&finished.stderr);
+    assert_eq!(finished.status.code(), Some(1), "the jig was not refused");
+    assert!(
+        stderr.contains("validating") && stderr.contains("'/tasks'"),
+        "the schema was not applied: {stderr}",
+    );
+}
+
 // ---- the invocation ---------------------------------------------------------
 
 // COVERS: FR-2.1, FR-2.1a, FR-3.9 | positive
