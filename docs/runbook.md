@@ -130,7 +130,7 @@ checkout.
 links that do not travel with the project:
 
 ```sh
-python3 /path/to/toolbox/bin/link-toolbox.py . common --absolute --yes
+python3 /path/to/toolbox/bin/link-toolbox.py . rust --absolute --yes
 ```
 
 wrench has no equivalent. The path dependency needs the sibling.

@@ -143,10 +143,9 @@ that task's verdict moves when toolbox does.
 No jig in service uses `short-circuit-failure`, `time-limit`, `optional` or
 `adapter-command`, so this build is a superset of what is exercised in practice.
 
-## Where this build differs from the legacy Go implementation
+## Where this build differs from the Go build it replaced
 
-The legacy Go implementation is a separate repository retained for behaviour
-comparison during the rebuild.
+Anything written against the Go build meets these differences.
 
 Work directories number from one. FR-9.2a specifies that, so the Go build was the
 divergence, but it breaks anything naming a directory and the failure presents as

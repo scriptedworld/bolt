@@ -3284,8 +3284,8 @@ fn a_jig_setting_no_limit_lets_a_slow_command_finish() {
 ///
 /// Each command finishes well inside the limit and the task still runs out,
 /// which is the whole of the difference between the two readings. Four paths at
-/// a tenth of a second each against a quarter of a second: under a per-execution
-/// budget every path has more than twice what it needs and all four pass, and
+/// 0.3s each against 0.7s: under a per-execution budget every path has more
+/// than twice what it needs and all four pass, and
 /// under FR-4.11a the third is killed partway and FR-4.11b stops the fourth.
 ///
 /// Commands that each outrun the limit on their own cannot separate the two. A

@@ -37,8 +37,8 @@ Read the verdict in `result.yaml` and each task's own output under `work/`. A
 run exits 0 whenever it could be carried out, so the exit status is not the
 answer; `success` in the result is.
 
-The tests task judges that profile per file at 80% of lines. `coverage.lcov` lands in the work directory as evidence and
-`adapters/rust/coverage.py` reads it, so a file falling below the line fails the
+The tests task judges that profile per file at 80% of lines. `coverage.lcov`
+lands in the work directory as evidence and `adapters/rust/coverage.py` reads it, so a file falling below the line fails the
 run and names itself. There is no aggregate threshold, because an aggregate is
 what lets a well-tested file carry an untested one.
 
@@ -47,8 +47,7 @@ cargo-llvm-cov writes `BRF:0` and no `BRDA` records at all without `--branch`,
 which is unstable and needs a nightly compiler. The adapter reads branch records
 where they exist and reports `branch_measured: false` where they do not, so
 nothing here passes a threshold that had nothing to judge. That is a gap and not
-a decision: the shared Go jig judges coverage per file and this one does not
-yet.
+a decision.
 
 Build before you gate. A stale binary answers for the tree it was built from,
 and a change to the runner, the adapters or the fold will not be in it.
