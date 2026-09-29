@@ -28,8 +28,8 @@ beside it while the run reported success.
 
 ## Why quoting was never going to be enough
 
-**The guarantee needs two things: correct quoting, and never reading substituted
-bytes again.**
+The guarantee needs two things: correct quoting, and never reading substituted
+bytes again.
 
 Each individual replacement was correct. The bug lives in the relationship
 between them: pass two treated pass one's output as input, and pass one's output

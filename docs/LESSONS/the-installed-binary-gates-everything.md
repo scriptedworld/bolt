@@ -41,7 +41,7 @@ at is *have something to disagree with*.
 A stale `bin/bolt` removes that by construction. Twelve projects run the same
 file, so twelve green gates are one observation repeated, not twelve. Agreement
 across the estate looks identical whether the binary is current or a week old,
-and **the more projects that agree, the more convincing the wrong answer gets**.
+and the more projects agree, the more convincing the wrong answer gets.
 
 So the byte comparison below is the only defence here, because the ordinary one
 cannot exist.

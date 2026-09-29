@@ -36,8 +36,7 @@ Cargo.lock
 #
 # The links are matched by shape, not named one at a time. `bolt.*-quality.yaml`
 # is narrow enough to be safe: it cannot match a `*.definitions.yaml`, and this
-# repository carries no jig of its own in any case, since `bolt.rust-quality.yaml`
-# moved to toolbox on 2026-09-03.
+# repository carries no jig of its own in any case.
 #
 # A list of names is what failed. Adopting toolbox's `rust` set added
 # `bolt.rust-std-quality.yaml` and `config/rust/clippy.toml`; neither was added

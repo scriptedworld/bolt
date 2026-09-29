@@ -25,23 +25,19 @@ $ ./target/release/bolt rust-std-quality . --output-dir .bolt-gate-rust
 /home/you/bolt/.bolt-gate/result.yaml
 ```
 
-Two runs, and neither jig is bolt's. `bolt.rust-quality.yaml` lived here while
-toolbox shipped no Rust jig. It moved to toolbox on 2026-09-03 as
-`bolt.rust-std-quality.yaml`, and the tasks it marked as belonging to the common
-jig were already there. This repository carries no jig and no definitions file:
-every value it set is the shared default.
+Two runs, and both jigs are toolbox's. This repository carries no jig and no
+definitions file, because every value it would set is the shared default.
 
 `rust-std-quality` is six tasks: format, lint, build, tests, vuln, licences.
-`common-quality` is three: traceability, suppressions, secrets. Complexity is no
-longer a task of its own. The four numbers it produced come from clippy inside
-`lint`, which is why that task's description says so.
+`common-quality` is three: traceability, suppressions, secrets. Complexity has
+no task of its own; its four numbers come from clippy inside `lint`, and that
+task's description says so.
 
 Read the verdict in `result.yaml` and each task's own output under `work/`. A
 run exits 0 whenever it could be carried out, so the exit status is not the
 answer; `success` in the result is.
 
-The tests task judges that profile per file at 80% of lines, since toolbox's
-2026-09-04 change. `coverage.lcov` lands in the work directory as evidence and
+The tests task judges that profile per file at 80% of lines. `coverage.lcov` lands in the work directory as evidence and
 `adapters/rust/coverage.py` reads it, so a file falling below the line fails the
 run and names itself. There is no aggregate threshold, because an aggregate is
 what lets a well-tested file carry an untested one.

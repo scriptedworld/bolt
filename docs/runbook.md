@@ -87,8 +87,8 @@ $ ./target/release/bolt rust-std-quality . --output-dir .bolt-gate-rust
 /home/you/bolt/.bolt-gate/result.yaml
 ```
 
-Two runs against toolbox's jigs; this repository has carried none of its own
-since they moved to toolbox on 2026-09-03. Three tasks in `common-quality`, six
+Two runs against toolbox's jigs, since this repository carries none of its own.
+Three tasks in `common-quality`, six
 in `rust-std-quality`. Bolt exits 0 whenever it could carry the run out, so
 `success` in `result.yaml` is the answer and the exit status is not.
 `traceability` fails on purpose; `CONTRIBUTING.md` says why and how to read its

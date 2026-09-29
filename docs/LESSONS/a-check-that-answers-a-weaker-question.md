@@ -34,8 +34,8 @@ which is the argument for the remedies rather than for care.
 Five of twelve are not bolt's, so where this file should live is an open
 question: a collection spanning repositories has no obvious home inside any one
 of them. A copy in wrench drifted, in `docs/LESSONS/`, which is the last
-directory anybody would search for a stale copy. **A version of this that says
-fewer than twelve is not the one being maintained.**
+directory anybody would search for a stale copy. A copy listing fewer than
+twelve is out of date.
 
 ## Why the name is the trap
 
