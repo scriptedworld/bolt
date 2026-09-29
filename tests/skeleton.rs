@@ -3632,9 +3632,11 @@ fn a_run_that_times_out_writes_a_result_carrying_what_completed() {
 /// into the tree after bolt has finished with it, so the file goes on growing
 /// once the run has returned. `SIGKILL` to the process group stops it.
 ///
-/// Asserted as quiescence, not as a process lookup: the file not growing
-/// is the property the row is about, and a pid check would pass against a child
-/// that was reparented and still writing.
+/// Asserted twice. The file not growing is the property the row is about, and a
+/// pid check alone would pass against a child that was reparented and still
+/// writing. The group being empty catches the opposite case: a survivor whose
+/// directory has gone stops writing, since its `>>` fails, and goes on forking
+/// with nothing to show for it.
 #[test]
 fn a_timed_out_command_leaves_no_children_running() {
     let root = tree();
@@ -3644,7 +3646,7 @@ fn a_timed_out_command_leaves_no_children_running() {
         concat!(
             "  - name: forks\n",
             "    time-limit: \"0.5s\"\n",
-            "    command: \"sh -c 'while : ; do echo tick >> ticks.txt; sleep 0.02; done & sleep 5'\"\n",
+            "    command: \"sh -c 'read _ _ _ _ g _ < /proc/self/stat; echo $g > group.txt; while : ; do echo tick >> ticks.txt; sleep 0.02; done & sleep 5'\"\n",
         ),
     );
 
@@ -3661,12 +3663,50 @@ fn a_timed_out_command_leaves_no_children_running() {
     );
 
     std::thread::sleep(std::time::Duration::from_millis(300));
+    let after_waiting = size();
 
+    let group = fs::read_to_string(root.path().join("group.txt"))
+        .expect("the command recorded its process group");
+    let group = group.trim();
+    let survivors = members_of_group(group);
+    if !survivors.is_empty() {
+        // Killed before either assertion, so a leak fails the suite once and
+        // leaves nothing forking after it.
+        let _ = std::process::Command::new("kill")
+            .args(["-9", "--", &format!("-{group}")])
+            .status();
+    }
+
+    assert!(
+        survivors.is_empty(),
+        "processes in the killed group outlived it: {survivors:?}",
+    );
     assert_eq!(
-        size(),
-        when_the_run_returned,
+        after_waiting, when_the_run_returned,
         "an orphaned child was still writing after the run returned",
     );
+}
+
+/// The pids of live processes in `group`, read from `/proc`.
+///
+/// A zombie is left out: it has exited and waits only to be reaped by whoever
+/// inherited it. The command name in `stat` is parenthesised and may hold
+/// spaces, so fields are counted from its closing parenthesis: state, parent,
+/// group.
+fn members_of_group(group: &str) -> Vec<String> {
+    let Ok(entries) = fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+    entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| fs::read_to_string(entry.path().join("stat")).ok())
+        .filter_map(|stat| {
+            let (pid, rest) = stat.split_once(' ')?;
+            let (_, fields) = rest.rsplit_once(')')?;
+            let fields: Vec<&str> = fields.split_whitespace().collect();
+            (fields.first() != Some(&"Z") && fields.get(2) == Some(&group)).then(|| pid.to_owned())
+        })
+        .collect()
 }
 
 // COVERS: FR-4.11e | negative
