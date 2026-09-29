@@ -2086,6 +2086,368 @@ fn a_task_naming_no_path_variable_claims_no_paths() {
     );
 }
 
+/// Every path under `root`, relative to it and sorted.
+fn listing(root: &Path) -> Vec<String> {
+    fn walk(root: &Path, dir: &Path, found: &mut Vec<String>) {
+        for entry in fs::read_dir(dir).expect("readable").filter_map(Result::ok) {
+            let path = entry.path();
+            found.push(
+                path.strip_prefix(root)
+                    .expect("under the root")
+                    .display()
+                    .to_string(),
+            );
+            if path.is_dir() {
+                walk(root, &path, found);
+            }
+        }
+    }
+    let mut found = Vec::new();
+    walk(root, root, &mut found);
+    found.sort();
+    found
+}
+
+// COVERS: FR-9.1 | property
+/// Everything a run writes is inside its one run directory.
+#[test]
+fn a_runs_whole_output_is_one_directory() {
+    let root = tree();
+    write(root.path(), "a.txt", "a");
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: read\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+    );
+    let before = listing(root.path());
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    let run = outcome
+        .output_dir
+        .strip_prefix(fs::canonicalize(root.path()).expect("the base"))
+        .expect("the default run directory is at the base")
+        .display()
+        .to_string();
+    let added: Vec<String> = listing(root.path())
+        .into_iter()
+        .filter(|path| !before.contains(path))
+        .collect();
+    assert!(
+        added.iter().all(|path| path.starts_with(&run)),
+        "the run wrote outside {run}: {added:?}",
+    );
+}
+
+// COVERS: FR-9.2c, FR-9.2d | edge
+/// An artifact is kept only where it was addressed, and one written at the base
+/// stays in the tree.
+#[test]
+fn an_artifact_not_written_to_the_work_directory_stays_where_it_landed() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: writes\n    command: \"sh -c 'echo x > stray.txt; echo y > {work_dir}/kept.txt'\"\n",
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    let dir = work(&outcome, "writes-1");
+    assert!(
+        dir.join("kept.txt").is_file(),
+        "the addressed artifact was lost"
+    );
+    assert!(
+        !dir.join("stray.txt").exists(),
+        "bolt went looking for an artifact it was not handed",
+    );
+    assert!(
+        root.path().join("stray.txt").is_file(),
+        "the artifact the tool wrote into the tree was removed",
+    );
+}
+
+// COVERS: FR-9.3 | property
+/// One execution's directory holds what ran, what it said and how it ended.
+///
+/// Copied somewhere else first, so nothing the assertions read can be reaching
+/// back into the rest of the run.
+#[test]
+fn one_executions_evidence_is_complete_in_its_directory() {
+    let root = tree();
+    write(root.path(), "a.txt", "a");
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: read\n    command: \"sh -c 'cat \\\"$1\\\"; echo e >&2; exit 2' sh {each_path}\"\n    matching: [\"*.txt\"]\n",
+    );
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+    let elsewhere = tree();
+    for name in [
+        "manifest.yaml",
+        "stdout",
+        "stderr",
+        "exitcode",
+        "output.yaml",
+    ] {
+        fs::copy(
+            work(&outcome, "read-1").join(name),
+            elsewhere.path().join(name),
+        )
+        .unwrap_or_else(|error| panic!("{name} is not in the work directory: {error}"));
+    }
+    let dir = elsewhere.path();
+
+    let manifest = read_validated(
+        &dir.join(bolt::run::MANIFEST_FILE),
+        &wrench::schemas::MANIFEST,
+    );
+    let a = fs::canonicalize(root.path().join("a.txt")).expect("a.txt");
+    assert!(
+        manifest["command"]
+            .as_str()
+            .is_some_and(|command| command.contains(&a.display().to_string())),
+        "the command as executed: {manifest}",
+    );
+    assert_eq!(fs::read_to_string(dir.join("stdout")).expect("stdout"), "a");
+    assert_eq!(
+        fs::read_to_string(dir.join("stderr")).expect("stderr"),
+        "e\n"
+    );
+    assert_eq!(
+        fs::read_to_string(dir.join("exitcode"))
+            .expect("exitcode")
+            .trim(),
+        "2"
+    );
+    assert!(!verdict(
+        &dir.join(bolt::run::OUTPUT_FILE),
+        &wrench::schemas::ENVELOPE
+    ));
+}
+
+// COVERS: FR-9.4 | property
+/// Two runs over one tree name every file the same.
+#[test]
+fn two_runs_over_one_tree_line_up_file_for_file() {
+    let root = tree();
+    for name in ["a.txt", "b.txt", "c.txt"] {
+        write(root.path(), name, name);
+    }
+    write_jig(
+        root.path(),
+        "check",
+        concat!(
+            "  - name: each\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+            "  - name: whole\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+    let out = tree();
+
+    let first = run_into("check", root.path(), &out.path().join("one")).expect("first run");
+    let second = run_into("check", root.path(), &out.path().join("two")).expect("second run");
+
+    assert_eq!(
+        listing(&first.output_dir),
+        listing(&second.output_dir),
+        "the two runs' files do not line up",
+    );
+}
+
+// COVERS: FR-9.5b | negative
+/// A manifest is not touched once its command starts.
+///
+/// The command copies its own manifest as it runs. After the run the manifest
+/// is byte for byte what the command saw, so nothing the run learned by
+/// finishing went into it.
+#[test]
+fn a_manifest_holds_only_what_was_known_beforehand() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: copies\n    command: \"sh -c 'cp {work_dir}/manifest.yaml {work_dir}/during.yaml; exit 5'\"\n",
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    let dir = work(&outcome, "copies-1");
+    assert_eq!(
+        fs::read(dir.join(bolt::run::MANIFEST_FILE)).expect("the manifest"),
+        fs::read(dir.join("during.yaml")).expect("the copy taken while running"),
+        "the manifest changed after its command started",
+    );
+}
+
+// COVERS: FR-9.5c | property
+/// The manifest names every variable the execution was given, the path
+/// variable included.
+#[test]
+fn the_manifest_records_every_template_variable() {
+    let root = tree();
+    write(root.path(), "a.txt", "a");
+    write(root.path(), "b.txt", "b");
+    write_jig(
+        root.path(),
+        "check",
+        concat!(
+            "  - name: each\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+            "  - name: all\n    command: \"cat {all_paths}\"\n    matching: [\"*.txt\"]\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    let variables = |entry: &str| {
+        read_validated(
+            &work(&outcome, entry).join(bolt::run::MANIFEST_FILE),
+            &wrench::schemas::MANIFEST,
+        )["variables"]
+            .clone()
+    };
+    let base = fs::canonicalize(root.path()).expect("the base");
+    let path = |name: &str| base.join(name).display().to_string();
+
+    let each = variables("each-2");
+    for location in [
+        "project_root",
+        "base_dir",
+        "work_dir",
+        "config_dir",
+        "output_dir",
+    ] {
+        assert_eq!(
+            each[location]["from"], "bolt",
+            "{location} is missing: {each}"
+        );
+    }
+    assert_eq!(
+        each["each_path"]["value"],
+        path("b.txt"),
+        "the path this execution got"
+    );
+    assert_eq!(
+        variables("all-1")["all_paths"]["value"],
+        serde_json::json!([path("a.txt"), path("b.txt")]),
+        "the list this execution got",
+    );
+}
+
+// COVERS: FR-9.5e | negative
+/// The environment bolt ran in is not written into any manifest.
+#[test]
+fn the_environment_is_not_in_the_manifest() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let finished = bolt()
+        .env("BOLT_TEST_MARKER", "marker-from-the-environment")
+        .arg("check")
+        .arg(root.path())
+        .output()
+        .expect("bolt runs");
+
+    let result = String::from_utf8_lossy(&finished.stdout).trim().to_owned();
+    let manifest = fs::read_to_string(
+        Path::new(&result)
+            .with_file_name(bolt::run::WORK_DIR)
+            .join("alpha-1")
+            .join(bolt::run::MANIFEST_FILE),
+    )
+    .expect("the manifest");
+    assert!(
+        !manifest.contains("marker-from-the-environment") && !manifest.contains("BOLT_TEST_MARKER"),
+        "the environment reached the manifest:\n{manifest}",
+    );
+}
+
+// COVERS: FR-9.8 | property
+/// Each per-path execution's manifest carries the whole matched list.
+#[test]
+fn every_per_path_manifest_carries_the_whole_selection() {
+    let root = tree();
+    for name in ["a.txt", "b.txt", "c.txt"] {
+        write(root.path(), name, name);
+    }
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: each\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    let base = fs::canonicalize(root.path()).expect("the base");
+    let all =
+        serde_json::json!(["a.txt", "b.txt", "c.txt"].map(|n| base.join(n).display().to_string()));
+    for entry in ["each-1", "each-2", "each-3"] {
+        let manifest = read_validated(
+            &work(&outcome, entry).join(bolt::run::MANIFEST_FILE),
+            &wrench::schemas::MANIFEST,
+        );
+        assert_eq!(manifest["selection"]["matched"], all, "{entry}'s selection");
+    }
+}
+
+// COVERS: FR-9.9 | edge
+/// A task that runs once still has an ordinal in its directory name.
+#[test]
+fn a_single_execution_still_carries_an_ordinal() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: once\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    assert!(work(&outcome, "once-1").is_dir(), "no once-1");
+    assert!(
+        !work(&outcome, "once").exists(),
+        "a bare task name was used"
+    );
+}
+
+// COVERS: FR-8.5 | property
+/// Each execution's envelope is still on disk, untouched, beside the result.
+#[test]
+fn constituent_envelopes_survive_the_merge() {
+    let root = tree();
+    let envelope = "\"success\": false\n\"reasons\":\n- \"kind\": \"k\"\n  \"message\": \"m\"\n";
+    write(root.path(), "envelope.yaml", envelope);
+    write_adapter(
+        root.path(),
+        "fixed",
+        &format!(
+            "for a in \"$@\"; do case $prev in --work-dir) w=$a;; esac; prev=$a; done\ncp {} \"$w/output.yaml\"\n",
+            root.path().join("envelope.yaml").display(),
+        ),
+    );
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n    adapter: fixed\n",
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    assert!(
+        outcome.output_dir.join(bolt::run::RESULT_FILE).is_file(),
+        "no result"
+    );
+    assert_eq!(
+        fs::read_to_string(envelope_of(&outcome, "alpha-1")).expect("the envelope"),
+        envelope,
+        "the constituent envelope was changed or removed by the merge",
+    );
+}
+
 // ---- adapters and the merge -------------------------------------------------
 
 // COVERS: FR-6.9 | positive
@@ -5927,6 +6289,173 @@ fn every_statement_of_the_licence_agrees() {
             "a comment cites NFR-12.3 and does not name {declared}: {line}",
         );
     }
+}
+
+// COVERS: NFR-12.1 | positive
+/// Bolt runs over its own repository and walks it the way its gate does.
+///
+/// The gate's jigs are toolbox's and not in this tree, so the jig here is a
+/// stand-in kept outside it. What is asserted is that bolt can be pointed at
+/// itself: the walk honours bolt's own `.gitignore`, so the build output under
+/// `target/` is not among what a gate would check.
+#[test]
+fn bolt_runs_over_its_own_repository() {
+    let config = tree();
+    let out = tree();
+    write_jig(
+        config.path(),
+        "self",
+        "  - name: sources\n    command: \"sh -c 'printf \\\"%s\\\\n\\\" \\\"$@\\\"' sh {all_paths}\"\n    matching: [\"**/*.rs\"]\n",
+    );
+
+    let outcome = bolt::run::invoke(&bolt::run::Invocation {
+        jig: "self",
+        base: repository(),
+        definitions: None,
+        output_dir: Some(&out.path().join("run")),
+        config_dir: Some(config.path()),
+    })
+    .expect("bolt runs over its own repository");
+
+    assert!(outcome.success, "the run failed");
+    let listed = fs::read_to_string(work(&outcome, "sources-1").join("stdout")).expect("stdout");
+    assert!(
+        listed.contains("/src/run.rs"),
+        "bolt's own source was not walked"
+    );
+    assert!(
+        !listed.contains("/target/"),
+        "bolt's build output was walked"
+    );
+}
+
+// COVERS: NFR-12.4 | property
+/// Nothing compiles C, and the binary links only the system C runtime.
+///
+/// `cc` is how a Rust build compiles C, so its absence from the lockfile is the
+/// dependency tree's half. `ldd` is the binary's half.
+#[test]
+fn bolt_builds_without_a_c_toolchain() {
+    let lock =
+        fs::read_to_string(repository().join("Cargo.lock")).expect("Cargo.lock after a build");
+    for crate_name in ["cc", "cmake"] {
+        assert!(
+            !lock.contains(&format!("name = \"{crate_name}\"\n")),
+            "{crate_name} is in the dependency tree",
+        );
+    }
+
+    let linked = Command::new("ldd")
+        .arg(env!("CARGO_BIN_EXE_bolt"))
+        .output()
+        .expect("ldd runs");
+    let mut libraries: Vec<String> = String::from_utf8_lossy(&linked.stdout)
+        .lines()
+        .filter_map(|line| line.split_whitespace().next())
+        .filter(|name| !name.starts_with("linux-vdso") && !name.contains("ld-linux"))
+        .map(|name| name.split(".so").next().unwrap_or(name).to_owned())
+        .collect();
+    libraries.sort();
+    assert_eq!(libraries, ["libc", "libgcc_s", "libm"], "linked against");
+}
+
+// COVERS: FR-11.1 | property
+/// A run needs the jig, the directory and nothing else from the machine.
+///
+/// No environment beyond a `PATH` for the shell, started from an unrelated
+/// directory, with the tree copied somewhere nothing else knows about.
+#[test]
+fn a_run_needs_only_the_jig_and_the_directory() {
+    let root = tree();
+    write(root.path(), "a.txt", "a");
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: read\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+    );
+    let elsewhere = tree();
+
+    let finished = bolt()
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .current_dir(elsewhere.path())
+        .arg("check")
+        .arg(root.path())
+        .output()
+        .expect("bolt runs");
+
+    assert_eq!(
+        finished.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&finished.stderr),
+    );
+    let result = String::from_utf8_lossy(&finished.stdout).trim().to_owned();
+    assert!(
+        verdict(Path::new(&result), &wrench::schemas::ENVELOPE),
+        "the run failed"
+    );
+}
+
+// COVERS: FR-11.3 | positive
+/// One jig runs against a throwaway copy of the tree with a change in it, and
+/// the two runs differ only where the trees did.
+#[test]
+fn the_same_jig_runs_against_a_throwaway_copy() {
+    let original = tree();
+    write(original.path(), "good.txt", "fine\n");
+    write(original.path(), "other.txt", "fine\n");
+    write_jig(
+        original.path(),
+        "check",
+        "  - name: clean\n    command: \"sh -c '! grep -q broken \\\"$1\\\"' sh {each_path}\"\n    matching: [\"*.txt\"]\n",
+    );
+    let copy = tree();
+    for name in ["good.txt", "other.txt", &bolt::jig::file_name("check")] {
+        fs::copy(original.path().join(name), copy.path().join(name)).expect("the copy");
+    }
+    write(copy.path(), "other.txt", "broken\n");
+
+    let before = bolt::run::run("check", original.path()).expect("the original runs");
+    let after = bolt::run::run("check", copy.path()).expect("the copy runs");
+
+    assert!(before.success, "the original tree failed");
+    assert!(!after.success, "the change in the copy went unnoticed");
+    assert!(
+        verdict(&envelope_of(&after, "clean-1"), &wrench::schemas::ENVELOPE),
+        "the unchanged file failed in the copy",
+    );
+}
+
+// COVERS: FR-13.7 | positive
+/// A commit SHA handed in through a definitions file is in every manifest,
+/// marked as the file's.
+///
+/// The command does not name it, and it is recorded anyway, because a manifest
+/// records every key the layers hold.
+#[test]
+fn a_commit_sha_from_the_caller_reaches_the_manifest() {
+    // Forty hex digits, built here so the secrets scanners see no literal.
+    let sha = "ab".repeat(20);
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+    write_definitions(root.path(), "tree", &format!("commit: \"{sha}\"\n"));
+
+    let outcome = run_with("check", root.path(), "tree").expect("the run completes");
+
+    let manifest = read_validated(
+        &work(&outcome, "alpha-1").join(bolt::run::MANIFEST_FILE),
+        &wrench::schemas::MANIFEST,
+    );
+    assert_eq!(
+        manifest["variables"]["commit"],
+        serde_json::json!({ "value": sha, "from": "file" }),
+        "the SHA did not reach the manifest",
+    );
 }
 
 // COVERS: FR-4.12 | property
