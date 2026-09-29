@@ -73,22 +73,24 @@ citation is indistinguishable from a right one forever.
 discharges in a comment directly above it:
 
 ```rust
-// COVERS: FR-4.11a, FR-4.11b | property
+// COVERS FR-4.11a, FR-4.11b | property
 ```
 
-The kinds are `positive`, `negative`, `edge`, `property` and `regression`. A
+No colon after `COVERS`: in a Python comment the colon form parses as an
+annotation and ruff's ERA001 flags it as commented-out code, so every language
+uses the one form. The kinds are `positive`, `negative`, `edge`, `property` and `regression`. A
 test citing nothing fails the gate, and so does one citing a row
 `REQUIREMENTS.md` does not define.
 
 A requirement can be retired or superseded, and a `## Retired` section records
 where it went. An ID is never reused: reuse silently rewrites what every
 existing reference to that ID means, and nothing about the new row looks wrong.
-Retiring a row means fixing the `COVERS:` marks that cite it in the same change.
+Retiring a row means fixing the `COVERS` marks that cite it in the same change.
 
 An ID takes at most one letter of suffix. The checker's grammar is
 `(?:FR|NFR)-\d+(?:\.\d+)?[a-z]?`, so `FR-10.8a` is an ID and `FR-10.8ca` is
 not: a two-letter suffix fails to match as a row at all and is silently absent
-from the denominator, while the same text in a `COVERS:` mark degrades to
+from the denominator, while the same text in a `COVERS` mark degrades to
 `FR-10` and fails loudly. Where a letter is taken, take the next number.
 
 Count the rows against the denominator, because a row the checker cannot see is

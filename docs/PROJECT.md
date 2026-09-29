@@ -207,7 +207,7 @@ other half. The test is
 `a_filename_containing_a_template_token_is_not_re_expanded`.
 
 The requirement and citation conventions are in `CONTRIBUTING.md`: the grammar
-an id has to satisfy, the shape of a `COVERS:` mark, and the two counts that
+an id has to satisfy, the shape of a `COVERS` mark, and the two counts that
 have to reconcile. Live rows must equal the traceability denominator plus the
 exempt count, because a row the checker's grammar rejects is absent from a run
 that says nothing is wrong.
@@ -219,7 +219,7 @@ caught two, and mutation probes, which have caught four.
 
 Mutation-test anything whose test was written after the code, since such a test
 tends to assert the outcome the code already produces. A probe breaks the code a
-row governs and runs the tests citing it, resolved from the `COVERS:` marks so
+row governs and runs the tests citing it, resolved from the `COVERS` marks so
 it cannot run the wrong test. The probes are local to a worktree that built
 them, and a fresh clone carries none.
 

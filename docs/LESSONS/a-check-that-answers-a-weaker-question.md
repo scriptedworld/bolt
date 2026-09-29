@@ -17,7 +17,7 @@ one of them reads as an ordinary bug.
 | `failed: 3 execution(s)` | how many executions ran |
 | `cargo test` passing | do the tests pass at *this* depth |
 | running `target/release/bolt` | what bolt did when that binary was built |
-| a `COVERS:` row count | how many rows the grammar could parse |
+| a `COVERS` row count | how many rows the grammar could parse |
 | `cmd \| tail -3` then `$?` | did `tail` succeed |
 | two mtimes, one second apart | did the second the clock can see change |
 | two runs into one directory | do two *refusals* differ |

@@ -93,7 +93,7 @@ fn work(outcome: &bolt::Outcome, entry: &str) -> PathBuf {
 
 // ---- runs and files ---------------------------------------------------------
 
-// COVERS: FR-1.1 | property
+// COVERS FR-1.1 | property
 /// A failing run's outcome is in its files, and stdout says only where.
 ///
 /// Asserted through the binary, since the streams are the binary's. Stdout
@@ -142,7 +142,7 @@ fn what_a_run_concluded_is_in_its_files_and_not_its_streams() {
     assert_eq!(captured, "broken\n", "the command's stdout was not kept");
 }
 
-// COVERS: FR-1.3 | positive
+// COVERS FR-1.3 | positive
 /// A jig that transforms files and judges nothing is an ordinary run.
 #[test]
 fn a_jig_reaching_no_verdict_about_code_is_a_run() {
@@ -166,7 +166,7 @@ fn a_jig_reaching_no_verdict_about_code_is_a_run() {
     assert_eq!(counted.trim(), "3", "the data is what the command produced");
 }
 
-// COVERS: FR-1.6 | negative
+// COVERS FR-1.6 | negative
 /// A jig that will not parse and a jig of the wrong shape fail different steps.
 ///
 /// Both are refused as unreadable, and the reason says which step refused it: a
@@ -196,7 +196,7 @@ fn parsing_and_validating_are_two_refusals() {
     );
 }
 
-// COVERS: FR-1.7 | edge
+// COVERS FR-1.7 | edge
 /// A command that will not parse as shell is still a string, and the jig loads.
 ///
 /// The unbalanced quote is the shell's to reject when the task executes. The
@@ -219,7 +219,7 @@ fn a_command_the_shell_cannot_parse_still_validates() {
     );
 }
 
-// COVERS: FR-1.8 | property
+// COVERS FR-1.8 | property
 /// Every structured file a run writes reads back through its schema.
 ///
 /// A passing task, a failing one, and one whose adapter wrote nothing, so the
@@ -262,7 +262,7 @@ fn every_structured_file_a_run_writes_reads_back() {
     assert_eq!(read, 3, "every execution's files were read");
 }
 
-// COVERS: FR-1.9a | edge
+// COVERS FR-1.9a | edge
 /// What a command writes is kept as it was, with no schema applied to it.
 ///
 /// Stdout that is broken YAML and an artifact of raw bytes would each be
@@ -297,7 +297,7 @@ fn captured_output_and_artifacts_are_not_read_as_data() {
     );
 }
 
-// COVERS: FR-1.10 | property
+// COVERS FR-1.10 | property
 /// Strings that look like other types are quoted, and booleans are not.
 ///
 /// `no`, `1.20` and `null` pass through the manifest as definitions values, so
@@ -345,7 +345,7 @@ fn canonical_yaml_keeps_every_scalar_its_type() {
     );
 }
 
-// COVERS: FR-1.13 | positive
+// COVERS FR-1.13 | positive
 /// Validation needs nothing from the machine: no `PATH`, no home, no network.
 ///
 /// The schema refusal proves the schema was there to apply. Bolt ships its
@@ -374,7 +374,7 @@ fn validation_needs_nothing_installed() {
 
 // ---- the invocation ---------------------------------------------------------
 
-// COVERS: FR-2.1, FR-2.1a, FR-3.9 | positive
+// COVERS FR-2.1, FR-2.1a, FR-3.9 | positive
 /// An invocation names a jig and a directory, and that is the whole of it.
 ///
 /// This asserts the run actually happened, not merely that the process was
@@ -417,7 +417,7 @@ fn an_invocation_is_a_jig_name_and_a_directory() {
     );
 }
 
-// COVERS: FR-2.1a, FR-10.5 | negative
+// COVERS FR-2.1a, FR-10.5 | negative
 /// A third argument asks for an interface bolt does not have.
 ///
 /// The status is asserted as exactly 1, not as "not success": a `todo!()` panic
@@ -446,7 +446,7 @@ fn a_third_argument_is_refused() {
     );
 }
 
-// COVERS: FR-10.1, FR-10.2, FR-10.5 | property
+// COVERS FR-10.1, FR-10.2, FR-10.5 | property
 /// The exit status says whether bolt ran, not whether the tools passed.
 #[test]
 fn the_exit_status_says_whether_bolt_ran_not_whether_tools_passed() {
@@ -480,7 +480,7 @@ fn the_exit_status_says_whether_bolt_ran_not_whether_tools_passed() {
     );
 }
 
-// COVERS: FR-10.5 | negative
+// COVERS FR-10.5 | negative
 /// A jig that will not parse is a refusal, not a crash.
 #[test]
 fn a_jig_that_will_not_parse_is_refused() {
@@ -495,7 +495,7 @@ fn a_jig_that_will_not_parse_is_refused() {
     );
 }
 
-// COVERS: FR-1.5, FR-3.9 | edge
+// COVERS FR-1.5, FR-3.9 | edge
 /// A jig with no `version` is valid, because the schema requires only `tasks`.
 ///
 /// Bolt validates what wrench's schema says, not what bolt would have chosen.
@@ -516,7 +516,7 @@ fn a_jig_without_a_version_is_read() {
     assert_eq!(outcome.executions, 1, "the task did not execute");
 }
 
-// COVERS: FR-5.22, FR-10.5 | negative
+// COVERS FR-5.22, FR-10.5 | negative
 /// A task carrying the retired `jig` field is refused by name, and told what
 /// replaced it.
 ///
@@ -552,7 +552,7 @@ fn a_task_carrying_the_retired_jig_field_is_refused_by_name() {
     );
 }
 
-// COVERS: FR-4.3, FR-2.3 | regression
+// COVERS FR-4.3, FR-2.3 | regression
 /// A filename containing a template token is not re-expanded into its own
 /// substitution.
 ///
@@ -594,7 +594,7 @@ fn a_filename_containing_a_template_token_is_not_re_expanded() {
     assert!(!canary.exists(), "the filename injected a command");
 }
 
-// COVERS: FR-4.18 | negative
+// COVERS FR-4.18 | negative
 /// A placeholder nothing defines is refused before anything executes.
 #[test]
 fn an_unknown_placeholder_is_refused() {
@@ -616,7 +616,7 @@ fn an_unknown_placeholder_is_refused() {
     }
 }
 
-// COVERS: FR-3.3a, FR-8.3 | regression
+// COVERS FR-3.3a, FR-8.3 | regression
 /// Two tasks sharing a name are refused, because the second would erase the
 /// first's evidence and its failure with it.
 ///
@@ -643,7 +643,7 @@ fn a_duplicate_task_name_is_refused() {
     );
 }
 
-// COVERS: FR-2.3, FR-9.2 | regression
+// COVERS FR-2.3, FR-9.2 | regression
 /// A task name that would climb out of the work directory is refused.
 ///
 /// The name is a path component by FR-3.3. Reproduced before this check: a task
@@ -666,7 +666,7 @@ fn a_task_name_that_leaves_the_work_directory_is_refused() {
     );
 }
 
-// COVERS: FR-2.5, FR-10.7a | negative
+// COVERS FR-2.5, FR-10.7a | negative
 /// A base that is not there is refused, and nothing is created.
 ///
 /// FR-2.5a is deliberately not cited. It gives every refusal a
@@ -706,7 +706,7 @@ fn a_missing_base_is_refused_and_nothing_is_created() {
 
 // ---- jigs and tasks ---------------------------------------------------------
 
-// COVERS: FR-3.2 | positive
+// COVERS FR-3.2 | positive
 /// A task using every field it may declare loads and runs as each one says.
 ///
 /// The adapter passes only if the evidence file lists the kept path and not the
@@ -754,7 +754,7 @@ fn a_task_using_every_field_at_once_runs() {
     );
 }
 
-// COVERS: FR-3.3 | property
+// COVERS FR-3.3 | property
 /// Every work directory starts with the name of the task that made it.
 #[test]
 fn a_tasks_name_prefixes_its_work_directories() {
@@ -781,7 +781,7 @@ fn a_tasks_name_prefixes_its_work_directories() {
     assert_eq!(names, ["fmt-1", "lint-1", "lint-2"], "work directories");
 }
 
-// COVERS: FR-3.4c | positive
+// COVERS FR-3.4c | positive
 /// A jig carries comments beside its entries, and they change nothing.
 ///
 /// One sits inside the `excluding` list, which is where the row says the reason
@@ -815,7 +815,7 @@ fn a_jig_carries_comments_beside_its_entries() {
     );
 }
 
-// COVERS: FR-3.4e | edge
+// COVERS FR-3.4e | edge
 /// A tool that finds its own files and finds none passes, and bolt cannot tell.
 ///
 /// The same empty selection made by bolt fails, by FR-4.4b. The pair is the
@@ -843,7 +843,7 @@ fn an_empty_selection_is_only_caught_where_bolt_selects() {
     );
 }
 
-// COVERS: FR-3.7 | positive
+// COVERS FR-3.7 | positive
 /// A jig kept outside the tree and linked in runs without being copied.
 ///
 /// The link's target is edited after it is made, and the run sees the edit, so
@@ -877,7 +877,7 @@ fn a_linked_jig_runs_from_where_it_lives() {
     );
 }
 
-// COVERS: FR-3.10e | property
+// COVERS FR-3.10e | property
 /// A composing jig's `requires` is its own; the child checks its own list.
 ///
 /// The child needs a tool that is absent and the parent does not list it. The
@@ -924,7 +924,7 @@ fn requires_belongs_to_the_jig_that_declares_it() {
     );
 }
 
-// COVERS: FR-3.12 | negative
+// COVERS FR-3.12 | negative
 /// A broken jig beside the one being run is not read, and does not fail it.
 #[test]
 fn a_broken_sibling_jig_does_not_fail_the_run() {
@@ -941,7 +941,7 @@ fn a_broken_sibling_jig_does_not_fail_the_run() {
     assert!(outcome.success, "the run failed");
 }
 
-// COVERS: FR-3.14 | property
+// COVERS FR-3.14 | property
 /// Two runs of one jig over one tree show the same tasks.
 ///
 /// The second runs with the tree touched and bolt's environment changed, which
@@ -990,7 +990,7 @@ fn two_runs_of_one_jig_show_the_same_tasks() {
 
 // ---- the walk ---------------------------------------------------------------
 
-// COVERS: FR-2.2 | positive
+// COVERS FR-2.2 | positive
 /// The walk is the whole input: it finds the files the tasks act on.
 ///
 /// Compared as a set. Sorted order is FR-2.2d's claim and has its own test, so
@@ -1012,7 +1012,7 @@ fn the_walk_finds_the_files_tasks_act_on() {
     );
 }
 
-// COVERS: FR-2.2a | negative
+// COVERS FR-2.2a | negative
 /// An ignored file is not part of the project and is not checked.
 ///
 /// Asserts what survives as well as what does not. An empty walk satisfies the
@@ -1044,7 +1044,7 @@ fn an_ignored_file_is_not_walked() {
     );
 }
 
-// COVERS: FR-2.2f | negative
+// COVERS FR-2.2f | negative
 /// Naming an ignored file in `matching` does not bring it back.
 ///
 /// The literal path is the strongest way a jig can ask for a file, so if any
@@ -1084,7 +1084,7 @@ fn matching_cannot_reach_an_ignored_file() {
     );
 }
 
-// COVERS: FR-2.9 | property
+// COVERS FR-2.9 | property
 /// A relative path means the base, wherever it was written and wherever bolt
 /// was started.
 ///
@@ -1126,7 +1126,7 @@ fn every_relative_path_resolves_against_the_base() {
     );
 }
 
-// COVERS: FR-2.2b, FR-2.7 | edge
+// COVERS FR-2.2b, FR-2.7 | edge
 /// A tree that is not a repository walks the same as one that is.
 ///
 /// The fixture has no `.git` at all, which is what "does not require a
@@ -1157,7 +1157,7 @@ fn a_tree_that_is_not_a_repository_walks_the_same() {
     );
 }
 
-// COVERS: FR-2.2b | negative
+// COVERS FR-2.2b | negative
 /// Git's own excludes are not read, because bolt reads nothing under `.git/`.
 ///
 /// Only the exclude file is asserted. Whether the walk *returns* paths under
@@ -1178,7 +1178,7 @@ fn a_git_excludes_file_is_not_read() {
     );
 }
 
-// COVERS: FR-2.2d | property
+// COVERS FR-2.2d | property
 /// The walk returns sorted paths, so two runs over one tree agree.
 ///
 /// The fixture pins component order against byte order: `nested.txt` and
@@ -1201,7 +1201,7 @@ fn the_walk_is_sorted_and_repeatable() {
     assert_eq!(first, second, "two walks over one tree disagree");
 }
 
-// COVERS: FR-2.2e | negative
+// COVERS FR-2.2e | negative
 /// A symlink is not followed, so what sits behind one is not walked.
 ///
 /// The row says the walk does not *follow* a symlink, and this asserts exactly
@@ -1236,7 +1236,7 @@ fn a_symlink_is_not_followed() {
 
 // ---- selection --------------------------------------------------------------
 
-// COVERS: FR-3.4, FR-3.4a, FR-3.5 | positive
+// COVERS FR-3.4, FR-3.4a, FR-3.5 | positive
 /// `matching` selects, `excluding` removes from what it selected, and both are
 /// matched relative to the base.
 ///
@@ -1273,7 +1273,7 @@ fn matching_selects_and_excluding_removes_relative_to_the_base() {
     );
 }
 
-// COVERS: FR-4.3 | negative
+// COVERS FR-4.3 | negative
 /// Every substituted path is quoted individually, against a shell.
 ///
 /// Asserted by round trip, not by shape. `format!("'{}'", path)` is the obvious
@@ -1305,7 +1305,7 @@ fn every_substituted_path_is_quoted_individually() {
 
 // ---- how a task runs --------------------------------------------------------
 
-// COVERS: FR-4.2 | positive
+// COVERS FR-4.2 | positive
 /// `{each_path}` runs once per matched path and `{all_paths}` runs once.
 ///
 /// Asserted by which work directories exist, not by a total. Swapping the two
@@ -1355,7 +1355,7 @@ fn each_path_runs_once_per_path_and_all_paths_runs_once() {
     );
 }
 
-// COVERS: FR-4.2 | negative
+// COVERS FR-4.2 | negative
 /// A command naming both path forms is a jig error, and the reason names it.
 #[test]
 fn a_command_naming_both_path_forms_is_a_jig_error() {
@@ -1381,7 +1381,7 @@ fn a_command_naming_both_path_forms_is_a_jig_error() {
     }
 }
 
-// COVERS: FR-4.4, FR-4.4b, FR-4.4e | negative
+// COVERS FR-4.4, FR-4.4b, FR-4.4e | negative
 /// A path-consuming task whose selection is empty fails, and says so.
 ///
 /// FR-4.4b makes this a failure. A silent skip would leave a typo'd pattern
@@ -1416,7 +1416,7 @@ fn a_path_consuming_task_with_an_empty_selection_fails() {
     );
 }
 
-// COVERS: FR-4.4c | positive
+// COVERS FR-4.4c | positive
 /// `optional` makes an empty selection an acceptable result.
 #[test]
 fn optional_makes_an_empty_selection_acceptable() {
@@ -1451,7 +1451,7 @@ fn optional_makes_an_empty_selection_acceptable() {
     );
 }
 
-// COVERS: FR-4.4 | positive
+// COVERS FR-4.4 | positive
 /// A command naming neither path form always executes.
 ///
 /// The tree is empty, so the walk finds nothing. A task that consumed paths
@@ -1474,7 +1474,7 @@ fn a_command_naming_no_path_variable_always_executes() {
     assert!(outcome.success, "and it passed");
 }
 
-// COVERS: FR-4.5 | property
+// COVERS FR-4.5 | property
 /// Tasks execute serially: no two executions overlap in time.
 ///
 /// The row says serially and says nothing about order. FR-4.5a calls serial the
@@ -1536,7 +1536,7 @@ fn stdout_of(jig: &str, base: &Path, entry: &str) -> (bolt::Outcome, String) {
     (outcome, stdout)
 }
 
-// COVERS: FR-4.1, FR-4.1c | positive
+// COVERS FR-4.1, FR-4.1c | positive
 /// Every location a task can name is substituted, and each is its own place.
 ///
 /// The outermost run sits at the project root, so `{project_root}` is the base
@@ -1572,7 +1572,7 @@ fn every_location_is_a_template_variable() {
     );
 }
 
-// COVERS: FR-4.1a | positive
+// COVERS FR-4.1a | positive
 /// A command stands at the base.
 #[test]
 fn a_command_runs_at_the_base_directory() {
@@ -1595,7 +1595,7 @@ fn a_command_runs_at_the_base_directory() {
     );
 }
 
-// COVERS: FR-4.2a | edge
+// COVERS FR-4.2a | edge
 /// A command naming no path variable runs once, however many files there are.
 #[test]
 fn a_command_naming_no_path_variable_runs_once_over_many_files() {
@@ -1615,7 +1615,7 @@ fn a_command_naming_no_path_variable_runs_once_over_many_files() {
     assert!(stdout.contains("c.txt"), "the tree was not there: {stdout}");
 }
 
-// COVERS: FR-4.4a | edge
+// COVERS FR-4.4a | edge
 /// A task composing bolt obeys the empty-selection rule like any other.
 ///
 /// Its command is bolt, over a subproject that is not there. Required, it fails
@@ -1655,7 +1655,7 @@ fn a_composing_task_over_a_missing_subproject_matches_nothing() {
     assert_eq!(optional.executions, 1, "bolt was started over nothing");
 }
 
-// COVERS: FR-4.4d | negative
+// COVERS FR-4.4d | negative
 /// `optional` on a command with no selection is refused before anything runs.
 #[test]
 fn optional_without_a_path_variable_is_a_jig_error() {
@@ -1677,7 +1677,7 @@ fn optional_without_a_path_variable_is_a_jig_error() {
     }
 }
 
-// COVERS: FR-4.4f | edge
+// COVERS FR-4.4f | edge
 /// An empty selection is a verdict, so bolt still exits 0.
 #[test]
 fn an_empty_selection_leaves_the_exit_status_alone() {
@@ -1703,7 +1703,7 @@ fn an_empty_selection_leaves_the_exit_status_alone() {
     );
 }
 
-// COVERS: FR-4.7 | property
+// COVERS FR-4.7 | property
 /// Declaring the same tasks in the opposite order gives the same result.
 ///
 /// Both tasks fail with different messages, so the reasons have an order to get
@@ -1732,7 +1732,7 @@ fn task_order_does_not_change_the_result() {
     );
 }
 
-// COVERS: FR-4.16c | negative
+// COVERS FR-4.16c | negative
 /// A definitions value is a scalar, in a jig's block and in a file alike.
 #[test]
 fn a_definitions_value_that_is_not_a_scalar_is_refused() {
@@ -1766,7 +1766,7 @@ fn a_definitions_value_that_is_not_a_scalar_is_refused() {
     );
 }
 
-// COVERS: FR-4.17b | positive
+// COVERS FR-4.17b | positive
 /// A relative definitions value reaches above the base, because the command
 /// stands at the base.
 #[test]
@@ -1793,7 +1793,7 @@ fn a_relative_definition_resolves_against_the_base() {
 
 // ---- evidence ---------------------------------------------------------------
 
-// COVERS: FR-1.4, FR-9.2, FR-4.15 | positive
+// COVERS FR-1.4, FR-9.2, FR-4.15 | positive
 /// Each execution keeps its native results, including files the command wrote.
 ///
 /// Every kept file's contents are asserted. `is_file()` alone is satisfied by a
@@ -1846,7 +1846,7 @@ fn an_execution_keeps_its_native_results() {
     );
 }
 
-// COVERS: FR-7.5, FR-7.5a, FR-7.5b | property
+// COVERS FR-7.5, FR-7.5a, FR-7.5b | property
 /// Nothing bolt writes as a unit leaves a temporary behind.
 ///
 /// FR-7.5a writes to a temporary and renames, so a killed bolt leaves the file
@@ -1893,7 +1893,7 @@ fn a_written_file_leaves_no_temporary_beside_it() {
     );
 }
 
-// COVERS: FR-9.2b | property
+// COVERS FR-9.2b | property
 /// The ordinal is zero-padded to the width that task's execution count needs.
 #[test]
 fn the_ordinal_is_zero_padded_to_the_width_needed() {
@@ -1919,7 +1919,7 @@ fn the_ordinal_is_zero_padded_to_the_width_needed() {
     );
 }
 
-// COVERS: FR-9.2a | property
+// COVERS FR-9.2a | property
 /// Each task numbers its own executions from one, independently of the others.
 ///
 /// A unit test over the naming function cannot show this: it is handed an index
@@ -1964,7 +1964,7 @@ fn each_task_numbers_its_own_executions_from_one() {
     );
 }
 
-// COVERS: FR-9.5 | positive
+// COVERS FR-9.5 | positive
 /// The manifest records what `matching` selected and what `excluding` removed.
 ///
 /// The jig is valid: `matching` and `excluding` sit on a task that names a path
@@ -2027,7 +2027,7 @@ fn the_manifest_records_what_was_selected_and_removed() {
     );
 }
 
-// COVERS: FR-9.5a | positive
+// COVERS FR-9.5a | positive
 /// A manifest is written before its command runs.
 ///
 /// The command reads its own manifest, which is the only way this suite can
@@ -2058,7 +2058,7 @@ fn a_manifest_exists_before_the_command_runs() {
     );
 }
 
-// COVERS: FR-9.6 | negative
+// COVERS FR-9.6 | negative
 /// A task naming no path variable has a manifest claiming no paths.
 ///
 /// Recording one would say the command saw files it never received.
@@ -2108,7 +2108,7 @@ fn listing(root: &Path) -> Vec<String> {
     found
 }
 
-// COVERS: FR-9.1 | property
+// COVERS FR-9.1 | property
 /// Everything a run writes is inside its one run directory.
 #[test]
 fn a_runs_whole_output_is_one_directory() {
@@ -2139,7 +2139,7 @@ fn a_runs_whole_output_is_one_directory() {
     );
 }
 
-// COVERS: FR-9.2c, FR-9.2d | edge
+// COVERS FR-9.2c, FR-9.2d | edge
 /// An artifact is kept only where it was addressed, and one written at the base
 /// stays in the tree.
 #[test]
@@ -2168,7 +2168,7 @@ fn an_artifact_not_written_to_the_work_directory_stays_where_it_landed() {
     );
 }
 
-// COVERS: FR-9.3 | property
+// COVERS FR-9.3 | property
 /// One execution's directory holds what ran, what it said and how it ended.
 ///
 /// Copied somewhere else first, so nothing the assertions read can be reaching
@@ -2227,7 +2227,7 @@ fn one_executions_evidence_is_complete_in_its_directory() {
     ));
 }
 
-// COVERS: FR-9.4 | property
+// COVERS FR-9.4 | property
 /// Two runs over one tree name every file the same.
 #[test]
 fn two_runs_over_one_tree_line_up_file_for_file() {
@@ -2255,7 +2255,7 @@ fn two_runs_over_one_tree_line_up_file_for_file() {
     );
 }
 
-// COVERS: FR-9.5b | negative
+// COVERS FR-9.5b | negative
 /// A manifest is not touched once its command starts.
 ///
 /// The command copies its own manifest as it runs. After the run the manifest
@@ -2280,7 +2280,7 @@ fn a_manifest_holds_only_what_was_known_beforehand() {
     );
 }
 
-// COVERS: FR-9.5c | property
+// COVERS FR-9.5c | property
 /// The manifest names every variable the execution was given, the path
 /// variable included.
 #[test]
@@ -2334,7 +2334,7 @@ fn the_manifest_records_every_template_variable() {
     );
 }
 
-// COVERS: FR-9.5e | negative
+// COVERS FR-9.5e | negative
 /// The environment bolt ran in is not written into any manifest.
 #[test]
 fn the_environment_is_not_in_the_manifest() {
@@ -2366,7 +2366,7 @@ fn the_environment_is_not_in_the_manifest() {
     );
 }
 
-// COVERS: FR-9.8 | property
+// COVERS FR-9.8 | property
 /// Each per-path execution's manifest carries the whole matched list.
 #[test]
 fn every_per_path_manifest_carries_the_whole_selection() {
@@ -2394,7 +2394,7 @@ fn every_per_path_manifest_carries_the_whole_selection() {
     }
 }
 
-// COVERS: FR-9.9 | edge
+// COVERS FR-9.9 | edge
 /// A task that runs once still has an ordinal in its directory name.
 #[test]
 fn a_single_execution_still_carries_an_ordinal() {
@@ -2414,7 +2414,7 @@ fn a_single_execution_still_carries_an_ordinal() {
     );
 }
 
-// COVERS: FR-8.5 | property
+// COVERS FR-8.5 | property
 /// Each execution's envelope is still on disk, untouched, beside the result.
 #[test]
 fn constituent_envelopes_survive_the_merge() {
@@ -2450,7 +2450,7 @@ fn constituent_envelopes_survive_the_merge() {
 
 // ---- adapters and the merge -------------------------------------------------
 
-// COVERS: FR-6.9 | positive
+// COVERS FR-6.9 | positive
 /// A task naming no adapter gets the generic exit-code adapter.
 ///
 /// The commands are `exit 0` and `exit 3`, not `true` and `false`, so no
@@ -2488,7 +2488,7 @@ fn a_task_naming_no_adapter_gets_the_exit_code_one() {
     );
 }
 
-// COVERS: FR-8.1 | property
+// COVERS FR-8.1 | property
 /// The merge folds every envelope into one result, repeatably.
 ///
 /// Repeatability is asserted on the file's bytes, not on one field. A merge that
@@ -2522,7 +2522,7 @@ fn the_merge_folds_every_envelope_repeatably() {
     );
 }
 
-// COVERS: FR-8.3 | property
+// COVERS FR-8.3 | property
 /// The merged result passes only when every constituent passes.
 ///
 /// Both directions. Without the passing case, a merge hardcoding failure is
@@ -2578,7 +2578,7 @@ fn the_merge_passes_only_when_every_constituent_passes() {
     }
 }
 
-// COVERS: FR-6.7 | property
+// COVERS FR-6.7 | property
 /// Every shape of merged result validates against the envelope schema.
 ///
 /// All passing, a mix, a constituent whose adapter wrote nothing, an empty
@@ -2622,7 +2622,7 @@ fn every_merged_result_validates() {
     }
 }
 
-// COVERS: FR-8.3a | negative
+// COVERS FR-8.3a | negative
 /// A merge finding no constituent fails, with a reason saying so.
 ///
 /// FR-8.3 alone would pass it: every constituent passing holds when there are
@@ -2647,7 +2647,7 @@ fn a_merge_finding_no_constituent_fails() {
 
 // ---- refusals write a result, and never over somebody else's ----------------
 
-// COVERS: FR-10.7, FR-2.5a | positive
+// COVERS FR-10.7, FR-2.5a | positive
 /// A refusal writes a `result.yaml` in the shape every refusal takes.
 ///
 /// FR-10.7 has bolt write one whenever it is alive and in control when it
@@ -2735,7 +2735,7 @@ fn assert_refusal_shape(result: &Path, kind: &str, says: &str) {
     );
 }
 
-// COVERS: FR-10.7a | edge
+// COVERS FR-10.7a | edge
 /// The refusal that writes nothing is the base not being there, and it says so.
 ///
 /// FR-10.7a: the default output directory sits inside the base, so writing the
@@ -2770,7 +2770,7 @@ fn the_missing_base_refusal_writes_nothing_and_says_so() {
     );
 }
 
-// COVERS: FR-10.7, FR-10.7a, FR-2.6b | regression
+// COVERS FR-10.7, FR-10.7a, FR-2.6b | regression
 /// Refusing a directory as unusable does not write into it.
 ///
 /// FR-10.7 can be satisfied without this guarantee, which is why it is asserted
@@ -2812,7 +2812,7 @@ fn a_refusal_does_not_write_into_the_directory_it_refused() {
 
 // ---- the merge carries its constituents up --------------------------------
 
-// COVERS: FR-8.4 | positive
+// COVERS FR-8.4 | positive
 /// The merged result carries the reasons its constituents produced.
 ///
 /// FR-8.4 wants what failed and why readable from the merged file alone.
@@ -2881,7 +2881,7 @@ fn the_merge_carries_its_constituents_reasons() {
 
 // ---- paths, and what the merge says a result rests on ----------------------
 
-// COVERS: FR-2.4 | positive
+// COVERS FR-2.4 | positive
 /// Paths are resolved to absolute before anything runs.
 ///
 /// Driven through the built binary with a relative base, because that is the
@@ -2956,7 +2956,7 @@ fn paths_are_resolved_to_absolute_before_anything_runs() {
     }
 }
 
-// COVERS: FR-8.2, FR-8.2a, FR-8.8 | positive
+// COVERS FR-8.2, FR-8.2a, FR-8.8 | positive
 /// Evidence is a mapping keyed by execution, each entry carrying args and result.
 ///
 /// FR-8.2 wants the merge to rewrite `evidence` from a list of paths into a
@@ -3037,7 +3037,7 @@ fn write_adapter(root: &Path, name: &str, body: &str) {
     fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).expect("executable");
 }
 
-// COVERS: FR-6.1, FR-6.4, FR-6.10, FR-6.12 | positive
+// COVERS FR-6.1, FR-6.4, FR-6.10, FR-6.12 | positive
 /// An adapter's verdict is the verdict, whatever the exit status said.
 ///
 /// FR-6.1: where an adapter reached an authoritative result, that result is the
@@ -3099,7 +3099,7 @@ fn an_adapters_verdict_is_the_verdict() {
     );
 }
 
-// COVERS: FR-6.2, FR-6.2a, FR-6.2c, FR-6.3 | positive
+// COVERS FR-6.2, FR-6.2a, FR-6.2c, FR-6.3 | positive
 /// The default invocation names the captures, the locations and the evidence.
 ///
 /// FR-6.2 fixes the flags. FR-6.2a hands over the same locations every task
@@ -3165,7 +3165,7 @@ fn the_default_invocation_names_the_captures_and_only_declared_evidence() {
     );
 }
 
-// COVERS: FR-6.2b, FR-6.2d, FR-6.2e | positive
+// COVERS FR-6.2b, FR-6.2d, FR-6.2e | positive
 /// An explicit invocation gets the same substitutions and the same envelope path.
 ///
 /// FR-6.2d: two spellings of a substitution would make the jig format teach
@@ -3205,7 +3205,7 @@ fn an_explicit_adapter_invocation_is_substituted_like_a_command() {
     );
 }
 
-// COVERS: FR-6.1a, FR-6.11, FR-7.6, FR-7.9 | negative
+// COVERS FR-6.1a, FR-6.11, FR-7.6, FR-7.9 | negative
 /// Each of the three broken-adapter cases gets its own kind.
 ///
 /// FR-6.11 keeps them apart because they have different causes: a crashing
@@ -3260,7 +3260,7 @@ fn each_broken_adapter_case_has_its_own_kind() {
     }
 }
 
-// COVERS: FR-7.1, FR-7.7, FR-6.7a | property
+// COVERS FR-7.1, FR-7.7, FR-6.7a | property
 /// What makes an adapter's envelope valid, checked on the way in.
 ///
 /// `success` alone is a complete envelope, and a failure needs reasons each
@@ -3325,7 +3325,7 @@ fn an_adapters_envelope_is_valid_by_the_schema_alone() {
     }
 }
 
-// COVERS: FR-7.3 | positive
+// COVERS FR-7.3 | positive
 /// `metadata` carrying `statistics` and `evidence` is accepted, and so is its
 /// absence.
 #[test]
@@ -3364,7 +3364,7 @@ fn metadata_is_optional_and_carries_statistics_and_evidence() {
     );
 }
 
-// COVERS: FR-7.3a | negative
+// COVERS FR-7.3a | negative
 /// The default envelope carries no exit status; the `exitcode` file does.
 #[test]
 fn the_exit_status_is_not_in_the_envelope_by_default() {
@@ -3395,7 +3395,7 @@ fn the_exit_status_is_not_in_the_envelope_by_default() {
     );
 }
 
-// COVERS: FR-7.3c | negative
+// COVERS FR-7.3c | negative
 /// No envelope or result bolt writes carries a timing.
 #[test]
 fn nothing_bolt_writes_carries_a_timing() {
@@ -3431,7 +3431,7 @@ fn nothing_bolt_writes_carries_a_timing() {
     }
 }
 
-// COVERS: FR-6.11 | regression
+// COVERS FR-6.11 | regression
 /// A silent adapter does not inherit an earlier fold's envelope.
 ///
 /// Carried over from the Go build, where the case first showed up. An
@@ -3480,7 +3480,7 @@ fn a_silent_adapter_does_not_inherit_an_envelope_it_did_not_write() {
     );
 }
 
-// COVERS: FR-6.14, FR-7.8 | negative
+// COVERS FR-6.14, FR-7.8 | negative
 /// A declared evidence file that was not produced fails the task, naming it.
 ///
 /// FR-6.2c's refusal to discover means nothing else notices: a task declaring
@@ -3521,7 +3521,7 @@ fn declared_evidence_that_was_not_produced_fails_the_task() {
     );
 }
 
-// COVERS: FR-6.14, FR-6.9, FR-7.2 | regression
+// COVERS FR-6.14, FR-6.9, FR-7.2 | regression
 /// Missing evidence and a non-zero exit are two reasons, not one.
 ///
 /// The evidence check returns before the exit-code path, so the status is easy
@@ -3564,7 +3564,7 @@ fn missing_evidence_carries_the_exit_status_beside_it() {
     );
 }
 
-// COVERS: FR-6.6, FR-6.13 | property
+// COVERS FR-6.6, FR-6.13 | property
 /// Re-folding a finished run costs no re-execution.
 ///
 /// FR-6.6: every input an adapter reads is already on disk, so fixing an adapter
@@ -3595,7 +3595,7 @@ fn refolding_a_finished_run_costs_no_re_execution() {
     );
 }
 
-// COVERS: FR-7.10 | property
+// COVERS FR-7.10 | property
 /// A task that could not execute is distinguishable in the merged result.
 ///
 /// FR-7.10 is about the merged file, not the per-execution envelope: the kind
@@ -3652,7 +3652,7 @@ fn a_task_that_could_not_execute_is_distinguishable_in_the_merged_result() {
 
 // ---- requires, and stopping when a jig asks ---------------------------------
 
-// COVERS: FR-3.10, FR-3.10b, FR-3.10d | negative
+// COVERS FR-3.10, FR-3.10b, FR-3.10d | negative
 /// A jig requiring a tool that is not there refuses before anything executes.
 ///
 /// FR-3.10b: an incomplete toolchain is known before a gate starts, not partway
@@ -3704,7 +3704,7 @@ fn a_jig_requiring_a_missing_tool_refuses_before_executing() {
     assert!(!ran, "a task executed before the missing tool was found");
 }
 
-// COVERS: FR-3.10a | negative
+// COVERS FR-3.10a | negative
 /// Every missing entry is named, not the first.
 ///
 /// A caller fixing them one at a time pays a round trip per tool, which is the
@@ -3739,7 +3739,7 @@ fn a_refusal_names_every_missing_tool() {
     );
 }
 
-// COVERS: FR-3.10 | positive
+// COVERS FR-3.10 | positive
 /// A jig whose `requires` are all present runs as before.
 #[test]
 fn a_jig_requiring_only_present_tools_runs() {
@@ -3758,7 +3758,7 @@ fn a_jig_requiring_only_present_tools_runs() {
     assert!(outcome.success, "the run did not pass");
 }
 
-// COVERS: FR-4.8 | positive
+// COVERS FR-4.8 | positive
 /// A failing task does not stop the run.
 ///
 /// FR-4.8 is the default and the reason for it: a run that stops early throws
@@ -3793,7 +3793,7 @@ fn a_failing_task_does_not_stop_the_run() {
     );
 }
 
-// COVERS: FR-4.9 | positive
+// COVERS FR-4.9 | positive
 /// A task carrying `short-circuit-failure` stops the run when it fails.
 ///
 /// Stopping is something a jig asks for; no jig gets it by default. The tasks
@@ -3828,7 +3828,7 @@ fn short_circuit_failure_stops_the_run_and_says_what_was_not_reached() {
     );
 }
 
-// COVERS: FR-4.9 | edge
+// COVERS FR-4.9 | edge
 /// `short-circuit-failure` on a task that passes stops nothing.
 ///
 /// The field asks for stopping *on failure*, so a run where the carrying task
@@ -3862,7 +3862,7 @@ fn short_circuit_failure_stops_nothing_when_the_task_passes() {
     );
 }
 
-// COVERS: FR-4.10, FR-4.10a, FR-4.10b, FR-3.10c | negative
+// COVERS FR-4.10, FR-4.10a, FR-4.10b, FR-3.10c | negative
 /// A command invoking an undeclared tool fails its task, and the run carries on.
 ///
 /// FR-3.10c keeps FR-3.10b narrow: checking `requires` up front is a guarantee
@@ -3917,7 +3917,7 @@ fn a_command_that_cannot_start_fails_its_task_and_the_run_carries_on() {
 
 // ---- the output directory ---------------------------------------------------
 
-// COVERS: FR-2.6, FR-2.6a | positive
+// COVERS FR-2.6, FR-2.6a | positive
 /// `--output-dir` names where a run writes, and is created with its parents.
 ///
 /// FR-2.6a: a graph node's `.ephemera/` may not exist yet, and making the caller
@@ -3952,7 +3952,7 @@ fn a_named_output_directory_is_created_with_its_parents() {
     );
 }
 
-// COVERS: FR-2.6c, FR-2.6d | positive
+// COVERS FR-2.6c, FR-2.6d | positive
 /// Given no `--output-dir`, a run writes `.bolt-<iso8601>` at its base.
 ///
 /// FR-2.6d wants the filesystem-safe spelling: hyphens where the strict form
@@ -3994,7 +3994,7 @@ fn the_default_output_directory_is_a_filesystem_safe_stamp_at_the_base() {
     );
 }
 
-// COVERS: FR-2.6e | regression
+// COVERS FR-2.6e | regression
 /// The default run directory ends in the process id of the run that wrote it.
 ///
 /// The stamp is second-granular, so without the id two invocations starting in
@@ -4060,7 +4060,7 @@ fn run_the_binary(base: &Path) -> (String, u32) {
     (directory, pid)
 }
 
-// COVERS: FR-2.6b | negative
+// COVERS FR-2.6b | negative
 /// A named output directory that already holds a run is refused.
 ///
 /// FR-2.6b: writing into one interleaves two runs' evidence, and FR-2.2c's
@@ -4090,7 +4090,7 @@ fn a_named_output_directory_holding_a_run_is_refused() {
     );
 }
 
-// COVERS: FR-2.2c | property
+// COVERS FR-2.2c | property
 /// A run never walks its own output directory, whatever it was named.
 ///
 /// Knowable because the run created it. The default `.bolt-<iso8601>` is hidden
@@ -4143,7 +4143,7 @@ fn a_run_does_not_walk_its_own_output_directory() {
     );
 }
 
-// COVERS: FR-8.9 | positive
+// COVERS FR-8.9 | positive
 /// `result.yaml` records the base the run was pointed at.
 ///
 /// FR-8.9: it is the first thing a reader asks of a result, and FR-9.5c's
@@ -4179,7 +4179,7 @@ fn the_result_records_the_base_the_run_was_pointed_at() {
     );
 }
 
-// COVERS: FR-10.7b, FR-10.3, FR-10.4 | edge
+// COVERS FR-10.7b, FR-10.3, FR-10.4 | edge
 /// Naming an output directory outside the tree gets a result for every refusal.
 ///
 /// FR-10.7a exempts the missing base only while the result would land inside
@@ -4221,7 +4221,7 @@ fn a_named_directory_outside_the_base_gets_a_result_for_a_missing_base() {
     assert_refusal_shape(&result, "base-missing", "not there");
 }
 
-// COVERS: FR-10.6 | edge
+// COVERS FR-10.6 | edge
 /// A bolt killed by a signal dies of the signal instead of choosing a status.
 ///
 /// FR-10.6 is the one case where bolt does not pick its own exit status: the
@@ -4340,7 +4340,7 @@ fn run_into(jig: &str, base: &Path, output_dir: &Path) -> Result<bolt::Outcome, 
     .map_err(bolt::Error::from)
 }
 
-// COVERS: FR-3.15, FR-4.16 | positive
+// COVERS FR-3.15, FR-4.16 | positive
 /// A jig's `definitions` block supplies its own placeholders.
 ///
 /// FR-4.16 builds one mapping in three layers. This is the middle one on its
@@ -4379,7 +4379,7 @@ fn a_jigs_definitions_block_supplies_its_placeholders() {
     );
 }
 
-// COVERS: FR-4.16a, FR-4.16b, FR-4.17 | positive
+// COVERS FR-4.16a, FR-4.16b, FR-4.17 | positive
 /// A definitions file merges over the jig's block, key by key.
 ///
 /// FR-4.17 is successive replacement: the file replaces the keys it names and
@@ -4423,7 +4423,7 @@ fn a_definitions_file_replaces_only_the_keys_it_names() {
     );
 }
 
-// COVERS: FR-9.5g | positive
+// COVERS FR-9.5g | positive
 /// The manifest says which layer supplied each value.
 ///
 /// FR-9.5g: the same key means different things depending on which file won,
@@ -4474,7 +4474,7 @@ fn the_manifest_records_which_layer_supplied_each_value() {
     );
 }
 
-// COVERS: FR-4.19, FR-4.16d | negative
+// COVERS FR-4.19, FR-4.16d | negative
 /// A jig or a file naming a reserved variable refuses the run.
 ///
 /// FR-4.19: `{base_dir}` redefined would substitute something other than where
@@ -4519,7 +4519,7 @@ fn a_definition_naming_a_reserved_variable_is_refused() {
     );
 }
 
-// COVERS: FR-4.18b | edge
+// COVERS FR-4.18b | edge
 /// A definition holding an empty value is defined.
 ///
 /// FR-4.18 refuses a placeholder no layer holds at all, which is a different
@@ -4542,7 +4542,7 @@ fn a_definition_holding_an_empty_value_is_defined() {
     assert!(outcome.success, "the run did not pass");
 }
 
-// COVERS: FR-4.17a, FR-4.17c | property
+// COVERS FR-4.17a, FR-4.17c | property
 /// A definition's value is a literal and is never re-read as a template.
 ///
 /// FR-4.17a settles every value on reading the file. FR-4.17c is what rests on
@@ -4591,7 +4591,7 @@ fn a_definition_value_is_a_literal_and_is_not_re_expanded() {
     );
 }
 
-// COVERS: FR-4.20 | negative
+// COVERS FR-4.20 | negative
 /// A definitions file that will not validate refuses, and is not taken as absent.
 ///
 /// FR-4.20: schema-validated under FR-1.5 like everything else bolt reads as
@@ -4629,7 +4629,7 @@ fn a_definitions_file_that_will_not_validate_is_refused() {
     );
 }
 
-// COVERS: FR-4.18a | negative
+// COVERS FR-4.18a | negative
 /// An unknown placeholder refuses before any task executes.
 ///
 /// FR-4.18a puts the check where `requires` is, under FR-3.10b, so a jig run
@@ -4740,7 +4740,7 @@ fn executed_anything(base: &Path) -> bool {
         })
 }
 
-// COVERS: FR-4.11 | positive
+// COVERS FR-4.11 | positive
 /// Both limits are options, so a jig setting neither lets a tool finish.
 ///
 /// The command sleeps for longer than every limit this file sets, so a bolt that
@@ -4767,7 +4767,7 @@ fn a_jig_setting_no_limit_lets_a_slow_command_finish() {
     );
 }
 
-// COVERS: FR-4.11a, FR-4.11b, FR-4.12f, FR-6.9a | property
+// COVERS FR-4.11a, FR-4.11b, FR-4.12f, FR-6.9a | property
 /// A task's limit covers all of its executions taken together.
 ///
 /// Each command finishes well inside the limit and the task still runs out,
@@ -4836,7 +4836,7 @@ fn a_tasks_limit_covers_all_its_executions_together() {
     );
 }
 
-// COVERS: FR-4.13, FR-4.14a | edge
+// COVERS FR-4.13, FR-4.14a | edge
 /// A run whose budget is gone before it starts runs nothing, and says so.
 ///
 /// A limit of `0s` puts the deadline in the past at the first check, which is
@@ -4896,7 +4896,7 @@ fn a_run_with_no_budget_left_executes_nothing_and_still_writes_a_result() {
     );
 }
 
-// COVERS: FR-4.11c, FR-4.12a, FR-4.12b, FR-7.5c | positive
+// COVERS FR-4.11c, FR-4.12a, FR-4.12b, FR-7.5c | positive
 /// The adapter runs after the limit fired, over what the command had gathered.
 ///
 /// FR-4.11c: the limit governs commands, and the adapter is what records that it
@@ -4955,7 +4955,7 @@ fn a_killed_command_keeps_its_output_and_its_adapter_still_runs() {
     );
 }
 
-// COVERS: FR-4.12, FR-4.11d | negative
+// COVERS FR-4.12, FR-4.11d | negative
 /// A task that passes its limit fails, and the run carries on past it.
 ///
 /// FR-4.8's rule holds for a slow task exactly as it does for a failing one: the
@@ -5011,7 +5011,7 @@ fn a_slow_task_fails_and_the_run_carries_on() {
     );
 }
 
-// COVERS: FR-4.12c, FR-4.12d | edge
+// COVERS FR-4.12c, FR-4.12d | edge
 /// Where the run's limit catches the adapter, bolt writes that envelope itself.
 ///
 /// FR-4.11c keeps a task's limit off its adapter; the run's is the one that can
@@ -5054,7 +5054,7 @@ fn the_runs_limit_catching_an_adapter_leaves_bolt_to_write_the_envelope() {
     );
 }
 
-// COVERS: FR-4.13, FR-4.14, FR-4.14a, FR-4.11d | negative
+// COVERS FR-4.13, FR-4.14, FR-4.14a, FR-4.11d | negative
 /// A run that passes its limit fails, and still writes what it managed.
 ///
 /// FR-4.14a is the half that most needs asserting: the task that finished before
@@ -5112,7 +5112,7 @@ fn a_run_that_times_out_writes_a_result_carrying_what_completed() {
     );
 }
 
-// COVERS: FR-4.12e | regression
+// COVERS FR-4.12e | regression
 /// A killed command takes the children it spawned with it.
 ///
 /// The command backgrounds a loop appending to a file every twenty milliseconds
@@ -5197,7 +5197,7 @@ fn members_of_group(group: &str) -> Vec<String> {
         .collect()
 }
 
-// COVERS: FR-4.11e | negative
+// COVERS FR-4.11e | negative
 /// A limit that is not a duration refuses the run before anything executes.
 ///
 /// Declared on the second task, so a bolt reading limits as it reached them
@@ -5274,7 +5274,7 @@ fn a_time_limit_that_is_not_a_duration_refuses_the_run() {
     );
 }
 
-// COVERS: FR-4.11e | property
+// COVERS FR-4.11e | property
 /// A limit is a decimal followed by `s`, `m` or `h`, and nothing else is one.
 ///
 /// The rejections are what this tests. `f64` parsing on its own takes `1e3`, `+5`,
@@ -5315,7 +5315,7 @@ fn a_time_limit_is_a_decimal_and_a_unit() {
     }
 }
 
-// COVERS: FR-4.11f | property
+// COVERS FR-4.11f | property
 /// A task's limit is wall clock from when the task started.
 ///
 /// So the adapters between its executions spend it, even though FR-4.11c keeps
@@ -5373,7 +5373,7 @@ fn a_tasks_limit_is_wall_clock_and_its_adapters_spend_it() {
     );
 }
 
-// COVERS: FR-4.12d | property
+// COVERS FR-4.12d | property
 /// Every timed-out execution has a valid envelope, however the limit caught it.
 ///
 /// Two shapes in one run: an execution killed mid-command, and one that never
@@ -5440,7 +5440,7 @@ fn write_recursing_jig(root: &Path, name: &str, next: &str) {
     );
 }
 
-// COVERS: FR-5.6, FR-5.7, FR-5.7b, FR-5.8 | negative
+// COVERS FR-5.6, FR-5.7, FR-5.7b, FR-5.8 | negative
 /// Bolt inside bolt is stopped at the ceiling, and the refusal writes a result.
 ///
 /// A chain of bolts, each running the next, until one is past the ceiling. It
@@ -5516,7 +5516,7 @@ fn bolt_inside_bolt_is_stopped_at_the_ceiling() {
     );
 }
 
-// COVERS: FR-5.7a, FR-5.7c | edge
+// COVERS FR-5.7a, FR-5.7c | edge
 /// The ceiling is a guard against accident, and the row says so.
 ///
 /// A command can unset the variable and be believed outermost. Asserted, not
@@ -5582,7 +5582,7 @@ fn unsetting_the_depth_is_believed_because_the_guard_is_against_accident() {
     );
 }
 
-// COVERS: FR-5.6a | positive
+// COVERS FR-5.6a | positive
 /// The depth reaches every process bolt spawns, under the agreed names.
 ///
 /// Not only the ones that are bolt. FR-5.6 says every process, which is what
@@ -5619,7 +5619,7 @@ fn every_spawned_process_is_told_the_depth() {
 
 // ---- the jig task, and where jigs are found ---------------------------------
 
-// COVERS: FR-2.8 | positive
+// COVERS FR-2.8 | positive
 /// A config directory says where jigs are found, so nothing has to infer it.
 ///
 /// Asserted with the jig in a tree the run never touches, so a bolt still
@@ -5729,7 +5729,7 @@ fn composing_tree() -> TempDir {
     root
 }
 
-// COVERS: FR-5.1a, FR-5.1b | property
+// COVERS FR-5.1a, FR-5.1b | property
 /// The same jig on the same directory reaches the same verdict, composed or by
 /// hand.
 ///
@@ -5767,7 +5767,7 @@ fn a_jig_run_by_hand_reaches_what_composition_reached() {
     );
 }
 
-// COVERS: FR-5.9 | property
+// COVERS FR-5.9 | property
 /// A child's paths are absolute even when its parent wrote them relative.
 ///
 /// The parent's command hands the child a relative base, config directory and
@@ -5832,7 +5832,7 @@ fn a_childs_paths_are_absolute_whatever_its_parent_wrote() {
     }
 }
 
-// COVERS: FR-5.18, FR-5.19, FR-5.20 | positive
+// COVERS FR-5.18, FR-5.19, FR-5.20 | positive
 /// Bolt composes with itself as a command, and the child's verdict folds in.
 ///
 /// This is the whole of composition. A task runs `bolt` the way it runs any
@@ -5889,7 +5889,7 @@ fn bolt_composes_as_a_command_and_the_childs_verdict_folds_in() {
     );
 }
 
-// COVERS: FR-10.3a | negative
+// COVERS FR-10.3a | negative
 /// A refusal prints where it recorded itself, on stdout, like any other run.
 ///
 /// FR-10.3 tells a caller where to read the verdict, not what it says, and
@@ -5944,7 +5944,7 @@ fn exiting_tree(code: u8) -> TempDir {
     root
 }
 
-// COVERS: FR-10.8, FR-10.8b, FR-10.8e | positive
+// COVERS FR-10.8, FR-10.8b, FR-10.8e | positive
 /// The envelope becomes the exit code only when the flag asks, and the result
 /// line is printed either way.
 ///
@@ -6003,7 +6003,7 @@ fn the_envelope_becomes_the_exit_code_only_when_asked() {
     );
 }
 
-// COVERS: FR-10.8b | positive
+// COVERS FR-10.8b | positive
 /// A passing run under the flag is 0, which is the half that makes 1 mean
 /// something.
 ///
@@ -6031,7 +6031,7 @@ fn a_passing_run_under_the_flag_is_zero() {
     );
 }
 
-// COVERS: FR-10.8c, FR-10.8d | negative
+// COVERS FR-10.8c, FR-10.8d | negative
 /// A refusal under the flag is 1, the same as without it, because a refusal is
 /// a verdict.
 ///
@@ -6100,7 +6100,7 @@ fn a_refusal_under_the_flag_is_still_one() {
     );
 }
 
-// COVERS: FR-10.9, FR-10.9a, FR-10.9b | property
+// COVERS FR-10.9, FR-10.9a, FR-10.9b | property
 /// Four refusals with four different fixes carry four different kinds.
 ///
 /// The claim is that they differ, so the test is that they differ, not that
@@ -6167,7 +6167,7 @@ fn refusals_that_need_different_fixes_carry_different_kinds() {
     );
 }
 
-// COVERS: FR-10.9c, FR-10.7c | edge
+// COVERS FR-10.9c, FR-10.7c | edge
 /// A reused output directory writes no kind, and the file already there is not
 /// its refusal.
 ///
@@ -6229,7 +6229,7 @@ fn repository() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
 }
 
-// COVERS: NFR-12.3 | property
+// COVERS NFR-12.3 | property
 /// Every place that names bolt's licence names the same one.
 ///
 /// The assertion is agreement, not a value. Four files state the licence and
@@ -6291,7 +6291,7 @@ fn every_statement_of_the_licence_agrees() {
     }
 }
 
-// COVERS: NFR-12.1 | positive
+// COVERS NFR-12.1 | positive
 /// Bolt runs over its own repository and walks it the way its gate does.
 ///
 /// The gate's jigs are toolbox's and not in this tree, so the jig here is a
@@ -6329,7 +6329,7 @@ fn bolt_runs_over_its_own_repository() {
     );
 }
 
-// COVERS: NFR-12.4 | property
+// COVERS NFR-12.4 | property
 /// Nothing compiles C, and the binary links only the system C runtime.
 ///
 /// `cc` is how a Rust build compiles C, so its absence from the lockfile is the
@@ -6359,7 +6359,7 @@ fn bolt_builds_without_a_c_toolchain() {
     assert_eq!(libraries, ["libc", "libgcc_s", "libm"], "linked against");
 }
 
-// COVERS: FR-11.1 | property
+// COVERS FR-11.1 | property
 /// A run needs the jig, the directory and nothing else from the machine.
 ///
 /// No environment beyond a `PATH` for the shell, started from an unrelated
@@ -6397,7 +6397,7 @@ fn a_run_needs_only_the_jig_and_the_directory() {
     );
 }
 
-// COVERS: FR-11.3 | positive
+// COVERS FR-11.3 | positive
 /// One jig runs against a throwaway copy of the tree with a change in it, and
 /// the two runs differ only where the trees did.
 #[test]
@@ -6427,7 +6427,7 @@ fn the_same_jig_runs_against_a_throwaway_copy() {
     );
 }
 
-// COVERS: FR-13.7 | positive
+// COVERS FR-13.7 | positive
 /// A commit SHA handed in through a definitions file is in every manifest,
 /// marked as the file's.
 ///
@@ -6458,7 +6458,7 @@ fn a_commit_sha_from_the_caller_reaches_the_manifest() {
     );
 }
 
-// COVERS: FR-4.12 | property
+// COVERS FR-4.12 | property
 /// The deadline arithmetic, which every timed task depends on and no other test reaches.
 ///
 /// These are three pure functions and the run path exercises them only through a
@@ -6512,7 +6512,7 @@ fn a_deadline_is_the_soonest_of_the_limits_that_are_set() {
     assert!(bolt::limit::passed(Some(soon), later));
 }
 
-// COVERS: FR-10.9c | edge
+// COVERS FR-10.9c | edge
 /// The one refusal bolt names and never writes.
 ///
 /// `OutputDirectoryInUse` is documented in `src/error.rs` as "named for

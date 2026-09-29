@@ -21,7 +21,7 @@ is expected there and nowhere else. `CONTRIBUTING.md` has the rest.
 
 New behaviour needs a row in `REQUIREMENTS.md` and a test citing it:
 
-    // COVERS: FR-4.11a | property
+    // COVERS FR-4.11a | property
 
-Retiring a row means moving it to `## Retired` and fixing every `COVERS:` mark
+Retiring a row means moving it to `## Retired` and fixing every `COVERS` mark
 that cites it, in this change rather than a later one.
