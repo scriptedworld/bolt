@@ -51,9 +51,8 @@ pub enum Error {
 
     /// A command names a placeholder no layer supplies.
     ///
-    /// FR-4.18 refuses before anything executes, with a reason naming it.
-    /// Substituting nothing and handing `{requirements}` to a shell is what the
-    /// row exists to prevent.
+    /// FR-4.18 refuses before anything executes, with a reason naming it, so
+    /// `{requirements}` never reaches a shell unsubstituted.
     UnknownPlaceholder {
         /// The task whose command names it.
         task: String,

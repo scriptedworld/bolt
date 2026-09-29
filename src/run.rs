@@ -316,8 +316,8 @@ pub fn invoke(invocation: &Invocation) -> Result<Outcome, Refusal> {
 /// happen after the base is canonical: the default is derived from the base,
 /// and a named one is resolved against the working directory like any path on a
 /// command line. `.bolt-<iso8601>` at a relative base would otherwise be
-/// recorded as `./.bolt-…`, which is the defect FR-2.4 exists to prevent one
-/// level up.
+/// recorded as `./.bolt-…`, the same relative path FR-2.4 rules out for the
+/// base.
 ///
 /// # Errors
 ///

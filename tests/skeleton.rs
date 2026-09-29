@@ -1393,7 +1393,7 @@ fn a_refusal_writes_a_result() {
 /// the same three assertions and differ only in which refusal produced the file
 /// and therefore in what it should say.
 ///
-/// `kind` is a parameter, not a constant, which is the point of FR-10.9. With
+/// `kind` is a parameter because FR-10.9 gives each refusal its own. With
 /// `bolt-refused` for every refusal, a helper asserting one string whatever
 /// produced the file could not notice two situations sharing one name.
 fn assert_refusal_shape(result: &Path, kind: &str, says: &str) {
@@ -3749,7 +3749,7 @@ fn a_time_limit_that_is_not_a_duration_refuses_the_run() {
 // COVERS: FR-4.11e | property
 /// A limit is a decimal followed by `s`, `m` or `h`, and nothing else is one.
 ///
-/// The rejected column is the point. `f64` parsing on its own takes `1e3`, `+5`,
+/// The rejections are what this tests. `f64` parsing on its own takes `1e3`, `+5`,
 /// `inf` and `NaN`, none of which anybody writes in a jig on purpose, and
 /// accepting them would make the grammar something a second implementation has
 /// to discover instead of read.
@@ -4442,12 +4442,11 @@ fn a_passing_run_under_the_flag_is_zero() {
 /// A refusal under the flag is 1, the same as without it, because a refusal is
 /// a verdict.
 ///
-/// **This is the row a later reader is most likely to undo**, and the wrong
-/// answer is the attractive one. Bolt writes `kind: bolt-refused` alongside
-/// `success: false`, so reading the kind and reporting "no check ran, so nothing
-/// was found wrong" as a third status looks like extra care. The envelope
-/// schema calls `success` the authoritative verdict, though, and overruling it
-/// with a neighbouring field is exactly the drift wrench exists to prevent.
+/// This row is the one most likely to be undone, because the wrong answer is
+/// attractive. Bolt writes `kind: bolt-refused` alongside `success: false`, so
+/// reading the kind and reporting "no check ran, so nothing was found wrong" as
+/// a third status looks like extra care. The envelope schema calls `success` the
+/// authoritative verdict, though, and a neighbouring field does not overrule it.
 ///
 /// The deeper reason there is no third status is that there is no third state.
 /// A task set always resolves. A task that matched nothing and was declared
@@ -4586,8 +4585,7 @@ fn refusals_that_need_different_fixes_carry_different_kinds() {
 /// performs, measured there by checksum, so this test is what such a change has
 /// to get past.
 ///
-/// **This is the limit on reading a refusal's kind, and it looks like the
-/// opposite.** FR-2.6b returns before writing, because the directory holds a
+/// Here a refusal's kind cannot be read at all. FR-2.6b returns before writing, because the directory holds a
 /// completed run and a refusal put there would replace a verdict. So a caller
 /// testing whether a `result.yaml` exists gets `true` about the previous run,
 /// and one reading its `success` gets that run's answer.
@@ -4712,8 +4710,7 @@ fn every_statement_of_the_licence_agrees() {
 /// `soonest` taking a set deadline over none is the arm that most needs a test.
 /// A run's budget and a task's own limit are each optional, and the wrong fold
 /// there (`None` winning, or the later of the two) is a limit that silently
-/// does not bind. That is the failure a time limit exists to prevent, and
-/// nothing would report it.
+/// does not bind, and nothing would report it.
 #[test]
 fn a_deadline_is_the_soonest_of_the_limits_that_are_set() {
     let now = Instant::now();
