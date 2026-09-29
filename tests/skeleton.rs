@@ -704,6 +704,290 @@ fn a_missing_base_is_refused_and_nothing_is_created() {
     );
 }
 
+// ---- jigs and tasks ---------------------------------------------------------
+
+// COVERS: FR-3.2 | positive
+/// A task using every field it may declare loads and runs as each one says.
+///
+/// The adapter passes only if the evidence file lists the kept path and not the
+/// excluded one, so `matching`, `excluding`, `evidence` and `adapter` each have
+/// to have done their part for the task to pass.
+#[test]
+fn a_task_using_every_field_at_once_runs() {
+    let root = tree();
+    write(root.path(), "keep.txt", "k");
+    write(root.path(), "skip.txt", "s");
+    write_adapter(
+        root.path(),
+        "listed",
+        concat!(
+            "for a in \"$@\"; do case $prev in --work-dir) w=$a;; esac; prev=$a; done\n",
+            "if grep -q keep.txt \"$w/list.txt\" && ! grep -q skip.txt \"$w/list.txt\"; then\n",
+            "  printf '\"success\": true\\n' > \"$w/output.yaml\"\n",
+            "else\n",
+            "  printf '\"success\": false\\n\"reasons\":\\n  - \"kind\": \"wrong-list\"\\n    \"message\": \"x\"\\n' > \"$w/output.yaml\"\n",
+            "fi\n",
+        ),
+    );
+    write_jig(
+        root.path(),
+        "full",
+        concat!(
+            "  - name: full\n",
+            "    description: every field a task may declare\n",
+            "    command: \"sh -c 'echo \\\"$@\\\" > {work_dir}/list.txt' sh {all_paths}\"\n",
+            "    matching: [\"*.txt\"]\n",
+            "    excluding: [\"skip.txt\"]\n",
+            "    adapter: listed\n",
+            "    evidence: [\"list.txt\"]\n",
+            "    short-circuit-failure: true\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("full", root.path()).expect("the run completes");
+
+    assert_eq!(outcome.executions, 1, "the task executed once");
+    assert!(
+        outcome.success,
+        "a field did not do its part: {:?}",
+        reasons_in(&work(&outcome, "full-1").join(bolt::run::OUTPUT_FILE)),
+    );
+}
+
+// COVERS: FR-3.3 | property
+/// Every work directory starts with the name of the task that made it.
+#[test]
+fn a_tasks_name_prefixes_its_work_directories() {
+    let root = tree();
+    write(root.path(), "a.txt", "a");
+    write(root.path(), "b.txt", "b");
+    write_jig(
+        root.path(),
+        "named",
+        concat!(
+            "  - name: lint\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+            "  - name: fmt\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("named", root.path()).expect("the run completes");
+
+    let mut names: Vec<String> = fs::read_dir(outcome.output_dir.join(bolt::run::WORK_DIR))
+        .expect("work")
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["fmt-1", "lint-1", "lint-2"], "work directories");
+}
+
+// COVERS: FR-3.4c | positive
+/// A jig carries comments beside its entries, and they change nothing.
+///
+/// One sits inside the `excluding` list, which is where the row says the reason
+/// for an exclusion belongs.
+#[test]
+fn a_jig_carries_comments_beside_its_entries() {
+    let root = tree();
+    write(root.path(), "a.txt", "a");
+    write(root.path(), "vendored.txt", "v");
+    write(
+        root.path(),
+        &bolt::jig::file_name("commented"),
+        concat!(
+            "# The whole-tree check.\n",
+            "tasks:\n",
+            "  - name: read # one execution per file\n",
+            "    command: \"cat {each_path}\"\n",
+            "    matching: [\"*.txt\"]\n",
+            "    excluding:\n",
+            "      # Vendored, and checked upstream.\n",
+            "      - vendored.txt\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("commented", root.path()).expect("a commented jig runs");
+
+    assert!(outcome.success, "the run failed");
+    assert_eq!(
+        outcome.executions, 1,
+        "the excluded file was read, or nothing was"
+    );
+}
+
+// COVERS: FR-3.4e | edge
+/// A tool that finds its own files and finds none passes, and bolt cannot tell.
+///
+/// The same empty selection made by bolt fails, by FR-4.4b. The pair is the
+/// row: bolt's guarantee reaches only the selections bolt makes.
+#[test]
+fn an_empty_selection_is_only_caught_where_bolt_selects() {
+    let run = |task: &str| {
+        let root = tree();
+        write(root.path(), "a.txt", "a");
+        write_jig(root.path(), "check", task);
+        bolt::run::run("check", root.path()).expect("the run completes")
+    };
+
+    let opaque = run("  - name: finds\n    command: \"sh -c 'find . -name \\\"*.go\\\"'\"\n");
+    let selected =
+        run("  - name: finds\n    command: \"cat {each_path}\"\n    matching: [\"**/*.go\"]\n");
+
+    assert!(
+        opaque.success,
+        "a tool that matched nothing on its own was noticed"
+    );
+    assert!(
+        !selected.success,
+        "bolt's own empty selection was not caught"
+    );
+}
+
+// COVERS: FR-3.7 | positive
+/// A jig kept outside the tree and linked in runs without being copied.
+///
+/// The link's target is edited after it is made, and the run sees the edit, so
+/// what ran is the file outside the tree and not a copy of it.
+#[test]
+fn a_linked_jig_runs_from_where_it_lives() {
+    let shared = tree();
+    let root = tree();
+    write_jig(
+        shared.path(),
+        "shared",
+        "  - name: old\n    command: \"sh -c 'exit 1'\"\n",
+    );
+    let name = bolt::jig::file_name("shared");
+    unix_fs::symlink(shared.path().join(&name), root.path().join(&name)).expect("the link");
+    write_jig(
+        shared.path(),
+        "shared",
+        "  - name: new\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let outcome = bolt::run::run("shared", root.path()).expect("a linked jig runs");
+
+    assert!(
+        outcome.success,
+        "the run did not read the jig through the link"
+    );
+    assert!(
+        work(&outcome, "new-1").exists(),
+        "the edit made after linking was not seen"
+    );
+}
+
+// COVERS: FR-3.10e | property
+/// A composing jig's `requires` is its own; the child checks its own list.
+///
+/// The child needs a tool that is absent and the parent does not list it. The
+/// parent runs, so it did not gather the child's list, and the child refuses
+/// when it runs, so the list was checked where it belongs.
+#[test]
+fn requires_belongs_to_the_jig_that_declares_it() {
+    let root = tree();
+    write(root.path(), "sub/a.txt", "a");
+    write(
+        root.path(),
+        &bolt::jig::file_name("inner"),
+        concat!(
+            "requires: [\"sh\", \"no-such-tool-594a\"]\n",
+            "tasks:\n  - name: inner-check\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+    write(
+        root.path(),
+        &bolt::jig::file_name("outer"),
+        &format!(
+            "requires: [\"env\"]\ntasks:\n  - name: subproject\n    command: \"env -u {} {}=3 {} inner \
+             {{base_dir}}/sub --config-dir {{config_dir}} --output-dir {{work_dir}}/child\"\n",
+            bolt::depth::DEPTH,
+            bolt::depth::CEILING,
+            env!("CARGO_BIN_EXE_bolt"),
+        ),
+    );
+
+    let outcome = bolt::run::run("outer", root.path()).expect("the parent is not refused");
+
+    assert_eq!(outcome.executions, 1, "the parent's task executed");
+    let child = work(&outcome, "subproject-1")
+        .join("child")
+        .join(bolt::run::RESULT_FILE);
+    let kinds: Vec<String> = reasons_in(&child)
+        .into_iter()
+        .map(|(kind, _)| kind)
+        .collect();
+    assert_eq!(
+        kinds,
+        ["requires-missing"],
+        "the child did not check its own list"
+    );
+}
+
+// COVERS: FR-3.12 | negative
+/// A broken jig beside the one being run is not read, and does not fail it.
+#[test]
+fn a_broken_sibling_jig_does_not_fail_the_run() {
+    let root = tree();
+    write(root.path(), &bolt::jig::file_name("broken"), "tasks: [\n");
+    write_jig(
+        root.path(),
+        "good",
+        "  - name: passes\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let outcome = bolt::run::run("good", root.path()).expect("a broken sibling is not read");
+
+    assert!(outcome.success, "the run failed");
+}
+
+// COVERS: FR-3.14 | property
+/// Two runs of one jig over one tree show the same tasks.
+///
+/// The second runs with the tree touched and bolt's environment changed, which
+/// is the state a condition read at run time would see. The work directories,
+/// which are the tasks as executed, match.
+#[test]
+fn two_runs_of_one_jig_show_the_same_tasks() {
+    let root = tree();
+    write(root.path(), "a.txt", "a");
+    write_jig(
+        root.path(),
+        "fixed",
+        concat!(
+            "  - name: each\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+            "  - name: whole\n    command: \"sh -c 'exit 0'\"\n",
+            "  - name: maybe\n    command: \"cat {all_paths}\"\n",
+            "    matching: [\"*.go\"]\n    optional: true\n",
+        ),
+    );
+    let tasks = |environment: &str| {
+        let out = tree();
+        bolt()
+            .env("CI", environment)
+            .arg("fixed")
+            .arg(root.path())
+            .arg("--output-dir")
+            .arg(out.path().join("run"))
+            .output()
+            .expect("bolt runs");
+        let mut names: Vec<String> = fs::read_dir(out.path().join("run").join(bolt::run::WORK_DIR))
+            .expect("work")
+            .filter_map(Result::ok)
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    };
+
+    let first = tasks("");
+    write(root.path(), "a.txt", "changed");
+    let second = tasks("true");
+
+    assert_eq!(first, ["each-1", "whole-1"], "the first run's tasks");
+    assert_eq!(first, second, "the task set moved between runs");
+}
+
 // ---- the walk ---------------------------------------------------------------
 
 // COVERS: FR-2.2 | positive
@@ -757,6 +1041,88 @@ fn an_ignored_file_is_not_walked() {
     assert!(
         !names.iter().any(|name| name.starts_with("build/")),
         "an ignored directory was walked: {names:?}",
+    );
+}
+
+// COVERS: FR-2.2f | negative
+/// Naming an ignored file in `matching` does not bring it back.
+///
+/// The literal path is the strongest way a jig can ask for a file, so if any
+/// spelling reached it this one would. A second task names a file that is not
+/// ignored, so the first matching nothing is shown to be the walk and not the
+/// pattern.
+#[test]
+fn matching_cannot_reach_an_ignored_file() {
+    let root = tree();
+    write(root.path(), ".gitignore", "generated.txt\n");
+    write(root.path(), "generated.txt", "ignored");
+    write(root.path(), "kept.txt", "kept");
+    write_jig(
+        root.path(),
+        "reach",
+        concat!(
+            "  - name: ignored\n    command: \"cat {each_path}\"\n",
+            "    matching: [\"generated.txt\"]\n    optional: true\n",
+            "  - name: kept\n    command: \"cat {each_path}\"\n",
+            "    matching: [\"kept.txt\"]\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("reach", root.path()).expect("the run completes");
+
+    assert!(
+        work(&outcome, "kept-1").exists(),
+        "the literal path matched nothing"
+    );
+    assert!(
+        !work(&outcome, "ignored-1").exists(),
+        "a task reached a file .gitignore excludes",
+    );
+    assert_eq!(
+        outcome.executions, 1,
+        "only the task naming a kept file executed"
+    );
+}
+
+// COVERS: FR-2.9 | property
+/// A relative path means the base, wherever it was written and wherever bolt
+/// was started.
+///
+/// Bolt is started one directory up, where a decoy `a.txt` sits, and given the
+/// base as a relative argument. The pattern, the definitions value and the path
+/// written into the command are all relative, and each reaches the base's own
+/// file and never the decoy.
+#[test]
+fn every_relative_path_resolves_against_the_base() {
+    let root = tree();
+    write(root.path(), "a.txt", "decoy\n");
+    write(root.path(), "sub/a.txt", "found\n");
+    write(
+        &root.path().join("sub"),
+        &bolt::jig::file_name("paths"),
+        concat!(
+            "definitions:\n  file: a.txt\n",
+            "tasks:\n  - name: read\n",
+            "    command: \"sh -c 'cat \\\"$1\\\" {file} a.txt' sh {each_path}\"\n",
+            "    matching: [\"a.txt\"]\n",
+        ),
+    );
+
+    let finished = bolt()
+        .current_dir(root.path())
+        .arg("paths")
+        .arg("sub")
+        .output()
+        .expect("bolt runs");
+
+    let result = String::from_utf8_lossy(&finished.stdout).trim().to_owned();
+    let stdout = Path::new(&result)
+        .with_file_name(bolt::run::WORK_DIR)
+        .join("read-1/stdout");
+    assert_eq!(
+        fs::read_to_string(&stdout).expect("the task ran"),
+        "found\nfound\nfound\n",
+        "a relative path reached something other than the base",
     );
 }
 
