@@ -2216,6 +2216,50 @@ fn the_merge_passes_only_when_every_constituent_passes() {
     }
 }
 
+// COVERS: FR-6.7 | property
+/// Every shape of merged result validates against the envelope schema.
+///
+/// All passing, a mix, a constituent whose adapter wrote nothing, an empty
+/// selection, and a run stopped by its own limit. Each reaches the merge by a
+/// different route, and the last carries a reason no constituent produced.
+#[test]
+fn every_merged_result_validates() {
+    let shapes = [
+        "  - name: a\n    command: \"sh -c 'exit 0'\"\n",
+        "  - name: a\n    command: \"sh -c 'exit 0'\"\n  - name: b\n    command: \"sh -c 'exit 2'\"\n",
+        "  - name: a\n    command: \"sh -c 'exit 0'\"\n    adapter: silent\n",
+        "  - name: a\n    command: \"cat {each_path}\"\n    matching: [\"*.py\"]\n",
+        "  - name: a\n    command: \"sh -c 'exit 0'\"\n  - name: b\n    command: \"sleep 5\"\n",
+    ];
+
+    for (index, tasks) in shapes.into_iter().enumerate() {
+        let root = tree();
+        write_adapter(root.path(), "silent", "exit 0");
+        let limit = if index == 4 {
+            "time-limit: \"0.5s\"\n"
+        } else {
+            ""
+        };
+        write(
+            root.path(),
+            &bolt::jig::file_name("shape"),
+            &format!("{limit}tasks:\n{tasks}"),
+        );
+
+        let outcome = bolt::run::run("shape", root.path()).expect("the run completes");
+
+        let result = read_validated(
+            &outcome.output_dir.join(bolt::run::RESULT_FILE),
+            &wrench::schemas::ENVELOPE,
+        );
+        assert_eq!(
+            result["success"].as_bool(),
+            Some(index == 0),
+            "shape {index}: {result}",
+        );
+    }
+}
+
 // COVERS: FR-8.3a | negative
 /// A merge finding no constituent fails, with a reason saying so.
 ///
@@ -2851,6 +2895,177 @@ fn each_broken_adapter_case_has_its_own_kind() {
             .and_then(Value::as_str)
             .unwrap_or_else(|| panic!("{name}: no kind on the reason"));
         assert_eq!(kind, expected, "{name}: the wrong case was reported");
+    }
+}
+
+// COVERS: FR-7.1, FR-7.7, FR-6.7a | property
+/// What makes an adapter's envelope valid, checked on the way in.
+///
+/// `success` alone is a complete envelope, and a failure needs reasons each
+/// carrying `message` and `kind`. The invalid cases all parse, so what refuses
+/// them is validation on read, which bolt's own checks on write cannot reach
+/// because the adapter never wrote through bolt.
+#[test]
+fn an_adapters_envelope_is_valid_by_the_schema_alone() {
+    let cases = [
+        ("\"success\": true", Ok(true)),
+        (
+            "\"success\": false\n\"reasons\":\n  - \"kind\": \"k\"\n    \"message\": \"m\"",
+            Ok(false),
+        ),
+        ("\"success\": \"true\"", Err("a string for success")),
+        ("\"success\": false", Err("a failure with no reasons")),
+        (
+            "\"success\": false\n\"reasons\":\n  - \"message\": \"m\"",
+            Err("a reason with no kind"),
+        ),
+        ("\"metadata\": {}", Err("no success at all")),
+    ];
+
+    for (envelope, expected) in cases {
+        let root = tree();
+        write(root.path(), "envelope.yaml", &format!("{envelope}\n"));
+        write_adapter(
+            root.path(),
+            "fixed",
+            &format!(
+                "for a in \"$@\"; do case $prev in --work-dir) w=$a;; esac; prev=$a; done\ncp {} \"$w/output.yaml\"\n",
+                root.path().join("envelope.yaml").display(),
+            ),
+        );
+        write_jig(
+            root.path(),
+            "check",
+            "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n    adapter: fixed\n",
+        );
+
+        let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+        let kinds: Vec<String> =
+            reasons_in(&work(&outcome, "alpha-1").join(bolt::run::OUTPUT_FILE))
+                .into_iter()
+                .map(|(kind, _)| kind)
+                .collect();
+        match expected {
+            Ok(passed) => {
+                assert_eq!(
+                    outcome.success, passed,
+                    "{envelope:?} was not authoritative"
+                );
+                if !passed {
+                    assert_eq!(kinds, ["k"], "{envelope:?}: the adapter's reason");
+                }
+            }
+            Err(why) => {
+                assert!(!outcome.success, "{why} was accepted");
+                assert_eq!(kinds, ["adapter-wrote-invalid"], "{why}");
+            }
+        }
+    }
+}
+
+// COVERS: FR-7.3 | positive
+/// `metadata` carrying `statistics` and `evidence` is accepted, and so is its
+/// absence.
+#[test]
+fn metadata_is_optional_and_carries_statistics_and_evidence() {
+    let root = tree();
+    write_adapter(
+        root.path(),
+        "rich",
+        concat!(
+            "for a in \"$@\"; do case $prev in --work-dir) w=$a;; esac; prev=$a; done\n",
+            "printf '\"success\": true\\n\"metadata\":\\n  \"statistics\":\\n    \"files\": 3\\n",
+            "  \"evidence\":\\n    - \"report.json\"\\n' > \"$w/output.yaml\"\n",
+        ),
+    );
+    write_jig(
+        root.path(),
+        "check",
+        concat!(
+            "  - name: rich\n    command: \"sh -c 'exit 0'\"\n    adapter: rich\n",
+            "  - name: bare\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    assert!(
+        outcome.success,
+        "an envelope with or without metadata failed"
+    );
+    let rich = read_validated(&envelope_of(&outcome, "rich-1"), &wrench::schemas::ENVELOPE);
+    assert_eq!(rich["metadata"]["statistics"]["files"], 3, "statistics");
+    let bare = read_validated(&envelope_of(&outcome, "bare-1"), &wrench::schemas::ENVELOPE);
+    assert!(
+        bare.get("metadata").is_none(),
+        "metadata was supplied: {bare}"
+    );
+}
+
+// COVERS: FR-7.3a | negative
+/// The default envelope carries no exit status; the `exitcode` file does.
+#[test]
+fn the_exit_status_is_not_in_the_envelope_by_default() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    let envelope = read_validated(
+        &envelope_of(&outcome, "alpha-1"),
+        &wrench::schemas::ENVELOPE,
+    );
+    assert_eq!(
+        envelope,
+        serde_json::json!({ "success": true }),
+        "the envelope carries more than the verdict",
+    );
+    assert_eq!(
+        fs::read_to_string(work(&outcome, "alpha-1").join(bolt::run::EXITCODE_FILE))
+            .expect("the exitcode file")
+            .trim(),
+        "0",
+        "the raw status is not on disk",
+    );
+}
+
+// COVERS: FR-7.3c | negative
+/// No envelope or result bolt writes carries a timing.
+#[test]
+fn nothing_bolt_writes_carries_a_timing() {
+    let root = tree();
+    write(root.path(), "a.txt", "a");
+    write_jig(
+        root.path(),
+        "check",
+        concat!(
+            "  - name: passes\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+            "  - name: fails\n    command: \"sh -c 'exit 1'\"\n",
+        ),
+    );
+
+    let outcome = bolt::run::run("check", root.path()).expect("the run completes");
+
+    let mut documents = vec![outcome.output_dir.join(bolt::run::RESULT_FILE)];
+    documents.extend(["passes-1", "fails-1"].map(|entry| envelope_of(&outcome, entry)));
+    for path in documents {
+        let document = read_validated(&path, &wrench::schemas::ENVELOPE);
+        let metadata: Vec<&String> = document
+            .get("metadata")
+            .and_then(Value::as_object)
+            .map(|metadata| metadata.keys().collect())
+            .unwrap_or_default();
+        assert!(
+            metadata
+                .iter()
+                .all(|key| ["base", "evidence"].contains(&key.as_str())),
+            "{}: metadata carries {metadata:?}",
+            path.display(),
+        );
     }
 }
 
@@ -4319,7 +4534,7 @@ fn a_run_with_no_budget_left_executes_nothing_and_still_writes_a_result() {
     );
 }
 
-// COVERS: FR-4.11c, FR-4.12a, FR-4.12b | positive
+// COVERS: FR-4.11c, FR-4.12a, FR-4.12b, FR-7.5c | positive
 /// The adapter runs after the limit fired, over what the command had gathered.
 ///
 /// FR-4.11c: the limit governs commands, and the adapter is what records that it
@@ -5188,6 +5403,71 @@ fn a_jig_run_by_hand_reaches_what_composition_reached() {
         by_hand.contains("inner-check exited 3"),
         "the jig run directly reached a different verdict: {by_hand}",
     );
+}
+
+// COVERS: FR-5.9 | property
+/// A child's paths are absolute even when its parent wrote them relative.
+///
+/// The parent's command hands the child a relative base, config directory and
+/// output directory. The child's result and manifest name them absolutely, so
+/// they mean the same thing read from the parent's work directory as from the
+/// child's own.
+#[test]
+fn a_childs_paths_are_absolute_whatever_its_parent_wrote() {
+    let root = tree();
+    write(root.path(), "sub/a.txt", "a");
+    write_jig(
+        root.path(),
+        "inner",
+        "  - name: inner-check\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+    );
+    write_jig(
+        root.path(),
+        "outer",
+        &format!(
+            "  - name: subproject\n    command: \"env -u {} {}=3 {} inner sub --config-dir . \
+             --output-dir child-run\"\n",
+            bolt::depth::DEPTH,
+            bolt::depth::CEILING,
+            env!("CARGO_BIN_EXE_bolt"),
+        ),
+    );
+
+    bolt::run::run("outer", root.path()).expect("the parent completes");
+
+    let child = root.path().join("child-run");
+    let result = read_validated(
+        &child.join(bolt::run::RESULT_FILE),
+        &wrench::schemas::ENVELOPE,
+    );
+    let base = result["metadata"]["base"]
+        .as_str()
+        .expect("the child's base");
+    assert!(Path::new(base).is_absolute(), "the child's base: {base}");
+    let evidence = result["metadata"]["evidence"]["inner-check-1"]["result"]
+        .as_str()
+        .expect("the child's evidence");
+    assert!(
+        Path::new(evidence).is_absolute(),
+        "the child's evidence: {evidence}"
+    );
+
+    let manifest = read_validated(
+        &child
+            .join(bolt::run::WORK_DIR)
+            .join("inner-check-1")
+            .join(bolt::run::MANIFEST_FILE),
+        &wrench::schemas::MANIFEST,
+    );
+    for (key, entry) in manifest["variables"].as_object().expect("variables") {
+        if key.ends_with("_dir") || key == "project_root" || key == "each_path" {
+            let value = entry["value"].as_str().expect("a string value");
+            assert!(
+                Path::new(value.trim_matches('\'')).is_absolute(),
+                "{key} was recorded as {value}",
+            );
+        }
+    }
 }
 
 // COVERS: FR-5.18, FR-5.19, FR-5.20 | positive
