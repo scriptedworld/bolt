@@ -954,6 +954,13 @@ fn execute_batches<'a>(
     // manifest claims none. Recording one would say the command saw files it
     // never received, so the key is absent, not empty.
     let recorded = plan.wants_paths.then_some(selection);
+    let path_variable = plan.wants_paths.then(|| {
+        if plan.command.contains("{each_path}") {
+            "each_path"
+        } else {
+            "all_paths"
+        }
+    });
 
     let deadlines = deadlines_for(scope, plan);
 
@@ -974,7 +981,12 @@ fn execute_batches<'a>(
             command: substitute(plan.command, &task.name, scope, &work_dir, batch)?,
             work_dir,
         };
-        write_manifest(scope, &execution, recorded)?;
+        write_manifest(
+            scope,
+            &execution,
+            recorded,
+            path_variable.map(|name| (name, batch.as_slice())),
+        )?;
 
         // FR-4.11b: the executions after a killed one do not start. This is the
         // case where the limit fell between two of them and not during one,
@@ -1102,7 +1114,7 @@ fn empty_selection(
             .join(work_dir_name(&task.name, 1, 1)),
     };
     create_dir(&execution.work_dir)?;
-    write_manifest(scope, &execution, Some(selection))?;
+    write_manifest(scope, &execution, Some(selection), None)?;
     write_envelope(
         &execution.work_dir,
         false,
@@ -1613,6 +1625,7 @@ fn write_manifest(
     scope: &Scope,
     execution: &Execution,
     selection: Option<&Selection>,
+    applied: Option<(&str, &[PathBuf])>,
 ) -> Result<(), Error> {
     let Scope {
         locations,
@@ -1636,7 +1649,7 @@ fn write_manifest(
         "task": task,
         "ordinal": ordinal,
         "command": command,
-        "variables": variables(locations, definitions, work_dir),
+        "variables": variables(locations, definitions, work_dir, applied),
     });
 
     // The key names are wrench's, not bolt's. FR-9.5 says a manifest records
@@ -1659,9 +1672,9 @@ fn write_manifest(
 
 /// Every template variable this execution was given, and where each came from.
 ///
-/// FR-9.5c puts the locations here. FR-9.5g adds the other two layers, because
-/// the same key means different things depending on which file won and the
-/// command line alone does not say.
+/// FR-9.5c puts the locations here, and whichever path variable applied.
+/// FR-9.5g adds the other two layers, because the same key means different
+/// things depending on which file won and the command line alone does not say.
 ///
 /// Every location is `from: "bolt"`, since all five are reserved to bolt's own
 /// layer. FR-4.19 refused any jig or file that named one, so the definitions
@@ -1671,6 +1684,7 @@ fn variables(
     locations: &Locations,
     definitions: &Definitions,
     work_dir: &Path,
+    applied: Option<(&str, &[PathBuf])>,
 ) -> serde_json::Value {
     let supplied = |path: &Path| json!({ "value": path.display().to_string(), "from": "bolt" });
     let mut variables = json!({
@@ -1687,6 +1701,19 @@ fn variables(
                 name.clone(),
                 json!({ "value": definition.value, "from": definition.from }),
             );
+        }
+        // `{each_path}` stood for one path and `{all_paths}` for the list, which
+        // the schema spells as a string and an array.
+        if let Some((name, paths)) = applied {
+            let names: Vec<String> = paths
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect();
+            let value = match names.as_slice() {
+                [one] if name == "each_path" => json!(one),
+                _ => json!(names),
+            };
+            map.insert(name.to_owned(), json!({ "value": value, "from": "bolt" }));
         }
     }
     variables

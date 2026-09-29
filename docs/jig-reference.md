@@ -189,7 +189,9 @@ an execution that was killed still records what it was going to attempt:
 ```
 
 `variables` records every value substituted into the command and which layer
-supplied it, so a wrong value can be traced to the file that set it.
+supplied it, so a wrong value can be traced to the file that set it. That
+includes the path variable the command named: `each_path` as the one path that
+execution was handed, `all_paths` as the list.
 
 `output.yaml` is one execution's verdict, written by its adapter.
 `result.yaml` is the run's one verdict, folded from all of them, and carries the
