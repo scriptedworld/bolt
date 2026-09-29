@@ -1677,6 +1677,36 @@ fn optional_without_a_path_variable_is_a_jig_error() {
     }
 }
 
+// COVERS FR-3.4b, FR-4.4h | negative
+/// `matching`, `excluding` and `optional` on a command naming no path variable
+/// are each refused by the jig schema, before bolt reads a task.
+///
+/// The reason is the schema's `validating` at the task, not a refusal of bolt's
+/// own, which is FR-4.4h's half: the runner has no rule of its own to restate.
+#[test]
+fn selection_fields_without_a_path_variable_are_refused_by_the_schema() {
+    for field in [
+        "matching: [\"*.txt\"]",
+        "excluding: [\"*.txt\"]",
+        "optional: true",
+    ] {
+        let root = tree();
+        write_jig(
+            root.path(),
+            "whole",
+            &format!("  - name: whole\n    command: \"sh -c 'exit 0'\"\n    {field}\n"),
+        );
+
+        match bolt::run::run("whole", root.path()) {
+            Err(bolt::Error::JigUnreadable { reason, .. }) => assert!(
+                reason.contains("validating") && reason.contains("'/tasks/0'"),
+                "{field}: not refused by the schema at the task: {reason}",
+            ),
+            other => panic!("{field} was not refused as unreadable: {other:?}"),
+        }
+    }
+}
+
 // COVERS FR-4.4f | edge
 /// An empty selection is a verdict, so bolt still exits 0.
 #[test]
@@ -2043,7 +2073,7 @@ fn a_manifest_exists_before_the_command_runs() {
         concat!(
             "  - name: reads-its-own\n",
             "    matching: [\"**/*.txt\"]\n",
-            "    command: \"sh -c 'test -f {work_dir}/manifest.yaml'\"\n",
+            "    command: \"sh -c 'test -f {work_dir}/manifest.yaml' sh {each_path}\"\n",
         ),
     );
 
