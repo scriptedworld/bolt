@@ -1381,7 +1381,7 @@ fn a_command_naming_both_path_forms_is_a_jig_error() {
     }
 }
 
-// COVERS: FR-4.4, FR-4.4b | negative
+// COVERS: FR-4.4, FR-4.4b, FR-4.4e | negative
 /// A path-consuming task whose selection is empty fails, and says so.
 ///
 /// FR-4.4b makes this a failure. A silent skip would leave a typo'd pattern
@@ -1527,9 +1527,273 @@ fn no_two_executions_overlap() {
     }
 }
 
+// ---- locations and selection ------------------------------------------------
+
+/// Run `jig` at `base` and return what its one task wrote to stdout.
+fn stdout_of(jig: &str, base: &Path, entry: &str) -> (bolt::Outcome, String) {
+    let outcome = bolt::run::run(jig, base).expect("the run completes");
+    let stdout = fs::read_to_string(work(&outcome, entry).join("stdout")).expect("stdout kept");
+    (outcome, stdout)
+}
+
+// COVERS: FR-4.1, FR-4.1c | positive
+/// Every location a task can name is substituted, and each is its own place.
+///
+/// The outermost run sits at the project root, so `{project_root}` is the base
+/// here. The config directory defaults to the base too, and the other two are
+/// the run's own.
+#[test]
+fn every_location_is_a_template_variable() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "where",
+        concat!(
+            "  - name: show\n    command: \"printf '%s\\\\n' ",
+            "{project_root} {base_dir} {work_dir} {config_dir} {output_dir}\"\n",
+        ),
+    );
+
+    let (outcome, stdout) = stdout_of("where", root.path(), "show-1");
+
+    let base = fs::canonicalize(root.path()).expect("the base");
+    let expected = [
+        base.clone(),
+        base.clone(),
+        work(&outcome, "show-1"),
+        base,
+        outcome.output_dir.clone(),
+    ]
+    .map(|path| path.display().to_string());
+    assert_eq!(
+        stdout.lines().collect::<Vec<_>>(),
+        expected,
+        "project root, base, work, config and output, in that order",
+    );
+}
+
+// COVERS: FR-4.1a | positive
+/// A command stands at the base.
+#[test]
+fn a_command_runs_at_the_base_directory() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "here",
+        "  - name: pwd\n    command: \"pwd -P\"\n",
+    );
+
+    let (_, stdout) = stdout_of("here", root.path(), "pwd-1");
+
+    assert_eq!(
+        stdout.trim(),
+        fs::canonicalize(root.path())
+            .expect("the base")
+            .display()
+            .to_string(),
+        "the command stood somewhere other than the base",
+    );
+}
+
+// COVERS: FR-4.2a | edge
+/// A command naming no path variable runs once, however many files there are.
+#[test]
+fn a_command_naming_no_path_variable_runs_once_over_many_files() {
+    let root = tree();
+    for name in ["a.txt", "b.txt", "c.txt"] {
+        write(root.path(), name, name);
+    }
+    write_jig(
+        root.path(),
+        "once",
+        "  - name: whole\n    command: \"ls\"\n",
+    );
+
+    let (outcome, stdout) = stdout_of("once", root.path(), "whole-1");
+
+    assert_eq!(outcome.executions, 1, "the command ran more than once");
+    assert!(stdout.contains("c.txt"), "the tree was not there: {stdout}");
+}
+
+// COVERS: FR-4.4a | edge
+/// A task composing bolt obeys the empty-selection rule like any other.
+///
+/// Its command is bolt, over a subproject that is not there. Required, it fails
+/// with bolt's empty-selection reason and bolt never starts; optional, it is
+/// satisfied.
+#[test]
+fn a_composing_task_over_a_missing_subproject_matches_nothing() {
+    let run = |optional: &str| {
+        let root = tree();
+        write(root.path(), "a.txt", "a");
+        write_jig(
+            root.path(),
+            "outer",
+            &format!(
+                "  - name: subproject\n    command: \"sh -c '{} inner {{base_dir}}/sub' {{all_paths}}\"\n    \
+                 matching: [\"sub/**\"]\n{optional}  - name: here\n    command: \"sh -c 'exit 0'\"\n",
+                env!("CARGO_BIN_EXE_bolt"),
+            ),
+        );
+        let outcome = bolt::run::run("outer", root.path()).expect("the run completes");
+        (root, outcome)
+    };
+
+    let (_kept, required) = run("");
+    let (_also_kept, optional) = run("    optional: true\n");
+
+    assert_eq!(required.executions, 1, "bolt was started over nothing");
+    let kinds: Vec<String> = reasons_in(&required.output_dir.join(bolt::run::RESULT_FILE))
+        .into_iter()
+        .map(|(kind, _)| kind)
+        .collect();
+    assert_eq!(kinds, ["empty-selection"], "the composing task's reason");
+    assert!(
+        optional.success,
+        "an expected missing subproject failed the run"
+    );
+    assert_eq!(optional.executions, 1, "bolt was started over nothing");
+}
+
+// COVERS: FR-4.4d | negative
+/// `optional` on a command with no selection is refused before anything runs.
+#[test]
+fn optional_without_a_path_variable_is_a_jig_error() {
+    let root = tree();
+    write_jig(
+        root.path(),
+        "pointless",
+        "  - name: whole\n    command: \"sh -c 'exit 0'\"\n    optional: true\n",
+    );
+
+    let refusal = bolt::run::run("pointless", root.path()).expect_err("the jig is refused");
+
+    match refusal {
+        bolt::Error::JigUnreadable { reason, .. } => assert!(
+            reason.contains("validating") && reason.contains("'/tasks/0'"),
+            "not refused by the schema at the task: {reason}",
+        ),
+        other => panic!("wrong refusal: {other:?}"),
+    }
+}
+
+// COVERS: FR-4.4f | edge
+/// An empty selection is a verdict, so bolt still exits 0.
+#[test]
+fn an_empty_selection_leaves_the_exit_status_alone() {
+    let root = tree();
+    write(root.path(), "a.txt", "a");
+    write_jig(
+        root.path(),
+        "empty",
+        "  - name: none\n    command: \"cat {each_path}\"\n    matching: [\"*.py\"]\n",
+    );
+
+    let finished = bolt()
+        .arg("empty")
+        .arg(root.path())
+        .output()
+        .expect("bolt runs");
+
+    assert_eq!(finished.status.code(), Some(0), "bolt carried the run out");
+    let result = String::from_utf8_lossy(&finished.stdout).trim().to_owned();
+    assert!(
+        !verdict(Path::new(&result), &wrench::schemas::ENVELOPE),
+        "the empty selection did not fail the result",
+    );
+}
+
+// COVERS: FR-4.7 | property
+/// Declaring the same tasks in the opposite order gives the same result.
+///
+/// Both tasks fail with different messages, so the reasons have an order to get
+/// wrong. The two runs share a base and differ only in their output directory,
+/// which is replaced before comparing.
+#[test]
+fn task_order_does_not_change_the_result() {
+    let root = tree();
+    let alpha = "  - name: alpha\n    command: \"sh -c 'exit 3'\"\n";
+    let beta = "  - name: beta\n    command: \"sh -c 'exit 4'\"\n";
+    write_jig(root.path(), "forward", &format!("{alpha}{beta}"));
+    write_jig(root.path(), "backward", &format!("{beta}{alpha}"));
+    let out = tree();
+
+    let result = |jig: &str| {
+        let outcome = run_into(jig, root.path(), &out.path().join(jig)).expect("the run completes");
+        fs::read_to_string(outcome.output_dir.join(bolt::run::RESULT_FILE))
+            .expect("the result")
+            .replace(&outcome.output_dir.display().to_string(), "OUT")
+    };
+
+    assert_eq!(
+        result("forward"),
+        result("backward"),
+        "the order leaked into the result"
+    );
+}
+
+// COVERS: FR-4.16c | negative
+/// A definitions value is a scalar, in a jig's block and in a file alike.
+#[test]
+fn a_definitions_value_that_is_not_a_scalar_is_refused() {
+    let in_jig = tree();
+    write(
+        in_jig.path(),
+        &bolt::jig::file_name("nested"),
+        concat!(
+            "definitions:\n  lint:\n    deny: warnings\n",
+            "tasks:\n  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+        ),
+    );
+    let in_file = tree();
+    write_jig(
+        in_file.path(),
+        "plain",
+        "  - name: alpha\n    command: \"sh -c 'exit 0'\"\n",
+    );
+    write_definitions(in_file.path(), "listed", "deny: [warnings, clippy]\n");
+
+    let from_jig = bolt::run::run("nested", in_jig.path()).expect_err("a nested block refuses");
+    let from_file = run_with("plain", in_file.path(), "listed").expect_err("a list refuses");
+
+    assert!(
+        matches!(from_jig, bolt::Error::JigUnreadable { .. }),
+        "a nested value in a jig: {from_jig:?}",
+    );
+    assert!(
+        matches!(from_file, bolt::Error::DefinitionsUnreadable { .. }),
+        "a list in a file: {from_file:?}",
+    );
+}
+
+// COVERS: FR-4.17b | positive
+/// A relative definitions value reaches above the base, because the command
+/// stands at the base.
+#[test]
+fn a_relative_definition_resolves_against_the_base() {
+    let root = tree();
+    write(root.path(), "REQUIREMENTS.md", "the root's\n");
+    write(root.path(), "go/REQUIREMENTS.md", "the pack's\n");
+    write(
+        &root.path().join("go"),
+        &bolt::jig::file_name("check"),
+        concat!(
+            "definitions:\n  requirements: ../REQUIREMENTS.md\n",
+            "tasks:\n  - name: read\n    command: \"cat {requirements}\"\n",
+        ),
+    );
+
+    let (_, stdout) = stdout_of("check", &root.path().join("go"), "read-1");
+
+    assert_eq!(
+        stdout, "the root's\n",
+        "the value did not resolve against the base"
+    );
+}
+
 // ---- evidence ---------------------------------------------------------------
 
-// COVERS: FR-1.4, FR-9.2 | positive
+// COVERS: FR-1.4, FR-9.2, FR-4.15 | positive
 /// Each execution keeps its native results, including files the command wrote.
 ///
 /// Every kept file's contents are asserted. `is_file()` alone is satisfied by a
@@ -3633,7 +3897,7 @@ fn the_manifest_records_which_layer_supplied_each_value() {
     );
 }
 
-// COVERS: FR-4.19 | negative
+// COVERS: FR-4.19, FR-4.16d | negative
 /// A jig or a file naming a reserved variable refuses the run.
 ///
 /// FR-4.19: `{base_dir}` redefined would substitute something other than where
