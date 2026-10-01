@@ -5,9 +5,9 @@
 //! one.
 //!
 //! FR-6.1a says when bolt writes an envelope itself, and says it as a rule, not
-//! a count: only where no adapter's result is available to take. A count was
-//! wrong twice, and a list claiming completeness invites the next reader to
-//! trust the number over the rule.
+//! a count: only where no adapter's result is available to take. A list
+//! claiming completeness invites the next reader to trust the number over the
+//! rule.
 
 use std::path::{Path, PathBuf};
 

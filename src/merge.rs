@@ -15,8 +15,8 @@ use crate::{Error, Outcome};
 /// directory: folding twice gives the same file, not merely the same verdict.
 ///
 /// FR-8.3 passes the merged result only when every constituent passes. There is
-/// no constituent whose failure does not count, because a check nobody wants
-/// enforced is a check not in the jig.
+/// no constituent whose failure does not count; a check nobody wants enforced
+/// is removed from the jig.
 ///
 /// `reasons` are the run's own, which no constituent can carry: FR-4.13's
 /// passed run limit is a property of the run, not of any one execution.

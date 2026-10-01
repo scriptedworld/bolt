@@ -40,8 +40,7 @@ fn compile(patterns: &[String]) -> Result<GlobSet, Error> {
 /// FR-3.5 makes patterns relative to `base`, so each path is tested by its
 /// position under it and a jig written for reuse says `**/*.rs` without naming
 /// the subtree it was dropped into. Matching the absolute path instead would
-/// leave `**/*.rs` working and every literal entry silently matching nothing,
-/// which is the shape a stage 4 review measured.
+/// leave `**/*.rs` working and every literal entry silently matching nothing.
 ///
 /// Paths keep the order they arrived in, so a sorted walk gives a sorted
 /// selection and FR-2.2d carries through to FR-9.2a's ordinals.

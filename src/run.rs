@@ -181,8 +181,7 @@ impl Expired<'_> {
 /// The locations bolt exposes to every command, by FR-4.1b.
 ///
 /// All five are reserved to bolt's own layer, which is why each is recorded
-/// `from: "bolt"`. FR-4.16's jig and file layers merge over them and belong to
-/// `definitions/10`, not to the skeleton.
+/// `from: "bolt"`. FR-4.16's jig and file layers merge over them.
 struct Locations {
     /// The outermost invocation's directory. No nesting here, so it is the base.
     project_root: PathBuf,
@@ -203,9 +202,9 @@ struct Locations {
 /// # Errors
 ///
 /// [`Error::BaseMissing`] when `base` is not there, by FR-2.5. The check runs
-/// before anything is created. The Go build made the base as a side effect of
-/// preparing the output directory, so a run over a typo'd path checked an empty
-/// tree and passed.
+/// before anything is created. Creating the base as a side effect of preparing
+/// the output directory would let a run over a typo'd path check an empty tree
+/// and pass.
 ///
 /// [`Error::JigUnreadable`] when the jig is absent or will not parse,
 /// [`Error::CommandNamesBothPathForms`] when a command names both path forms by
@@ -277,7 +276,7 @@ pub fn invoke(invocation: &Invocation) -> Result<Outcome, Refusal> {
 
     // FR-2.4, and this is the only place it has to happen. Every path bolt
     // records or substitutes descends from the base, so resolving it once here
-    // resolves all of them, and `bolt gate .` stops recording `"value": "."` in
+    // resolves all of them, and `bolt gate .` never records `"value": "."` in
     // manifests that a reader standing somewhere else cannot use.
     //
     // FR-4.17b keeps this away from definitions: nothing distinguishes
@@ -323,7 +322,7 @@ pub fn invoke(invocation: &Invocation) -> Result<Outcome, Refusal> {
 ///
 /// [`Error::OutputDirectoryInUse`] by FR-2.6b, for a named directory as much as
 /// for the default. It returns before anything is written, and that ordering
-/// is the guarantee, not an implementation detail; `holds_a_run` carries why.
+/// is the guarantee; `holds_a_run` carries why.
 fn output_dir_of(
     base: &Path,
     named: Option<&Path>,
@@ -489,9 +488,9 @@ fn walk_excluding(base: &Path, output_dir: &Path) -> Result<Vec<PathBuf>, Error>
 ///
 /// The whole guarantee is that this refuses instead of writing. Writing into
 /// one interleaves two runs' evidence, and the default stamp is second-granular
-/// so two runs started in one second resolve to the same directory. Reproduced
-/// against the Go build, a second jig's refusal replaced the first's completed
-/// verdict while its per-task evidence still said otherwise.
+/// so two runs started in one second resolve to the same directory. A second
+/// jig's refusal written there replaces the first's completed verdict while its
+/// per-task evidence still says otherwise.
 /// `a_refusal_does_not_write_into_the_directory_it_refused` holds it, and
 /// removing the directory is the caller's decision, not bolt's.
 fn holds_a_run(output_dir: &Path) -> bool {
@@ -855,8 +854,7 @@ fn validate<'a>(jig: &'a jig::Jig, definitions: &Definitions) -> Result<Vec<Plan
 
         // The name becomes a path component, so it must stay one. Without this
         // a task named `../../victim` writes a full evidence directory outside
-        // the base. That breaks FR-2.3's containment, so this is more than a
-        // naming nicety.
+        // the base, which breaks FR-2.3's containment.
         if Path::new(&task.name).components().count() != 1
             || task.name.contains(std::path::MAIN_SEPARATOR)
         {
@@ -1422,8 +1420,7 @@ fn adapt<'a>(
 ///
 /// The envelope is removed before the adapter runs. An `output.yaml` left by
 /// an earlier fold would otherwise satisfy "the adapter wrote one", and a silent
-/// adapter would inherit the previous run's verdict. Carried over from the Go
-/// build, which found it.
+/// adapter would inherit the previous run's verdict.
 ///
 /// FR-6.11's three cases are kept apart because they have different causes, and
 /// FR-6.12 leaves canonical form to the adapter: bolt validates on the way in
@@ -1502,9 +1499,7 @@ fn invocation(scope: &Scope, task: &Task, name: &str) -> String {
 
 /// Why an adapter's result cannot be taken, where it cannot, by FR-6.11.
 ///
-/// The three are kept apart because they have different causes: a crashing
-/// adapter, a silent one, and one whose output is not an envelope are three
-/// different things to go and fix.
+/// The three are kept apart for the reason [`adapter::Unauthoritative`] gives.
 fn unauthoritative(ran: &Ran, envelope: &Path) -> Option<adapter::Unauthoritative> {
     if ran.status != 0 {
         Some(adapter::Unauthoritative::Exited(ran.status))
@@ -1519,13 +1514,14 @@ fn unauthoritative(ran: &Ran, envelope: &Path) -> Option<adapter::Unauthoritativ
 
 /// Substitute a command's template variables, in one left-to-right pass.
 ///
-/// Chained `str::replace` is a command injection, and it was one here. Against
-/// the built binary, a file named `p{all_paths};id #`, selected by a
-/// `{each_path}` task, was quoted correctly by [`quote`] and then had the
-/// literal `{all_paths}` *inside its own name* expanded by the next `replace`. That spliced a fresh `'…'` string into
-/// the middle of the already-quoted region, broke the quoting, and put the rest
-/// of the filename on the command line unquoted. `id` executed. A second fixture
-/// escaped the base and created a file beside it while the run reported success.
+/// Chained `str::replace` is a command injection. Under it, a file named
+/// `p{all_paths};id #`, selected by a `{each_path}` task, is quoted correctly
+/// by [`quote`] and then has the literal `{all_paths}` *inside its own name*
+/// expanded by the next `replace`. That splices a fresh `'…'` string into the
+/// middle of the already-quoted region, breaks the quoting, and puts the rest
+/// of the filename on the command line unquoted, so `id` executes. A name built
+/// the same way can escape the base and create a file beside it while the run
+/// reports success.
 ///
 /// So FR-4.3's guarantee needs both the quoting and never reading substituted
 /// bytes again. A single pass gives the second and chaining cannot.

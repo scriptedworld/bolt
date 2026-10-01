@@ -2,8 +2,7 @@
 # bolt.rust-std-quality.yaml, which this repository adopts as a link.
 #
 # Without this the check fails on bolt's own Apache-2.0 licence, because an
-# empty allow list allows nothing, which is the tool working as intended: a
-# licence policy nobody wrote is one nobody agreed to.
+# empty allow list allows nothing, which is the tool working as intended.
 
 # The targets bolt is built for. Without this cargo-deny reads every target's
 # dependencies, including ones that never reach a binary here.
@@ -63,7 +62,6 @@ wildcards = "deny"
 yanked = "deny"
 
 [sources]
-# Anything not from crates.io is named explicitly or it does not build. A git
-# dependency nobody declared is a supply chain nobody reviewed.
+# Anything not from crates.io is named explicitly or it does not build.
 unknown-registry = "deny"
 unknown-git = "deny"

@@ -43,7 +43,7 @@ pub struct Outcome {
     /// Whether every constituent envelope passed.
     ///
     /// FR-8.3: there is no constituent whose failure does not count. A check
-    /// nobody wants enforced is a check not in the jig.
+    /// nobody wants enforced is removed from the jig.
     pub success: bool,
 
     /// The run directory, holding one work directory per execution.

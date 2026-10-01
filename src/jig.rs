@@ -18,8 +18,7 @@ pub struct Jig {
     ///
     /// Optional, because wrench's schema requires only `tasks`. A mandatory
     /// version is stricter than the contract and refuses six of the estate's
-    /// jigs, bolt's own among them; that showed up the first time the Rust bolt
-    /// was pointed at its own gate by NFR-12.1.
+    /// jigs, bolt's own among them.
     #[serde(default)]
     pub version: Option<String>,
 
@@ -117,11 +116,9 @@ pub struct Task {
     /// FR-4.4d and FR-4.4h make it a jig error on a task naming no path
     /// variable, enforced by the schema and not here.
     ///
-    /// Spelled `allow-empty` until wrench `dbc3570`. The new name is the one
-    /// that answers FR-10.8d's question: `optional` says what an empty selection
-    /// resolves to, where `allow-empty` described the permission and not the
-    /// outcome. No jig in the estate carried the field, so the rename cost
-    /// nothing.
+    /// The name answers FR-10.8d's question: `optional` says what an empty
+    /// selection resolves to, where `allow-empty` would describe the permission
+    /// and not the outcome.
     #[serde(default)]
     pub optional: bool,
 

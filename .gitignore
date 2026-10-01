@@ -38,15 +38,13 @@ Cargo.lock
 # is narrow enough to be safe: it cannot match a `*.definitions.yaml`, and this
 # repository carries no jig of its own in any case.
 #
-# A list of names is what failed. Adopting toolbox's `rust` set added
-# `bolt.rust-std-quality.yaml` and `config/rust/clippy.toml`; neither was added
-# to the list, so both sat untracked where `git add -A` would have committed them
-# as symlinks, which is the failure the paragraph above describes. A pattern
-# covers a set that grows and a list does not.
+# A list of names does not cover a set that grows. Adopting toolbox's `rust` set
+# adds `bolt.rust-std-quality.yaml` and `config/rust/clippy.toml`; a list missing
+# them leaves both untracked where `git add -A` would commit them as symlinks,
+# which is the failure the paragraph above describes.
 #
-# The other reason for naming files here was `bin/count-selection.py`, which no
-# longer exists, so `bin/` holds nothing of this project's but the built binary
-# named above.
+# `bin/*.py` matched `bin/count-selection.py`, which no longer exists, so `bin/`
+# holds nothing of this project's but the built binary named above.
 bolt.*-quality.yaml
 bolt.secrets.yaml
 bin/*.py

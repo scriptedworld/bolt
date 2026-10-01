@@ -64,8 +64,8 @@ pub enum Error {
     ///
     /// FR-3.3a: the name prefixes a task's work directories by FR-3.3, so a
     /// duplicate puts two tasks' executions in the same place. In a reproduction,
-    /// the second overwrote the first's evidence, the fold saw one constituent,
-    /// and a failing task vanished into a green result.
+    /// the second overwrote the first's evidence and the fold saw one
+    /// constituent, so a failing task produced a green result.
     DuplicateTaskName {
         /// The name used twice.
         task: String,
@@ -84,9 +84,8 @@ pub enum Error {
     /// The run's output directory already holds a run.
     ///
     /// FR-2.6b. Writing into a directory that already holds a run interleaves
-    /// two runs' evidence. In a measurement taken before the default directory
-    /// carried a process id, a second jig's result reported a failing task
-    /// belonging to the first, and both callers were handed the same conflated
+    /// two runs' evidence: a second jig's result reports a failing task
+    /// belonging to the first, and both callers are handed the same conflated
     /// file. FR-2.6e separates two invocations, so what reaches this is an
     /// `--output-dir` named twice, a rerun into a directory kept from before,
     /// or two runs of the library inside one process.

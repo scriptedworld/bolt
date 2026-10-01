@@ -9,8 +9,7 @@
 //! Envelopes and manifests are read through wrench, by FR-1.12, which also
 //! validates them against their schemas on the way in. A substring check over
 //! the raw text cannot tell `success: true` from a command whose name happens
-//! to be `true`, and the first draft had exactly that defect, found on three
-//! separate reads.
+//! to be `true`.
 
 use std::fs;
 use std::os::unix::fs as unix_fs;
@@ -500,7 +499,7 @@ fn a_jig_that_will_not_parse_is_refused() {
 ///
 /// Bolt validates what wrench's schema says, not what bolt would have chosen.
 /// Requiring `version` here refuses six of the estate's jigs, bolt's own among
-/// them, and nothing showed it until the Rust bolt was pointed at its own gate.
+/// them.
 #[test]
 fn a_jig_without_a_version_is_read() {
     let root = tree();
@@ -527,8 +526,7 @@ fn a_jig_without_a_version_is_read() {
 ///
 /// Asserted on the text as well as the variant. A reader meeting this has a jig
 /// written against a mechanism that no longer exists, and the variant name
-/// reaches nobody. Wrench's real jig has two of these in its gate, which is
-/// where the case turned up.
+/// reaches nobody. Wrench's real jig has two of these in its gate.
 #[test]
 fn a_task_carrying_the_retired_jig_field_is_refused_by_name() {
     let root = tree();
@@ -1278,8 +1276,8 @@ fn matching_selects_and_excluding_removes_relative_to_the_base() {
 ///
 /// Asserted by round trip, not by shape. `format!("'{}'", path)` is the obvious
 /// implementation and passes any starts-with/ends-with check, and a path
-/// containing a single quote escapes it: against the first draft, a file named
-/// `'a'; touch <path>/PWNED; '.txt'` ran the injected command.
+/// containing a single quote escapes it: against that implementation, a file
+/// named `'a'; touch <path>/PWNED; '.txt'` runs the injected command.
 #[test]
 fn every_substituted_path_is_quoted_individually() {
     let root = tree();
@@ -3464,9 +3462,8 @@ fn nothing_bolt_writes_carries_a_timing() {
 // COVERS FR-6.11 | regression
 /// A silent adapter does not inherit an earlier fold's envelope.
 ///
-/// Carried over from the Go build, where the case first showed up. An
-/// `output.yaml` already in the work directory would satisfy "the adapter wrote
-/// one", so a silent adapter would be handed a verdict it did not reach and
+/// An `output.yaml` already in the work directory would satisfy "the adapter
+/// wrote one", so a silent adapter would be handed a verdict it did not reach and
 /// FR-6.11's `adapter-wrote-nothing` would never fire.
 ///
 /// The command plants the envelope, not an earlier run, which reaches the
@@ -4809,7 +4806,7 @@ fn a_jig_setting_no_limit_lets_a_slow_command_finish() {
 /// Commands that each outrun the limit on their own cannot separate the two. A
 /// bolt that restarts the budget every execution passes that version, because
 /// the first execution is killed either way and FR-4.11b then stops the rest,
-/// so nothing downstream can tell the two apart. Found by mutation.
+/// so nothing downstream can tell the two apart.
 #[test]
 fn a_tasks_limit_covers_all_its_executions_together() {
     let root = tree();
@@ -4884,7 +4881,6 @@ fn a_tasks_limit_covers_all_its_executions_together() {
 /// its executions carry, since there are no executions. A test for FR-4.13 with
 /// a killed execution passes against a merge that drops the run's reason
 /// entirely, because it finds the same words on that execution's envelope.
-/// Found by mutation.
 #[test]
 fn a_run_with_no_budget_left_executes_nothing_and_still_writes_a_result() {
     let root = tree();
@@ -5768,7 +5764,7 @@ fn composing_tree() -> TempDir {
 /// terminal is doing the identical thing, so there is one code path because
 /// there was never a second one to keep in step.
 ///
-/// Measured, not just claimed. The composed run's child result and this one
+/// The composed run's child result and this one
 /// are compared on the reason text, so a bolt that treated an invocation from a
 /// jig differently would show it here and not only in a comment.
 ///
@@ -5929,9 +5925,8 @@ fn bolt_composes_as_a_command_and_the_childs_verdict_folds_in() {
 /// an absent result as a bolt that died, so a silent refusal is the one failure
 /// that misreports itself.
 ///
-/// Measured before FR-10.3a was implemented: `bolt nosuchjig <dir>
-/// --output-dir <out>` wrote `out/result.yaml` and printed zero bytes on
-/// stdout.
+/// Without FR-10.3a, `bolt nosuchjig <dir> --output-dir <out>` writes
+/// `out/result.yaml` and prints zero bytes on stdout.
 #[test]
 fn a_refusal_prints_where_it_recorded_itself() {
     let root = tree();
@@ -6076,9 +6071,8 @@ fn a_passing_run_under_the_flag_is_zero() {
 /// optional is satisfied; a required one that never ran has failed. Neither is
 /// an absent verdict, so nothing is being collapsed.
 ///
-/// Wrench's prototype and then bolt were both built with the third status
-/// first, and I corrected both. It is kept as a test, not a comment, because
-/// the reasoning that produced the wrong version is genuinely persuasive.
+/// It is kept as a test, not a comment, because the reasoning for a third
+/// status is genuinely persuasive.
 ///
 /// Asserted as a pair on one refusal, flag and no flag, which makes it a claim
 /// about the flag and not about refusals: the numbers being equal is the
@@ -6494,7 +6488,7 @@ fn a_commit_sha_from_the_caller_reaches_the_manifest() {
 /// These are three pure functions and the run path exercises them only through a
 /// task that actually times out, which is slow and asserts something else.
 /// Without these tests the arithmetic itself goes unmeasured, and
-/// `src/limit.rs` sat at 77.4% of lines, under the gate's per-file coverage
+/// `src/limit.rs` falls to 77.4% of lines, under the gate's per-file coverage
 /// line.
 ///
 /// `soonest` taking a set deadline over none is the arm that most needs a test.
