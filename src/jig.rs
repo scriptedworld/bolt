@@ -1,6 +1,6 @@
 //! A jig, and the tasks it declares.
 //!
-//! FR-3.4d makes a jig YAML, read through wrench by FR-1.12 and validated
+//! A jig is YAML, read through wrench by FR-1.12 and validated
 //! against its schema on the way in by FR-1.5. Bolt takes the parsed value as
 //! `serde_json::Value` from wrench and derives these types off it, so a jig is
 //! a struct and not eighty lines of map digging.

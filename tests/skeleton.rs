@@ -141,6 +141,63 @@ fn what_a_run_concluded_is_in_its_files_and_not_its_streams() {
     assert_eq!(captured, "broken\n", "the command's stdout was not kept");
 }
 
+// COVERS FR-1.2 | positive
+/// A tool bolt has never seen runs, and its adapter's verdict is the run's.
+///
+/// `frobnicate` and its adapter are invented here, so nothing in bolt can know
+/// them. The source half asserts the only program bolt starts by name is the
+/// `sh` a command line runs in.
+#[test]
+fn a_tool_bolt_has_never_seen_runs_on_the_jigs_word() {
+    let root = tree();
+    write_adapter(root.path(), "frobnicate", "echo 'frobnicated: badly'\n");
+    write_adapter(
+        root.path(),
+        "frob-adapter",
+        concat!(
+            "for a in \"$@\"; do case $prev in --stdout) out=$a;; --work-dir) w=$a;; esac; prev=$a; done\n",
+            "grep -q badly \"$out\" || { printf '\"success\": true\\n' > \"$w/output.yaml\"; exit 0; }\n",
+            "printf '\"success\": false\\n\"reasons\":\\n  - \"kind\": \"frobnicated\"\\n    \"message\": \"badly\"\\n' > \"$w/output.yaml\"\n",
+        ),
+    );
+    write_jig(
+        root.path(),
+        "frob",
+        "  - name: frob\n    command: \"./frobnicate\"\n    adapter: frob-adapter\n",
+    );
+
+    let outcome = bolt::run::run("frob", root.path()).expect("the run completes");
+
+    assert!(
+        !outcome.success,
+        "the adapter's failing verdict was not the run's"
+    );
+    let kinds: Vec<String> = reasons_in(&outcome.output_dir.join(bolt::run::RESULT_FILE))
+        .into_iter()
+        .map(|(kind, _)| kind)
+        .collect();
+    assert_eq!(
+        kinds,
+        ["frobnicated"],
+        "the adapter's own reason did not reach the result"
+    );
+
+    for entry in fs::read_dir(repository().join("src"))
+        .expect("src")
+        .filter_map(Result::ok)
+    {
+        let source = fs::read_to_string(entry.path()).expect("a source file");
+        for started in source.split("Command::new(").skip(1) {
+            assert!(
+                started.starts_with("\"sh\")"),
+                "{} starts a program by name: Command::new({}",
+                entry.path().display(),
+                started.lines().next().unwrap_or_default(),
+            );
+        }
+    }
+}
+
 // COVERS FR-1.3 | positive
 /// A jig that transforms files and judges nothing is an ordinary run.
 #[test]
@@ -6690,6 +6747,84 @@ fn a_run_needs_only_the_jig_and_the_directory() {
     assert!(
         verdict(Path::new(&result), &wrench::schemas::ENVELOPE),
         "the run failed"
+    );
+}
+
+/// Every path under `root` with each file's contents, for before-and-after.
+fn snapshot(root: &Path) -> Vec<(String, Vec<u8>)> {
+    listing(root)
+        .into_iter()
+        .map(|relative| {
+            let path = root.join(&relative);
+            let bytes = if path.is_file() {
+                fs::read(&path).expect("readable")
+            } else {
+                Vec::new()
+            };
+            (relative, bytes)
+        })
+        .collect()
+}
+
+// COVERS FR-11.2 | property
+/// A run whose commands only read leaves everything outside its output
+/// directory as it was.
+///
+/// The tree, and a home directory the run is given, are compared path for path
+/// and byte for byte. A bolt keeping a state file, a cache or a lock anywhere
+/// but its output directory changes one of the two.
+#[test]
+fn a_run_writes_only_its_output_directory() {
+    let root = tree();
+    let home = tree();
+    let out = tree();
+    write(root.path(), "a.txt", "a");
+    write(root.path(), "sub/b.txt", "b");
+    write_jig(
+        root.path(),
+        "read",
+        concat!(
+            "  - name: each\n    command: \"cat {each_path}\"\n    matching: [\"**/*.txt\"]\n",
+            "  - name: fail\n    command: \"sh -c 'exit 1'\"\n",
+        ),
+    );
+    let tree_before = snapshot(root.path());
+    let home_before = snapshot(home.path());
+
+    let finished = bolt()
+        .env("HOME", home.path())
+        .env("XDG_STATE_HOME", home.path().join(".local/state"))
+        .env("XDG_CACHE_HOME", home.path().join(".cache"))
+        .env("XDG_CONFIG_HOME", home.path().join(".config"))
+        .arg("--output-dir")
+        .arg(out.path().join("run"))
+        .arg("read")
+        .arg(root.path())
+        .output()
+        .expect("bolt runs");
+
+    assert_eq!(
+        finished.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&finished.stderr),
+    );
+    assert!(
+        out.path()
+            .join("run")
+            .join(bolt::run::RESULT_FILE)
+            .is_file(),
+        "the run wrote no result, so it did not run",
+    );
+    assert_eq!(
+        snapshot(root.path()),
+        tree_before,
+        "the run changed the tree"
+    );
+    assert_eq!(
+        snapshot(home.path()),
+        home_before,
+        "the run wrote under HOME"
     );
 }
 

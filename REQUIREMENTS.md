@@ -53,8 +53,9 @@ rediscover it. An intermediate step inside a script produces no envelope, no
 manifest and no work directory, so §19's worked example loses its evidence
 exactly where it was interesting: the analyzer's own input and verdict are no
 longer on disk. A pipeline wanting every stage evidenced writes each stage as
-its own task and passes files through the tree, which FR-4.6 permits and does
-not help with.
+its own task and passes files through the tree, which
+`docs/DECISIONS/tasks-do-not-consume-other-task-output.md` permits and does not
+help with.
 
 ---
 
@@ -63,12 +64,11 @@ not help with.
 | ID | Requirement | |
 |---|---|---|
 | FR-1.1 | A run executes the command lines its jig declares and records what happened as files on disk. Nothing a consumer needs to know about the outcome exists only in bolt's own output streams. | [A/D] |
-| FR-1.2 | Bolt holds no knowledge of any particular tool. Which commands run, and what their output means, come from the jig. Adding a language or a checker to the ecosystem changes a jig and an adapter, never bolt. | [A] |
+| FR-1.2 | Which commands run, and what their output means, come from the jig and its adapters. Bolt's source starts one program by name, the `sh` a command line runs in, and a jig naming a tool bolt has never seen runs it and takes its adapter's verdict. Adding a language or a checker to the ecosystem changes a jig and an adapter, never bolt. | [A] |
 | FR-1.3 | Task ETL is the abstraction and quality checking is its first use. A jig that runs no checker and reaches no verdict about code is a legitimate run. | [A/D] |
 | FR-1.4 | A run captures each command's native results whatever form they take: stdout, stderr, exit code, and arbitrary files the command generated. Those results survive the run as evidence. | [A/D] |
 | FR-1.5 | Every file bolt reads as data is parsed and validated against a schema before anything acts on it, a jig, a definitions file and a task's envelope alike. What a schema leaves open stays open; what it requires is checked. | [A] |
 | FR-1.6 | Validation is two steps: can the parser load the file at all, and does the structure it produced match the JSON Schema for that kind of file. Schemas apply to decoded maps and lists, not to text, so one mechanism covers everything bolt reads. | [A] |
-| FR-1.6a | FR-1.5, FR-1.6 and FR-3.4d are ecosystem decisions bolt honours; bolt does not make them. YAML everywhere and JSON Schema over decoded structures apply to every component, and bolt does not get to differ. They are raised against the architecture document and not settled here. | [A] |
 | FR-1.7 | A schema checks shape, not meaning. A command that parsed differently from how it was written is still a string of the right type, and validation passes it. | [D] |
 | FR-1.8 | Validation runs before writing as well as after reading. Bolt checks a file against its schema on the way out, so it cannot emit something it would refuse to read back. | [A] |
 | FR-1.9 | Every read and every write of a file bolt treats as data goes through wrench, which requires a schema. Bolt's source reaches no YAML crate and no JSON codec's text, byte or stream entry point of its own, so validation is not a step a call site can omit. | [A] |
@@ -116,9 +116,7 @@ not help with.
 | FR-3.4a | `excluding` is its counterpart, taking the same list of patterns or literal paths and removing from what `matching` selected. A task wanting everything but one shape of file says so directly instead of writing a pattern that means "not that", and a single known-bad file is named outright. | [A] |
 | FR-3.4b | `matching` and `excluding` belong to a task that consumes paths. On a command naming neither path variable they are a jig error, caught in validation and not quietly ignored. Whether a whole-project command should run at all is a question about where the jig is pointed, and FR-4.4 already answers it: a command naming neither variable always executes. | [A] |
 | FR-3.4e | FR-4.4b's guarantee reaches only the tasks bolt selects for. A command handed a directory, whose tool finds its own files, is opaque: bolt cannot know whether it read a thousand files or none, so a tool that silently matched nothing reports a pass and bolt has nothing to notice. Where that matters, the task takes `matching` and a path variable so the selection is bolt's and FR-4.4b applies. | [D] |
-| FR-3.4f | Tasks that pass a directory directly to their tool cannot record the selected paths promised by FR-9.5. This is a reason to move selection into the jig, not a reason against the rule. | [D] |
 | FR-3.4c | The jig format carries comments, and an entry's reasoning sits beside it. Somebody asking why a path is excluded finds the answer where the path is, without reconstructing it from git history. | [A/D] |
-| FR-3.4d | A jig is YAML, as an envelope is. One serialisation everywhere: one parser, one schema mechanism, and a jig and a result readable by the same tooling. | [A] |
 | FR-3.5 | Filter patterns are relative to the base directory of the run they are declared in. A jig written for reuse therefore says `**/*.go` and never names the subtree it was dropped into, which is what makes it the same jig at the repository root and at `backend/`. | [A] |
 | FR-3.6 | Organisation-wide, language-specific and repository-specific behaviour compose through jigs, with none of it hard-coded into bolt. | [?] |
 | FR-3.7 | A jig maintained outside the repository and made available inside it, as toolbox's `link-toolbox` does, runs without being copied into the tree. | [D] |
@@ -130,7 +128,6 @@ not help with.
 | FR-3.10b | `requires` is checked before any task executes and the run refuses, naming what is missing. An incomplete toolchain is known before half a gate has run, not partway through it. | [D] |
 | FR-3.10c | FR-4.10 still stands for a command that cannot start for any other reason. Checking up front is a guarantee about `requires`, not about every way a process fails to launch. | [D] |
 | FR-3.10d | A project's own jig has no image built from it, so `requires` naming a tool the base image lacks is caught by FR-3.10b at the start of the run. Installing it is not bolt's to do. | [D] |
-| FR-3.11 | A jig's `requires` is readable by things other than bolt, and nothing depends on bolt gathering anything up. What a consumer builds from that list is the consumer's business. | [A] |
 | FR-3.12 | Bolt validates the jig it is handed and does not go looking for others. Every reachable jig being well-formed is a checker's job, run over the config directory as a task like any other, so a broken jig fails a gate instead of surfacing halfway through one, and nothing is left unvalidated: the jig bolt is given fails at once and the checker covers the ones bolt was never asked to read. | [A/D] |
 | FR-3.14 | A jig's task set is fixed by the jig. No task is conditional on anything read at run time, so two runs of one jig show the same tasks and differ only where the tree differed. State cannot be relied on to be the same between runs, and a task set that varied with it would make two results incomparable without either of them saying so. FR-4.4's empty selection is not an exception: what a task matched is a property of the tree being run over, which is the run's input and is recorded in its manifest, where a condition read at run time is neither. | [A/D] |
 | FR-3.14a | A task wanted in some directories and not others is a separate jig, listed by the jigs that want it and left out of the ones that do not. FR-5.18 already has one jig invoked by many tasks at different directories, so selecting per directory is what a project jig is for, and the selection is readable in the jig instead of being decided during the run. | [?] |
@@ -155,8 +152,7 @@ not help with.
 | FR-4.4e | The default is failure because the alternative hides the common defect. A pattern that matches nothing is usually a typo or a moved directory, and under a silent skip it stays green forever. Declaring the exception costs one line in the jig that spans languages, written by whoever knew it spanned them, and it buys a check on every jig written by somebody who did not expect to match nothing. | [D] |
 | FR-4.4f | The exit status is unaffected. Bolt carried the run out, so FR-10.2 applies and it exits 0 with `success: false` in the result. An empty selection is a finding about the jig or the project, not bolt failing to execute. | [D] |
 | FR-4.4a | The empty-selection rule holds for every task, because every task is a command task by FR-5.18. A task composing bolt over a subdirectory that is not there matches nothing and fails by FR-4.4b, and says `optional` when a missing subproject is expected. | [A/D] |
-| FR-4.5 | Tasks execute serially, because one execution at a time is the simplest thing that works and not because anything requires it. FR-4.6 and FR-4.7 already give the independence parallelism would need, and FR-9.2a takes the ordinals from the matched list and not from execution order, so nothing in the evidence layout depends on it either. | [A/D] |
-| FR-4.6 | No task consumes another task's output. Work needing several steps is one script producing one exit code and one output. | [A] |
+| FR-4.5 | Tasks execute serially, because one execution at a time is the simplest thing that works and not because anything requires it. FR-4.7 and the decision that no task consumes another's output already give the independence parallelism would need, and FR-9.2a takes the ordinals from the matched list and not from execution order, so nothing in the evidence layout depends on it either. | [A/D] |
 | FR-4.7 | Because no task depends on another, the merged result does not vary with the order tasks ran in. | [D] |
 | FR-4.8 | A failing task does not stop the run. The tasks after it still execute, because a run that stops early throws away the evidence they would have produced and leaves a reader unable to tell what else was wrong. | [A] |
 | FR-4.9 | A task may set `short-circuit-failure`, defaulting to false, to stop the run when it fails. A jig gets stopping only by asking for it. | [A] |
@@ -347,7 +343,7 @@ A run's whole output is one directory:
 | ID | Requirement | |
 |---|---|---|
 | FR-11.1 | A run needs nothing beyond the jig it was named, the directory it was pointed at, and what the walk finds inside it. Control-plane state is absent from a worker sandbox, so a run depending on it could not execute there. The row says one jig and a directory, not jigs and paths, because FR-2.1a settled one jig and one directory and FR-2.2 has bolt walk that directory instead of being handed a list. A row written in the plural would describe a second interface nobody built. | [D] |
-| FR-11.2 | A run changes no graph state, no task state and no other control-plane record. That is what §4 was about, and it is what makes a run safe to repeat and safe to throw away. It is not a claim that the tree is untouched: FR-9.2d already admits the opposite, since a tool with no output-path flag writes into the tree being checked and nothing in the run removes it, so a formatter run without `--check` rewrites the source. What bolt writes deliberately is the output directory; what a tool writes is the tool's. | [D] |
+| FR-11.2 | What bolt writes is its output directory. A run whose commands write nothing leaves every file outside that directory as it was, in the tree and in the home directory it ran under, so a run is safe to repeat and safe to throw away. That is what §4's control-plane rule asks of a run. It is not a claim that the tree is untouched: FR-9.2d already admits the opposite, since a tool with no output-path flag writes into the tree being checked and nothing in the run removes it, so a formatter run without `--check` rewrites the source. What bolt writes deliberately is the output directory; what a tool writes is the tool's. | [D] |
 | FR-11.3 | The same jig runs against whatever tree state it is pointed at, including a throwaway copy prepared to test a prospective merge. | [D] |
 
 ## 12. The program
@@ -355,7 +351,6 @@ A run's whole output is one directory:
 | ID | Requirement | |
 |---|---|---|
 | NFR-12.1 | Bolt runs itself. Its own quality gate is a bolt run over its own repository. | [A] |
-| NFR-12.2 | Bolt installs into a standardised development image beside a toolchain it knows nothing about. | [D] |
 | NFR-12.3 | Bolt is Apache-2.0 licensed, with a `NOTICE` naming the copyright holder. Every manifest that declares a licence declares the same one, so the machine-readable answer and the file agree. | [A] |
 | NFR-12.4 | Bolt builds without a C toolchain, so a cross-build needs no target compiler. Nothing in the dependency tree compiles C and `libc` is declarations only. Anything bolt links against inherits that constraint. The binary is dynamically linked against the system `libc`, `libm` and `libgcc_s`; a single-file image would need a musl target, and nothing requires one. | [D] |
 
@@ -468,4 +463,10 @@ Numbering therefore has gaps, and a gap is the record working, not an oversight.
 | FR-3.14b | 2026-08-30 | FR-3.14, which absorbed it. |
 | FR-10.8a | 2026-08-30 | FR-10.8, which absorbed it. |
 | FR-6.1b | 2026-08-30 | Nothing. It recorded that FR-6.1a's count had been corrected twice, which is history git holds. |
+| FR-1.6a | 2026-10-01 | silo, which owns estate decisions: YAML everywhere and JSON Schema over decoded structures. Filed as `clank/inbox/silo/bolt-yaml-everywhere-rows-retired-to-silo`. FR-1.5 and FR-1.6 keep bolt's own behaviour. |
+| FR-3.4d | 2026-10-01 | silo, by the same entry. That a jig is YAML is an estate decision bolt honours through FR-1.5. |
+| FR-3.11 | 2026-10-01 | anvil, which builds from a jig's `requires`. Filed as `clank/inbox/anvil/bolt-image-rows-retired-to-anvil`. FR-3.10 keeps the declaration. |
+| NFR-12.2 | 2026-10-01 | anvil, by the same entry. Bolt in the standard image is the image's requirement. |
+| FR-3.4f | 2026-10-01 | Nothing. Its evidence was a script reading every sibling repository, so no test in a clone of bolt could discharge it. FR-9.5 still says what a manifest records. |
+| FR-4.6 | 2026-10-01 | `docs/DECISIONS/tasks-do-not-consume-other-task-output.md`, which records the decision. Bolt offers no mechanism for one task to read another's output, so there is no behaviour to test. |
 | FR-11.2b | 2026-08-30 | Nothing. It narrated a superseded row and a test derived from it; the shape is in `docs/LESSONS/a-check-that-answers-a-weaker-question.md`. |
