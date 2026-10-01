@@ -40,8 +40,7 @@ searching for the newest timestamped directory.
 
 A timestamp search is especially unsafe after a refusal that creates no output
 directory. It returns the preceding run and lets a caller grade old evidence as
-the current result. A caller that needs a known location supplies
-`--output-dir`; every caller reads the path bolt prints.
+the current result.
 
 Bolt refuses to reuse a directory that already contains a run. Reuse could
 interleave evidence from different runs or destroy the earlier record.

@@ -246,10 +246,11 @@ Anything else is an adapter's own, and that set is open. An adapter writes
 whatever kind its format warrants, `findings` among them, and bolt does not
 second-guess it.
 
-`evidence-missing` supersedes `nonzero-exit`. The evidence check returns first,
-so where a task declared a file, did not produce it, and also exited non-zero,
-the exit status is not reported. A tool that never ran is the usual cause of
-both.
+Where a task declared a file, did not produce it, and also exited non-zero, a
+task with no adapter reports `nonzero-exit` beside `evidence-missing`. A task
+that names an adapter reports `evidence-missing` alone: the evidence check
+returns before the adapter runs, so the exit status is not reported. A tool that
+never ran is the usual cause of both.
 
 ## Exit status
 

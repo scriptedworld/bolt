@@ -12,8 +12,7 @@ of the tools does, and it decays into something nobody will touch.
 
 Bolt knows nothing about any tool it runs. It executes what the jig declares and
 hands each execution's output to an adapter that turns it into a verdict, so
-swapping a linter for another linter is an edit to the jig. Bolt is the part
-that does not have to change.
+swapping a linter for another linter is an edit to the jig.
 
 ## Where this stands, and what is not done
 

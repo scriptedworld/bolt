@@ -390,8 +390,7 @@ fails naming the test and prints the row's own text back, which for an
 accidental retirement is the superseded-by cell reading as nonsense.
 
 So the window is the gap between writing a requirement and writing its test.
-Written together there is no window, which is the argument the chain already
-makes for writing them together.
+Written together there is no window.
 
 A requirement can be retired or superseded. Its ID is never reused, because
 reuse silently rewrites what every existing reference to that ID meant and

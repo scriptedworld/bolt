@@ -12,8 +12,7 @@ execution's output to an adapter that turns it into a verdict, and folds those
 verdicts into a result. Replacing a linter is an edit to a jig, not to bolt.
 
 A gate that knows about its tools has to change whenever they do, and gates
-written that way decay into shell scripts nobody will touch. Bolt is the part
-that does not have to change.
+written that way decay into shell scripts nobody will touch.
 
 ### Where it sits against its siblings
 
@@ -83,8 +82,7 @@ Two earlier implementations existed and neither is available. The first is
 sealed for the provenance reason above. The second was Go, and it was deleted
 once this tree reached parity instead of being kept as a fallback.
 
-So a claim here can be checked against this repository or not at all. There is
-no older tree to appeal to, and that is intended.
+So a claim here can be checked against this repository or not at all.
 
 ## Layout
 
@@ -182,19 +180,21 @@ The one that misleads is `adapter-failed`. It reads like a verdict an adapter
 reached and is bolt reporting that it could not get one out of the adapter at
 all.
 
-### `evidence-missing` supersedes `nonzero-exit`, and drops the status
+### `evidence-missing` drops the status where the task names an adapter
 
-The evidence check returns before the exit-code path, so whenever both apply the
-status is lost. A task declaring `coverage.xml` and not writing it reports
-`evidence-missing` where the same task with no declared evidence would report
-`nonzero-exit` and the number.
+A task with no adapter that declares `coverage.xml`, does not write it and exits
+non-zero reports `evidence-missing` and, beside it, `nonzero-exit` with the
+number. `evidence-missing` is the more actionable reason and the status is the
+more diagnostic fact. A `pytest` exit of 4 is a usage error and means something
+different from 1, and it is usually *why* the coverage file is absent, because
+the tool never ran. Reporting only the symptom sends a reader to their coverage
+configuration when the command line is what is wrong.
 
-It is the more actionable reason and it drops the more diagnostic fact. A
-`pytest` exit of 4 is a usage error and means something different from 1, and it
-is usually *why* the coverage file is absent: the tool never ran. Reporting only
-the symptom sends a reader to their coverage configuration when the command line
-is what is wrong. Recorded as a question in `NEXT_STEPS.md` and left unchanged,
-because it alters what every gate downstream of bolt prints.
+A task declaring both evidence and an adapter still loses the status. The
+evidence check returns before the adapter runs, and FR-6.3 leaves the exit
+code's meaning to the adapter, so bolt adds no `nonzero-exit` of its own. A
+command a time limit killed carries none either, by FR-6.9a. Whether the
+adapter case should keep the status is a question in `NEXT_STEPS.md`.
 
 ## Conventions particular to this repository
 
@@ -254,8 +254,8 @@ has been to split the function.
   to "no verdict" would overrule an authoritative field with its neighbour. The
   deeper reason is that a task set always resolves: an optional task matching
   nothing is satisfied, a required one that never ran has failed, and neither is
-  an absent verdict. Two other designs were built and both were corrected: a
-  no-verdict code, and then a code per remedy.
+  an absent verdict. A no-verdict code and a code per remedy are both rejected
+  designs.
 - Discrimination between refusals lives in the envelope's `kind`, not in the
   exit status. Every refusal names its own, so a base that is not there is
   `base-missing` where a task carrying a retired field is `jig-task-retired`.

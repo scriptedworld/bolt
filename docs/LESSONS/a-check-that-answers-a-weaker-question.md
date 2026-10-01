@@ -1,6 +1,6 @@
 # A check that answers a weaker question than the one it is named for
 
-The check runs. It reports success. It did not look at the thing.
+The check runs and reports success without having looked at the thing.
 
 That differs from a check that fails wrongly, and is worse, because a failure
 gets investigated and this does not. To whoever is running it, a check that
@@ -82,8 +82,7 @@ you own is the cheapest second source there is and the one you are least likely
 to consult.
 
 Make the scope visible in the output. `141 of 245 … 3 open and exempt` can be
-reconciled by a reader; `failed: 3` cannot. A check that prints only its verdict
-cannot be audited by the person reading it.
+reconciled by a reader; `failed: 3` cannot.
 
 ## Which commands the remedies get skipped on
 
@@ -127,8 +126,7 @@ on the command over its output: a command re-runs and a number does not.
 
 ## The one that generalises furthest
 
-Running the wrong binary is re-running the claim. The check does not fail and
-does not fire, and from the inside that is indistinguishable from it passing.
-Anything that re-derives a fact from an artefact has this property. So a passing
+`a-second-build-answers-for-the-tree.md` is the sharpest case: running the wrong
+binary re-runs the claim, and the check neither fails nor fires. Anything that re-derives a fact from an artefact has this property. So a passing
 check settles little on its own, and the question to keep asking is whether this
 check could have failed.

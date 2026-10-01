@@ -41,7 +41,7 @@ interleave their evidence.
 A jig that runs a destructive command, an adapter that does something
 unexpected, or a definitions file that redirects a command at another path. All
 three are the jig author's to answer for, in the same way a Makefile's contents
-are. Bolt carrying them out as written is what it is for.
+are.
 
 A tool bolt ran reporting a vulnerability in your project is that tool's finding,
 not bolt's.

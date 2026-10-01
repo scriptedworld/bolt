@@ -25,8 +25,7 @@ artefact that answers wrongly defeats the check meant to catch it.
 
 Running the wrong binary is re-running the claim. The check does not fail; it
 does not fire, because from the inside it is indistinguishable from the check
-passing. That is what makes it worse than stale prose, which at least still
-looks like something to be verified.
+passing.
 
 One instance of a class collected in `a-check-that-answers-a-weaker-question.md`,
 and the sharpest of them, because the artefact answering is the same kind of
@@ -35,7 +34,7 @@ thing as the artefact that should have answered.
 Same shape as the Go build issuing false greens from a `+dirty` tree: the thing
 that looks like the tool is not the tool the tree describes.
 
-## What catches it is disagreement, not measurement
+## What catches it is disagreement with a measurement
 
 The release binary was reached for first from wrench, because it was the obvious
 one, and `target/debug` was tried only because the wording did not match what

@@ -1,9 +1,9 @@
 # The adapter contract
 
-What bolt hands an adapter, and what it expects back. It is written down here
-because it was written down nowhere else: a port had to derive it by reading the
-Go build's `internal/adapter/adapter.go`, and three of toolbox's four adapters
-had drifted onto a retired version of it with nothing detecting the drift.
+What bolt hands an adapter, and what it expects back. No other document states
+it: a port otherwise derives it by reading the Go build's
+`internal/adapter/adapter.go`, and three of toolbox's four adapters drifted onto
+a retired version of it with nothing detecting the drift.
 
 Verified against `src/adapter.rs` and `src/run.rs` at bolt `1a77e4e`.
 
@@ -36,8 +36,7 @@ else the tool happened to leave in the work directory. Declared, never
 discovered: discovery would hand an adapter whatever was lying around and let
 something irrelevant decide a run.
 
-Variables are underscored and flags are hyphenated, and that is a rule, not an
-accident: `{work_dir}` in a jig, `--work-dir` on a command line.
+Variables are underscored and flags are hyphenated, as a rule: `{work_dir}` in a jig, `--work-dir` on a command line.
 
 ## What it gets
 

@@ -36,7 +36,8 @@ The remaining implementation work is:
 ## Results and refusals
 
 - Decide whether `evidence-missing` should retain a command's nonzero exit
-  status when both conditions apply.
+  status for a task that declares both evidence and an adapter. A task with no
+  adapter already carries both reasons.
 - Define ownership and retention for run directories.
 - Decide whether result envelopes need a schema-version field and whether
   adapter-specific metadata is open-ended.
