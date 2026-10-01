@@ -2014,7 +2014,8 @@ fn an_empty_selection_leaves_the_exit_status_alone() {
 ///
 /// Both tasks fail with different messages, so the reasons have an order to get
 /// wrong. The two runs share a base and differ only in their output directory,
-/// which is replaced before comparing.
+/// whose name is replaced before comparing. Replacing the name and not the
+/// whole path holds whether FR-8.6 wrote the references relative or absolute.
 #[test]
 fn task_order_does_not_change_the_result() {
     let root = tree();
@@ -2028,7 +2029,7 @@ fn task_order_does_not_change_the_result() {
         let outcome = run_into(jig, root.path(), &out.path().join(jig)).expect("the run completes");
         fs::read_to_string(outcome.output_dir.join(bolt::run::RESULT_FILE))
             .expect("the result")
-            .replace(&outcome.output_dir.display().to_string(), "OUT")
+            .replace(&format!("/{jig}/{}/", bolt::run::WORK_DIR), "/OUT/work/")
     };
 
     assert_eq!(
@@ -3310,8 +3311,11 @@ fn evidence_is_keyed_by_execution_and_carries_args_and_result() {
         .get("result")
         .and_then(Value::as_str)
         .unwrap_or_else(|| panic!("the entry carries no result filepath: {entry:?}"));
+    // Relative to the base when this test runs outermost and absolute when a
+    // gate's bolt runs it nested, by FR-8.6. Joining onto the base reads both.
+    let base = fs::canonicalize(root.path()).expect("the base");
     assert!(
-        Path::new(result).is_file(),
+        base.join(result).is_file(),
         "the result filepath does not name a file that exists: {result:?}",
     );
 
@@ -4533,6 +4537,176 @@ fn the_result_records_the_base_the_run_was_pointed_at() {
         fs::canonicalize(root.path()).expect("the base resolves"),
         "the result names the wrong base",
     );
+}
+
+/// Run the built binary as an outermost bolt, or nested at `depth`, and read
+/// the `result.yaml` it printed.
+///
+/// The depth is set or removed explicitly, so the answer does not move with the
+/// depth this test process itself was started at.
+fn result_at_depth(jig: &str, base: &Path, output_dir: &Path, depth: Option<&str>) -> Value {
+    let mut command = bolt();
+    match depth {
+        Some(level) => command.env(bolt::depth::DEPTH, level),
+        None => command.env_remove(bolt::depth::DEPTH),
+    };
+    let finished = command
+        .env_remove(bolt::depth::CEILING)
+        .arg("--output-dir")
+        .arg(output_dir)
+        .arg(jig)
+        .arg(base)
+        .output()
+        .expect("bolt runs");
+    let printed = String::from_utf8_lossy(&finished.stdout).trim().to_owned();
+    assert!(
+        !printed.is_empty(),
+        "bolt printed no result: {}",
+        String::from_utf8_lossy(&finished.stderr),
+    );
+    read_validated(Path::new(&printed), &wrench::schemas::ENVELOPE)
+}
+
+/// Every `metadata.evidence.*.result` in a result, keyed by execution.
+fn evidence_results(result: &Value) -> Vec<(String, String)> {
+    result["metadata"]["evidence"]
+        .as_object()
+        .expect("an evidence mapping")
+        .iter()
+        .map(|(key, entry)| {
+            let path = entry["result"].as_str().expect("a result path").to_owned();
+            (key.clone(), path)
+        })
+        .collect()
+}
+
+// COVERS FR-8.6 | positive
+/// The outermost result names each constituent relative to the base, and a
+/// nested one names it absolutely.
+///
+/// Run three times over one tree: outermost into the default place inside the
+/// base, outermost into a directory outside it, and nested. Each relative path
+/// resolves against the base to the file it names.
+#[test]
+fn only_the_outermost_result_is_relative_to_the_base() {
+    let root = tree();
+    let elsewhere = tree();
+    write(root.path(), "a.txt", "a");
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: each\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+    );
+    let base = fs::canonicalize(root.path()).expect("the base");
+
+    let inside = result_at_depth("check", root.path(), &root.path().join("run"), None);
+    let outside = result_at_depth("check", root.path(), &elsewhere.path().join("run"), None);
+    let nested = result_at_depth(
+        "check",
+        root.path(),
+        &elsewhere.path().join("nested"),
+        Some("1"),
+    );
+
+    for (key, path) in evidence_results(&inside) {
+        assert_eq!(
+            path,
+            format!("run/work/{key}/output.yaml"),
+            "inside the base"
+        );
+        assert!(base.join(&path).is_file(), "{path} does not resolve");
+    }
+    for (_, path) in evidence_results(&outside) {
+        assert!(path.starts_with("../"), "outside the base: {path}");
+        assert!(base.join(&path).is_file(), "{path} does not resolve");
+    }
+    for (_, path) in evidence_results(&nested) {
+        assert!(Path::new(&path).is_absolute(), "nested: {path}");
+    }
+    assert_eq!(
+        inside["metadata"]["base"].as_str(),
+        Some(base.display().to_string().as_str()),
+        "the base itself stays absolute, by FR-8.9",
+    );
+}
+
+// COVERS FR-8.7 | edge
+/// The rewrite stops at the structured references.
+///
+/// A tool's adapter puts an absolute path in its reason, and the command line
+/// carries one through `{each_path}`. Both reach the outermost result as they
+/// were written.
+#[test]
+fn a_path_a_tool_printed_is_not_rewritten() {
+    let root = tree();
+    let out = tree();
+    write(root.path(), "a.txt", "a");
+    write_adapter(
+        root.path(),
+        "names-a-path",
+        concat!(
+            "for a in \"$@\"; do case $prev in --stdout) out=$a;; --work-dir) w=$a;; esac; prev=$a; done\n",
+            "printf '\"success\": false\\n\"reasons\":\\n  - \"kind\": \"findings\"\\n    \"message\": \"%s\"\\n' \"$(cat \"$out\")\" > \"$w/output.yaml\"\n",
+        ),
+    );
+    write_jig(
+        root.path(),
+        "check",
+        "  - name: each\n    command: \"echo {each_path}\"\n    matching: [\"*.txt\"]\n    adapter: names-a-path\n",
+    );
+    let file = fs::canonicalize(root.path().join("a.txt"))
+        .expect("the file")
+        .display()
+        .to_string();
+
+    let result = result_at_depth("check", root.path(), &out.path().join("run"), None);
+
+    let message = result["reasons"][0]["message"].as_str().expect("a reason");
+    assert_eq!(message, file, "the reason's text was rewritten");
+    let args = result["metadata"]["evidence"]["each-1"]["args"]
+        .as_str()
+        .expect("args");
+    assert!(args.contains(&file), "args was rewritten: {args}");
+    let (_, reference) = &evidence_results(&result)[0];
+    assert!(
+        Path::new(reference).is_relative(),
+        "the reference was not: {reference}"
+    );
+}
+
+// COVERS FR-9.4b | property
+/// An outermost result moved with its base still finds every constituent.
+///
+/// The project, with its run directory inside it, is renamed after the run.
+/// Every evidence reference resolves against the base's new name.
+#[test]
+fn a_moved_result_still_finds_its_evidence() {
+    let parent = tree();
+    let project = parent.path().join("project");
+    write(&project, "a.txt", "a");
+    write(&project, "b.txt", "b");
+    write_jig(
+        &project,
+        "check",
+        "  - name: each\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+    );
+    result_at_depth("check", &project, &project.join("run"), None);
+
+    let moved = parent.path().join("moved");
+    fs::rename(&project, &moved).expect("the project moves");
+    let result = read_validated(
+        &moved.join("run").join(bolt::run::RESULT_FILE),
+        &wrench::schemas::ENVELOPE,
+    );
+
+    let references = evidence_results(&result);
+    assert_eq!(references.len(), 2, "{references:?}");
+    for (key, path) in references {
+        assert!(
+            moved.join(&path).is_file(),
+            "{key}'s result is lost after the move: {path}",
+        );
+    }
 }
 
 // COVERS FR-10.7b, FR-10.3, FR-10.4 | edge
@@ -6129,6 +6303,9 @@ fn a_jig_run_by_hand_reaches_what_composition_reached() {
 /// output directory. The child's result and manifest name them absolutely, so
 /// they mean the same thing read from the parent's work directory as from the
 /// child's own.
+///
+/// The child is told depth 1, so it is nested whatever depth the test itself
+/// runs at. An outermost child would relativise its result by FR-8.6.
 #[test]
 fn a_childs_paths_are_absolute_whatever_its_parent_wrote() {
     let root = tree();
@@ -6142,7 +6319,7 @@ fn a_childs_paths_are_absolute_whatever_its_parent_wrote() {
         root.path(),
         "outer",
         &format!(
-            "  - name: subproject\n    command: \"env -u {} {}=3 {} inner sub --config-dir . \
+            "  - name: subproject\n    command: \"env {}=1 {}=3 {} inner sub --config-dir . \
              --output-dir child-run\"\n",
             bolt::depth::DEPTH,
             bolt::depth::CEILING,

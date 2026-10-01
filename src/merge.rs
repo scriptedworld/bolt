@@ -1,7 +1,7 @@
 //! Folding every execution's envelope into the run's one result.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use serde_json::{Value, json};
 
@@ -55,7 +55,11 @@ pub fn merge(output_dir: &Path, base: &Path, reasons: &[Value]) -> Result<Outcom
         return Err(Error::NoConstituents);
     }
 
-    let mut folded = fold(&entries)?;
+    // FR-8.6: only the outermost run relativises, and it knows it is outermost
+    // by finding no depth set. A nested run's result is read by its parent, to
+    // which an absolute path means the same thing at any depth, by FR-5.9.
+    let relative_to = (crate::depth::Depth::from_environment().level == 1).then_some(base);
+    let mut folded = fold(&entries, relative_to)?;
 
     // The run's own reasons first. They are why the constituents stop where they
     // do, so a reader meets the explanation before the partial evidence it
@@ -115,7 +119,7 @@ struct Folded {
 /// validate. That case is an adapter that wrote an envelope FR-6.11 would have
 /// caught, so the reason says the constituent failed and does not pretend to
 /// know why.
-fn fold(entries: &[std::path::PathBuf]) -> Result<Folded, Error> {
+fn fold(entries: &[PathBuf], relative_to: Option<&Path>) -> Result<Folded, Error> {
     let mut evidence = serde_json::Map::new();
     let mut reasons = Vec::new();
 
@@ -135,7 +139,7 @@ fn fold(entries: &[std::path::PathBuf]) -> Result<Folded, Error> {
             reasons.extend(carried(&envelope, &name));
         }
 
-        evidence.insert(name, reference(entry));
+        evidence.insert(name, reference(entry, relative_to));
     }
 
     Ok(Folded { evidence, reasons })
@@ -158,8 +162,16 @@ fn fold(entries: &[std::path::PathBuf]) -> Result<Folded, Error> {
 /// A work directory with no readable manifest still gets an entry, carrying its
 /// result and no args. Losing the whole merge over it would discard every other
 /// constituent's evidence to report a missing field in one of them.
-fn reference(entry: &Path) -> Value {
-    let result = entry.join(OUTPUT_FILE).display().to_string();
+///
+/// `result` is relative to `relative_to` where one is given, by FR-8.6. `args`
+/// is left as it ran: FR-8.7 stops the rewrite at the structured path
+/// references, and an argv is text a command was handed.
+fn reference(entry: &Path, relative_to: Option<&Path>) -> Value {
+    let absolute = entry.join(OUTPUT_FILE);
+    let result = relative_to
+        .map_or_else(|| absolute.clone(), |base| relative(&absolute, base))
+        .display()
+        .to_string();
     let args = load_manifest(&entry.join(MANIFEST_FILE))
         .ok()
         .and_then(|manifest| {
@@ -173,6 +185,24 @@ fn reference(entry: &Path) -> Value {
         Some(args) => json!({ "args": args, "result": result }),
         None => json!({ "result": result }),
     }
+}
+
+/// `path` written relative to `base`, both absolute.
+///
+/// An output directory named with `--output-dir` may sit outside the base, so
+/// the walk climbs out with `..` where the two part. Nothing is resolved on
+/// disk: both paths are already absolute by FR-2.4, and the answer has to hold
+/// for a reader who moves the base and the run directory together.
+fn relative(path: &Path, base: &Path) -> PathBuf {
+    let path: Vec<Component> = path.components().collect();
+    let base: Vec<Component> = base.components().collect();
+    let shared = path.iter().zip(&base).take_while(|(a, b)| a == b).count();
+    let mut relative: PathBuf = base[shared..]
+        .iter()
+        .map(|_| Component::ParentDir)
+        .collect();
+    relative.extend(&path[shared..]);
+    relative
 }
 
 /// Read an execution's manifest through wrench, validating it on the way in.

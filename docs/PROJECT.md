@@ -154,7 +154,8 @@ divergence, but it breaks anything naming a directory and the failure presents a
 
 `metadata.evidence` differs in three ways. A task's key carries the ordinal
 (`complexity-1`, where Go wrote `complexity`); the value is one mapping, not a
-list of them; and `result` is absolute, not relative to the base. A consumer
+list of them; and in a nested run's result `result` is absolute, where the
+outermost run's is relative to the base as Go's was. A consumer
 looking a task up by bare name and indexing `[0]` breaks on all three, and it
 breaks by raising, not by reading a wrong value. This
 repository has no production reader of that block. Bolt's tests read it, while

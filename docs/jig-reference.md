@@ -203,12 +203,17 @@ evidence index:
   "evidence":
     "complexity-1":
       "args": "lizard --CCN 15 '/home/you/project/src/run.rs'"
-      "result": "/home/you/project/.bolt-.../work/complexity-1/output.yaml"
+      "result": ".bolt-.../work/complexity-1/output.yaml"
 "reasons":
   - "kind": "nonzero-exit"
     "message": "complexity exited 1"
 "success": false
 ```
+
+Each `result` is relative to `base` in the outermost run, so the result still
+finds its evidence after the project moves with its run directory inside it. A
+run nested under another bolt writes it absolute, for the parent to read. `base`
+and `args` are written as they were in both.
 
 Both files are envelopes in the same shape: `success`, and `reasons` carrying a
 `kind` and a `message` when it is false. A consumer reads one format whatever
