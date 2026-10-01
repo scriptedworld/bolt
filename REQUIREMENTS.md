@@ -463,8 +463,8 @@ Numbering therefore has gaps, and a gap is the record working, not an oversight.
 | FR-3.14b | 2026-08-30 | FR-3.14, which absorbed it. |
 | FR-10.8a | 2026-08-30 | FR-10.8, which absorbed it. |
 | FR-6.1b | 2026-08-30 | Nothing. It recorded that FR-6.1a's count had been corrected twice, which is history git holds. |
-| FR-1.6a | 2026-10-01 | silo, which owns estate decisions: YAML everywhere and JSON Schema over decoded structures. Filed as `clank/inbox/silo/bolt-yaml-everywhere-rows-retired-to-silo`. FR-1.5 and FR-1.6 keep bolt's own behaviour. |
-| FR-3.4d | 2026-10-01 | silo, by the same entry. That a jig is YAML is an estate decision bolt honours through FR-1.5. |
+| FR-1.6a | 2026-10-01 | `silo/docs/DECISIONS/yaml-everywhere-validated-against-the-decoded-structure.md`. FR-1.5 and FR-1.6 keep bolt's own behaviour. |
+| FR-3.4d | 2026-10-01 | `silo/docs/DECISIONS/yaml-everywhere-validated-against-the-decoded-structure.md`. That a jig is YAML is an estate decision bolt honours through FR-1.5. |
 | FR-3.11 | 2026-10-01 | anvil, which builds from a jig's `requires`. Filed as `clank/inbox/anvil/bolt-image-rows-retired-to-anvil`. FR-3.10 keeps the declaration. |
 | NFR-12.2 | 2026-10-01 | anvil, by the same entry. Bolt in the standard image is the image's requirement. |
 | FR-3.4f | 2026-10-01 | Nothing. Its evidence was a script reading every sibling repository, so no test in a clone of bolt could discharge it. FR-9.5 still says what a manifest records. |
