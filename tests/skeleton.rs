@@ -371,6 +371,71 @@ fn validation_needs_nothing_installed() {
     );
 }
 
+// COVERS FR-1.9, FR-1.12 | property
+/// Bolt reads and writes no structured file itself, so wrench is the only route.
+///
+/// Two halves. The manifest takes wrench from the path FR-1.12 names and no
+/// YAML crate of bolt's own, and no source file reaches a JSON codec's text,
+/// byte or stream entry points. `serde_json::from_value` stays allowed: it
+/// derives a type off a value wrench already validated, and reads no file.
+#[test]
+fn every_structured_file_goes_through_wrench() {
+    let manifest = fs::read_to_string(repository().join("Cargo.toml")).expect("Cargo.toml");
+    let wrench = manifest
+        .lines()
+        .find(|line| line.starts_with("wrench = "))
+        .expect("the manifest names wrench");
+    assert!(
+        wrench.contains("path = \"../wrench/rust\""),
+        "wrench is not taken from ../wrench/rust: {wrench}",
+    );
+    let yaml: Vec<&str> = manifest
+        .lines()
+        .filter(|line| {
+            !line.starts_with('#')
+                && line
+                    .split('=')
+                    .next()
+                    .is_some_and(|name| name.contains("yaml"))
+        })
+        .collect();
+    assert!(
+        yaml.is_empty(),
+        "bolt names a YAML crate of its own: {yaml:?}"
+    );
+
+    let codec = [
+        "from_str",
+        "from_slice",
+        "from_reader",
+        "to_string",
+        "to_string_pretty",
+        "to_vec",
+        "to_writer",
+    ];
+    for entry in fs::read_dir(repository().join("src"))
+        .expect("src")
+        .filter_map(Result::ok)
+    {
+        let source = fs::read_to_string(entry.path()).expect("a source file");
+        for name in codec {
+            let called = source.contains(&format!("serde_json::{name}("));
+            let imported = source
+                .lines()
+                .filter(|line| line.trim_start().starts_with("use serde_json"))
+                .any(|line| {
+                    line.split(|c: char| !c.is_alphanumeric() && c != '_')
+                        .any(|word| word == name)
+                });
+            assert!(
+                !called && !imported,
+                "{} reaches serde_json::{name} without wrench",
+                entry.path().display(),
+            );
+        }
+    }
+}
+
 // ---- the invocation ---------------------------------------------------------
 
 // COVERS FR-2.1, FR-2.1a, FR-3.9 | positive
@@ -986,6 +1051,95 @@ fn two_runs_of_one_jig_show_the_same_tasks() {
     assert_eq!(first, second, "the task set moved between runs");
 }
 
+/// The work directory names one run wrote, sorted: the tasks as executed.
+fn executed(outcome: &bolt::Outcome) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(outcome.output_dir.join(bolt::run::WORK_DIR))
+        .expect("work")
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+// COVERS FR-3.1 | property
+/// What bolt executes over a tree is exactly the jig it was handed.
+///
+/// Two jigs over one unchanged tree. Each run executes its own jig's tasks and
+/// none of the other's, so nothing about the tree chose what ran.
+#[test]
+fn what_runs_is_the_jig_and_nothing_else() {
+    let root = tree();
+    write(root.path(), "a.txt", "a");
+    write_jig(
+        root.path(),
+        "one",
+        "  - name: first\n    command: \"sh -c 'exit 0'\"\n  - name: second\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+    );
+    write_jig(
+        root.path(),
+        "two",
+        "  - name: third\n    command: \"sh -c 'exit 0'\"\n",
+    );
+
+    let out = tree();
+    let one = run_into("one", root.path(), &out.path().join("one")).expect("one runs");
+    let two = run_into("two", root.path(), &out.path().join("two")).expect("two runs");
+
+    assert_eq!(executed(&one), ["first-1", "second-1"], "jig one");
+    assert_eq!(executed(&two), ["third-1"], "jig two");
+}
+
+// COVERS FR-3.8 | property
+/// A jig run from a shared config directory and the same jig in the project
+/// run alike.
+///
+/// The file is byte for byte the same in both places, so any difference in the
+/// tasks executed or the verdict would be bolt treating a shared jig as a
+/// different kind of thing from a project's own.
+#[test]
+fn a_shared_jig_and_a_project_jig_run_alike() {
+    let tasks = concat!(
+        "  - name: pass\n    command: \"sh -c 'exit 0'\"\n",
+        "  - name: fail\n    command: \"sh -c 'exit 3'\"\n",
+        "  - name: each\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+    );
+    let root = tree();
+    let shared = tree();
+    let out = tree();
+    write(root.path(), "a.txt", "a");
+    write(root.path(), "b.txt", "b");
+    write_jig(root.path(), "gate", tasks);
+    write_jig(shared.path(), "gate", tasks);
+
+    let local =
+        run_into("gate", root.path(), &out.path().join("local")).expect("the project jig runs");
+    let remote = bolt::run::invoke(&bolt::run::Invocation {
+        jig: "gate",
+        base: root.path(),
+        definitions: None,
+        output_dir: Some(&out.path().join("shared")),
+        config_dir: Some(shared.path()),
+    })
+    .expect("the shared jig runs");
+
+    assert_eq!(
+        executed(&local),
+        ["each-1", "each-2", "fail-1", "pass-1"],
+        "the project jig's tasks",
+    );
+    assert_eq!(
+        executed(&local),
+        executed(&remote),
+        "the two placements ran different tasks"
+    );
+    assert!(
+        !local.success,
+        "the failing task did not fail the project jig"
+    );
+    assert_eq!(local.success, remote.success, "the two placements disagree");
+}
+
 // ---- the walk ---------------------------------------------------------------
 
 // COVERS FR-2.2 | positive
@@ -1568,6 +1722,73 @@ fn every_location_is_a_template_variable() {
         expected,
         "project root, base, work, config and output, in that order",
     );
+}
+
+// COVERS FR-4.1d | property
+/// Template variables are underscored, flags are hyphenated, and a flag and a
+/// variable spelled alike name one place.
+///
+/// Every variable bolt reserves is lower case with underscores. Each location
+/// flag maps to the variable its name becomes once hyphens are underscores,
+/// and that variable substitutes to the value the flag was given.
+#[test]
+fn a_flag_and_its_variable_are_one_name_in_two_shapes() {
+    for name in bolt::definitions::RESERVED {
+        assert!(
+            name.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
+            "{{{name}}} is not lower case with underscores",
+        );
+    }
+
+    let root = tree();
+    let config = tree();
+    let out = tree();
+    write(root.path(), "a.txt", "a");
+    write_jig(
+        config.path(),
+        "say",
+        "  - name: say\n    command: \"printf '%s\\\\n' {config_dir} {output_dir}\"\n",
+    );
+    let run = out.path().join("run");
+
+    let finished = bolt()
+        .arg("--config-dir")
+        .arg(config.path())
+        .arg("--output-dir")
+        .arg(&run)
+        .arg("say")
+        .arg(root.path())
+        .output()
+        .expect("bolt runs");
+    assert!(
+        finished.status.success(),
+        "{}",
+        String::from_utf8_lossy(&finished.stderr),
+    );
+
+    let said = fs::read_to_string(run.join(bolt::run::WORK_DIR).join("say-1").join("stdout"))
+        .expect("stdout");
+    let flags = [("--config-dir", config.path()), ("--output-dir", &run)];
+    assert_eq!(
+        said.lines().count(),
+        flags.len(),
+        "one line per flag: {said}"
+    );
+    for ((flag, given), line) in flags.into_iter().zip(said.lines()) {
+        let variable = flag.trim_start_matches("--").replace('-', "_");
+        assert!(
+            bolt::definitions::RESERVED.contains(&variable.as_str()),
+            "{flag} has no {{{variable}}}",
+        );
+        assert_eq!(
+            line,
+            fs::canonicalize(given)
+                .expect("the flag's path")
+                .display()
+                .to_string(),
+            "{{{variable}}} is not where {flag} pointed",
+        );
+    }
 }
 
 // COVERS FR-4.1a | positive
@@ -3350,6 +3571,57 @@ fn an_adapters_envelope_is_valid_by_the_schema_alone() {
                 assert_eq!(kinds, ["adapter-wrote-invalid"], "{why}");
             }
         }
+    }
+}
+
+// COVERS FR-7.4 | property
+/// A task's envelope, a run's result and a refusal's result are one shape.
+///
+/// All three are read by one consumer against wrench's one envelope schema,
+/// with no case for which of bolt's writers produced the file.
+#[test]
+fn every_envelope_bolt_writes_is_read_one_way() {
+    let root = tree();
+    let out = tree();
+    write_jig(
+        root.path(),
+        "gate",
+        "  - name: fail\n    command: \"sh -c 'exit 2'\"\n",
+    );
+    write(root.path(), &bolt::jig::file_name("broken"), "tasks: [\n");
+
+    let ran = run_into("gate", root.path(), &out.path().join("ran")).expect("the run completes");
+    let refused = out.path().join("refused");
+    let finished = bolt()
+        .arg("--output-dir")
+        .arg(&refused)
+        .arg("broken")
+        .arg(root.path())
+        .output()
+        .expect("bolt runs");
+    assert_eq!(
+        finished.status.code(),
+        Some(1),
+        "the broken jig was not refused"
+    );
+
+    let written = [
+        envelope_of(&ran, "fail-1"),
+        ran.output_dir.join(bolt::run::RESULT_FILE),
+        refused.join(bolt::run::RESULT_FILE),
+    ];
+    for path in &written {
+        assert!(
+            !verdict(path, &wrench::schemas::ENVELOPE),
+            "{} does not read as a failure",
+            path.display(),
+        );
+        let reasons = read_validated(path, &wrench::schemas::ENVELOPE)["reasons"].clone();
+        assert!(
+            reasons.as_array().is_some_and(|all| !all.is_empty()),
+            "{} carries no reasons: {reasons}",
+            path.display(),
+        );
     }
 }
 
