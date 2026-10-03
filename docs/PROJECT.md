@@ -111,8 +111,11 @@ project's whole observable surface in the order the requirements state it.
 
 Bolt gates itself, so gating this repository is a bolt run over it:
 
-    bolt common-quality .
-    bolt rust-std-quality .
+    just checks
+
+That builds the release binary and runs `common-quality` and `rust-std-quality`
+with it, reading each verdict from `result.yaml`. `just/lang.just` replaces the
+shared `_verdict` to do so.
 
 Both jigs are toolbox's. This repository keeps no jig and no definitions file,
 because every value it would set (`REQUIREMENTS.md` and `deny: warnings`) is the
@@ -129,11 +132,9 @@ they are the same program.
 `LESSONS/the-installed-binary-gates-everything.md` and
 `LESSONS/a-second-build-answers-for-the-tree.md` carry that in full.
 
-`traceability` fails deliberately while settled requirements remain uncovered.
-Marking them `[?]` merely to clear the gate would misreport what is settled.
-Some need tests, some need citations against existing tests, and some describe
-design properties no test can observe. The last group must become testable,
-move to the component that owns it, or be explicitly exempted.
+`traceability` fails while a settled requirement a test could observe has no
+test citing it. A design property no test can observe is marked `[?]`, which
+the checker prints as context and does not fail.
 
 `bin/test-traceability.py` is a symlink to the shared checker in toolbox, so
 that task's verdict moves when toolbox does.

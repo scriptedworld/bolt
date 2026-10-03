@@ -15,15 +15,20 @@ the run up front instead of failing a task halfway through.
 
 `cargo test` is the fast one. The suite runs in under a second; `cargo test` prints how many.
 
-The gate is a bolt run over bolt's own repository, so the binary under test is
-the binary doing the testing:
+The gate is `just checks`, a bolt run over bolt's own repository with the binary
+built from this tree, so the binary under test is the binary doing the testing.
+By hand it is:
 
 ```console
 $ cargo build --release
-$ ./target/release/bolt common-quality . --output-dir .bolt-gate
-$ ./target/release/bolt rust-std-quality . --output-dir .bolt-gate-rust
-/home/you/bolt/.bolt-gate/result.yaml
+$ ./target/release/bolt common-quality .
+$ ./target/release/bolt --config-dir ../toolbox rust-std-quality .
 ```
+
+Each run takes bolt's default output directory, which is new every time. A
+fixed `--output-dir` works once, because bolt refuses a directory that already
+holds a run. `--config-dir ../toolbox` reaches the Rust jig where the runbook's
+link step has not put it in this tree.
 
 Two runs, and both jigs are toolbox's. This repository carries no jig and no
 definitions file, because every value it would set is the shared default.
