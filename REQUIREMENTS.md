@@ -465,8 +465,8 @@ Numbering therefore has gaps, and a gap is the record working, not an oversight.
 | FR-6.1b | 2026-08-30 | Nothing. It recorded that FR-6.1a's count had been corrected twice, which is history git holds. |
 | FR-1.6a | 2026-10-01 | `silo/docs/DECISIONS/yaml-everywhere-validated-against-the-decoded-structure.md`. FR-1.5 and FR-1.6 keep bolt's own behaviour. |
 | FR-3.4d | 2026-10-01 | `silo/docs/DECISIONS/yaml-everywhere-validated-against-the-decoded-structure.md`. That a jig is YAML is an estate decision bolt honours through FR-1.5. |
-| FR-3.11 | 2026-10-01 | anvil, which builds from a jig's `requires`. Filed as `clank/inbox/anvil/bolt-image-rows-retired-to-anvil`. FR-3.10 keeps the declaration. |
-| NFR-12.2 | 2026-10-01 | anvil, by the same entry. Bolt in the standard image is the image's requirement. |
+| FR-3.11 | 2026-10-01 | `anvil` FR-1.1, the package list is the jig's `requires`. FR-3.10 keeps the declaration. |
+| NFR-12.2 | 2026-10-01 | `anvil` FR-1.8, bolt is in every image above `quality`. |
 | FR-3.4f | 2026-10-01 | Nothing. Its evidence was a script reading every sibling repository, so no test in a clone of bolt could discharge it. FR-9.5 still says what a manifest records. |
 | FR-4.6 | 2026-10-01 | `docs/DECISIONS/tasks-do-not-consume-other-task-output.md`, which records the decision. Bolt offers no mechanism for one task to read another's output, so there is no behaviour to test. |
 | FR-11.2b | 2026-08-30 | Nothing. It narrated a superseded row and a test derived from it; the shape is in `docs/LESSONS/a-check-that-answers-a-weaker-question.md`. |
