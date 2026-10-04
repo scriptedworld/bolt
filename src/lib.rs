@@ -17,6 +17,7 @@ pub mod selection;
 pub mod walk;
 
 mod error;
+mod retention;
 mod stamp;
 
 pub use error::Error;

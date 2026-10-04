@@ -8,6 +8,7 @@ writing an adapter, see `PATTERNS/the-adapter-contract.md`.
 
     bolt <jig> <directory> [--definitions <name>] [--output-dir <path>]
                            [--config-dir <path>] [--result-to-exitcode]
+                           [--remove-old-runs]
 
 `<jig>` is a name and never a path. Bolt reads `bolt.<jig>.yaml` from the
 config directory, which defaults to `<directory>`. A shared jig can therefore be
@@ -19,8 +20,16 @@ distributed and adopted without a project knowing where the file came from.
     --config-dir <path>     look for the jig, its definitions and its adapters
                             here instead of in <directory>
     --result-to-exitcode    exit 0 when the run succeeded and 1 when it did not
+    --remove-old-runs       first remove default run directories under
+                            <directory> stamped more than seven days ago
 
 Flags may be written before or after the positionals.
+
+`--remove-old-runs` reads a directory's age from its `.bolt-<timestamp>` name,
+not its modification time, and takes only real directories directly under
+`<directory>`. A directory named with `--output-dir`, a file, a symlink and
+anything named otherwise are left alone, and a refused run removes nothing.
+`result.yaml` lists what went under `metadata.removed`.
 
 ## Jig fields
 

@@ -1177,6 +1177,7 @@ fn a_shared_jig_and_a_project_jig_run_alike() {
         definitions: None,
         output_dir: Some(&out.path().join("shared")),
         config_dir: Some(shared.path()),
+        remove_old_runs: false,
     })
     .expect("the shared jig runs");
 
@@ -2819,7 +2820,7 @@ fn the_merge_folds_every_envelope_repeatably() {
     let result = outcome.output_dir.join(bolt::run::RESULT_FILE);
     let first = fs::read(&result).expect("a run has a result");
 
-    bolt::merge::merge(&outcome.output_dir, root.path(), &[])
+    bolt::merge::merge(&outcome.output_dir, root.path(), &[], &[])
         .expect("a finished directory refolds");
 
     assert_eq!(
@@ -2939,7 +2940,7 @@ fn a_merge_finding_no_constituent_fails() {
     let empty = tree();
     fs::create_dir(empty.path().join(bolt::run::WORK_DIR)).expect("an empty work directory");
 
-    let refusal = bolt::merge::merge(empty.path(), empty.path(), &[])
+    let refusal = bolt::merge::merge(empty.path(), empty.path(), &[], &[])
         .expect_err("no constituent is a failure");
 
     assert!(
@@ -3944,7 +3945,7 @@ fn refolding_a_finished_run_costs_no_re_execution() {
     let ran = fs::read_to_string(work(&outcome, "alpha-1").join(bolt::run::EXITCODE_FILE))
         .expect("the exit code is on disk");
 
-    bolt::merge::merge(&outcome.output_dir, root.path(), &[])
+    bolt::merge::merge(&outcome.output_dir, root.path(), &[], &[])
         .expect("a finished directory refolds");
 
     assert_eq!(
@@ -4831,6 +4832,7 @@ fn run_with(jig: &str, base: &Path, definitions: &str) -> Result<bolt::Outcome, 
         definitions: Some(definitions),
         output_dir: None,
         config_dir: None,
+        remove_old_runs: false,
     })
     .map_err(bolt::Error::from)
 }
@@ -4866,6 +4868,7 @@ fn run_into(jig: &str, base: &Path, output_dir: &Path) -> Result<bolt::Outcome, 
         definitions: None,
         output_dir: Some(output_dir),
         config_dir: None,
+        remove_old_runs: false,
     })
     .map_err(bolt::Error::from)
 }
@@ -6176,6 +6179,7 @@ fn a_config_directory_says_where_jigs_are_found() {
         definitions: None,
         output_dir: None,
         config_dir: Some(elsewhere.path()),
+        remove_old_runs: false,
     })
     .expect("a jig in the config directory is found");
 
@@ -6285,6 +6289,7 @@ fn a_jig_run_by_hand_reaches_what_composition_reached() {
         definitions: None,
         output_dir: Some(&out),
         config_dir: Some(root.path()),
+        remove_old_runs: false,
     })
     .expect("the same jig run by hand completes");
 
@@ -6674,6 +6679,7 @@ fn refusals_that_need_different_fixes_carry_different_kinds() {
             definitions: None,
             output_dir: Some(&out),
             config_dir: Some(root.path()),
+            remove_old_runs: false,
         })
         .expect_err("each of these is a refusal");
 
@@ -6734,6 +6740,7 @@ fn a_reused_output_directory_leaves_the_earlier_result_alone() {
         definitions: None,
         output_dir: Some(&out),
         config_dir: None,
+        remove_old_runs: false,
     })
     .expect_err("a directory holding a run is refused");
 
@@ -6844,6 +6851,7 @@ fn bolt_runs_over_its_own_repository() {
         definitions: None,
         output_dir: Some(&out.path().join("run")),
         config_dir: Some(config.path()),
+        remove_old_runs: false,
     })
     .expect("bolt runs over its own repository");
 
@@ -7032,6 +7040,146 @@ fn the_same_jig_runs_against_a_throwaway_copy() {
     assert!(
         verdict(&envelope_of(&after, "clean-1"), &wrench::schemas::ENVELOPE),
         "the unchanged file failed in the copy",
+    );
+}
+
+/// A default run directory's stamp for `ago`, as GNU `date` writes it.
+fn stamp_ago(ago: &str) -> String {
+    let printed = Command::new("date")
+        .args(["-u", "-d", ago, "+%Y-%m-%dT%H-%M-%SZ"])
+        .output()
+        .expect("date runs");
+    String::from_utf8_lossy(&printed.stdout).trim().to_owned()
+}
+
+/// A base holding every kind of thing FR-13.6 must tell apart, and the names of
+/// the ones it removes.
+///
+/// Removed: an old directory in each of the three spellings, and one eight days
+/// old. Kept: one six days old, an old-stamped file, an old-stamped symlink to a
+/// directory outside the base, and a directory whose name is not a run's.
+fn aged_runs(root: &Path, outside: &Path) -> Vec<String> {
+    let removed = vec![
+        ".bolt-2020-01-01T00-00-00-07-00".to_owned(),
+        ".bolt-2020-01-01T00-00-00Z".to_owned(),
+        ".bolt-2020-01-01T00-00-00Z-123".to_owned(),
+        format!(".bolt-{}-7", stamp_ago("8 days ago")),
+    ];
+    for name in &removed {
+        write(root, &format!("{name}/result.yaml"), "\"success\": true\n");
+    }
+    write(
+        root,
+        &format!(".bolt-{}-6/result.yaml", stamp_ago("6 days ago")),
+        "\"success\": true\n",
+    );
+    write(root, ".bolt-2020-01-01T00-00-00Z-9", "a file, not a run");
+    write(outside, "linked/result.yaml", "\"success\": true\n");
+    unix_fs::symlink(
+        outside.join("linked"),
+        root.join(".bolt-2020-01-01T00-00-00Z-8"),
+    )
+    .expect("the symlink");
+    write(root, "old-results/result.yaml", "\"success\": true\n");
+    write(root, "a.txt", "a");
+    write_jig(
+        root,
+        "check",
+        "  - name: read\n    command: \"cat {each_path}\"\n    matching: [\"*.txt\"]\n",
+    );
+    removed
+}
+
+/// Every entry directly under `root`, sorted.
+fn entries(root: &Path) -> Vec<String> {
+    let mut names: Vec<String> = fs::read_dir(root)
+        .expect("readable")
+        .filter_map(Result::ok)
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    names
+}
+
+// COVERS FR-13.6 | positive
+/// `--remove-old-runs` removes default run directories older than seven days at
+/// the base, and nothing else, and the result names each one.
+#[test]
+fn old_runs_are_removed_when_asked() {
+    let root = tree();
+    let outside = tree();
+    let out = tree();
+    let removed = aged_runs(root.path(), outside.path());
+    write(
+        out.path(),
+        ".bolt-2020-01-01T00-00-00Z-5/result.yaml",
+        "\"success\": true\n",
+    );
+    let before = entries(root.path());
+
+    let finished = bolt()
+        .arg("--remove-old-runs")
+        .arg("--output-dir")
+        .arg(out.path().join("run"))
+        .arg("check")
+        .arg(root.path())
+        .output()
+        .expect("bolt runs");
+    assert_eq!(
+        finished.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&finished.stderr),
+    );
+
+    let kept: Vec<String> = before
+        .into_iter()
+        .filter(|name| !removed.contains(name))
+        .collect();
+    assert_eq!(entries(root.path()), kept, "the base after the cleanup");
+    assert!(
+        outside.path().join("linked/result.yaml").is_file(),
+        "the symlink's target was touched",
+    );
+    assert!(
+        out.path().join(".bolt-2020-01-01T00-00-00Z-5").is_dir(),
+        "a run directory outside the base was removed",
+    );
+    let result = read_validated(
+        &out.path().join("run").join(bolt::run::RESULT_FILE),
+        &wrench::schemas::ENVELOPE,
+    );
+    let recorded: Vec<String> = result["metadata"]["removed"]
+        .as_array()
+        .expect("metadata.removed")
+        .iter()
+        .map(|name| name.as_str().expect("a name").to_owned())
+        .collect();
+    let mut expected = removed;
+    expected.sort();
+    assert_eq!(recorded, expected, "the result does not name what went");
+}
+
+// COVERS FR-13.6 | negative
+/// Without the flag nothing is removed and nothing is recorded.
+#[test]
+fn old_runs_stay_unless_asked() {
+    let root = tree();
+    let outside = tree();
+    let out = tree();
+    aged_runs(root.path(), outside.path());
+    let before = entries(root.path());
+
+    let result = result_at_depth("check", root.path(), &out.path().join("run"), None);
+
+    assert_eq!(
+        entries(root.path()),
+        before,
+        "a run without the flag removed something"
+    );
+    assert!(
+        result["metadata"].get("removed").is_none(),
+        "a run that removed nothing recorded a removal: {result}",
     );
 }
 

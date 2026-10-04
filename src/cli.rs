@@ -24,6 +24,8 @@ struct Parsed {
     config_dir: Option<PathBuf>,
     /// Whether FR-10.8's flag was named, making the envelope the exit code.
     result_to_exitcode: bool,
+    /// Whether FR-13.6's cleanup was asked for.
+    remove_old_runs: bool,
 }
 
 /// Read an invocation, or `None` where it is not one.
@@ -42,6 +44,7 @@ fn parse(arguments: &[OsString]) -> Option<Parsed> {
     let mut output_dir = None;
     let mut config_dir = None;
     let mut result_to_exitcode = false;
+    let mut remove_old_runs = false;
     let mut rest = arguments.iter();
 
     while let Some(argument) = rest.next() {
@@ -76,6 +79,8 @@ fn parse(arguments: &[OsString]) -> Option<Parsed> {
             // flag says one thing however many times it is written, where a
             // value written twice leaves two readings and no way to choose.
             Some("--result-to-exitcode") => result_to_exitcode = true,
+            // FR-13.6, a flag like the one above for the same reason.
+            Some("--remove-old-runs") => remove_old_runs = true,
             _ => positional.push(argument),
         }
     }
@@ -90,6 +95,7 @@ fn parse(arguments: &[OsString]) -> Option<Parsed> {
         output_dir,
         config_dir,
         result_to_exitcode,
+        remove_old_runs,
     })
 }
 
@@ -149,11 +155,12 @@ where
         output_dir,
         config_dir,
         result_to_exitcode,
+        remove_old_runs,
     }) = parse(&arguments)
     else {
         eprintln!(
             "usage: bolt <jig> <directory> [--definitions <name>] [--output-dir <path>] \
-             [--config-dir <path>] [--result-to-exitcode]"
+             [--config-dir <path>] [--result-to-exitcode] [--remove-old-runs]"
         );
         return ExitCode::from(REFUSED);
     };
@@ -164,6 +171,7 @@ where
         definitions: definitions.as_deref(),
         output_dir: output_dir.as_deref(),
         config_dir: config_dir.as_deref(),
+        remove_old_runs,
     }) {
         Ok(outcome) => {
             // FR-10.3: the verdict is in the envelope, so what a caller is told

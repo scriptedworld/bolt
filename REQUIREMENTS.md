@@ -369,7 +369,7 @@ The questions that would settle any remaining row are in `NEXT_STEPS.md`.
 
 | ID | Requirement | |
 |---|---|---|
-| FR-13.6 | A run directory older than seven days is removed, and the cleanup is automatic, so a dogfooding repository does not accumulate them without bound. | [A] |
+| FR-13.6 | A run given `--remove-old-runs` first removes the default run directories directly under its base whose `.bolt-<timestamp>` name, with or without a process id, is stamped more than seven days before the run started, so a dogfooding repository does not accumulate them without bound. It removes nothing else: not its own directory, not a directory outside the base, not a file or a symlink, and nothing at all without the flag or when the run is refused. `result.yaml` names each directory removed under `metadata.removed`. | [A] |
 | FR-13.7 | An execution's manifest records the commit SHA its source materials came from, so evidence can be tied to the tree state that produced it, as §65 requires. Bolt reads no git and does not acquire that dependency: the SHA reaches it from the caller, through the definitions layer that already records a `from:` provenance for every key. | [A] |
 
 ## Retired

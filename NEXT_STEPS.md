@@ -38,7 +38,8 @@ The remaining implementation work is:
 - Decide whether `evidence-missing` should retain a command's nonzero exit
   status for a task that declares both evidence and an adapter. A task with no
   adapter already carries both reasons.
-- Define ownership and retention for run directories.
+- Define ownership of run directories. Retention is FR-13.6's
+  `--remove-old-runs`.
 - Decide whether result envelopes need a schema-version field and whether
   adapter-specific metadata is open-ended.
 

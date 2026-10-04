@@ -14,7 +14,7 @@ use crate::depth;
 use crate::jig::{self, Task};
 use crate::limit;
 use crate::selection::{self, consumes_paths, quote, quote_str};
-use crate::{Error, Outcome, Refusal, merge, stamp, walk};
+use crate::{Error, Outcome, Refusal, merge, retention, stamp, walk};
 
 /// The directory under a run's output directory holding one entry per execution.
 pub const WORK_DIR: &str = "work";
@@ -216,6 +216,7 @@ pub fn run(jig: &str, base: &Path) -> Result<Outcome, Error> {
         definitions: None,
         output_dir: None,
         config_dir: None,
+        remove_old_runs: false,
     })
     .map_err(Error::from)
 }
@@ -241,6 +242,9 @@ pub struct Invocation<'a> {
     /// does not sit in. The default stays the base, which is what makes naming
     /// it unnecessary for a project keeping its own jigs.
     pub config_dir: Option<&'a Path>,
+    /// Whether FR-13.6's cleanup was asked for. Off unless named, because it
+    /// deletes directories.
+    pub remove_old_runs: bool,
 }
 
 /// Carry out an invocation.
@@ -262,6 +266,7 @@ pub fn invoke(invocation: &Invocation) -> Result<Outcome, Refusal> {
         definitions,
         output_dir,
         config_dir,
+        remove_old_runs,
     } = invocation;
 
     // One stamp for the whole invocation. Taking it twice would let a second
@@ -300,7 +305,16 @@ pub fn invoke(invocation: &Invocation) -> Result<Outcome, Refusal> {
     // FR-2.8 defaults to the base, absolute like every path a caller writes.
     let config_dir = config_dir.map_or_else(|| base.clone(), absolute);
 
-    carry_out(jig, base, &output_dir, *definitions, &config_dir).map_err(|error| {
+    let cleanup = Cleanup {
+        asked: *remove_old_runs,
+        started,
+    };
+    let placed = Placed {
+        base,
+        output_dir: &output_dir,
+        config_dir: &config_dir,
+    };
+    carry_out(jig, &placed, *definitions, cleanup).map_err(|error| {
         write_refusal(&output_dir, &error);
         Refusal {
             error,
@@ -542,14 +556,37 @@ fn write_refusal(output_dir: &Path, refusal: &Error) {
     );
 }
 
+/// FR-13.6's cleanup, as asked for, and the moment its age is measured from.
+#[derive(Clone, Copy)]
+struct Cleanup {
+    /// Whether `--remove-old-runs` was named.
+    asked: bool,
+    /// When this run started, which is what seven days are counted back from.
+    started: SystemTime,
+}
+
+/// The three directories a run has resolved before it carries anything out.
+struct Placed<'a> {
+    /// The base, canonical by FR-2.4.
+    base: &'a Path,
+    /// Where this run writes, already established as its own.
+    output_dir: &'a Path,
+    /// Where jigs, definitions and adapters are found.
+    config_dir: &'a Path,
+}
+
 /// Carry the run out, once the output directory is known to be bolt's own.
 fn carry_out(
     jig: &str,
-    base: &Path,
-    output_dir: &Path,
+    placed: &Placed,
     definitions: Option<&str>,
-    config_dir: &Path,
+    cleanup: Cleanup,
 ) -> Result<Outcome, Error> {
+    let Placed {
+        base,
+        output_dir,
+        config_dir,
+    } = *placed;
     let output_dir = output_dir.to_path_buf();
 
     let depth = within_ceiling()?;
@@ -575,6 +612,14 @@ fn carry_out(
     // tree, spends it like anything else does.
     let started = Instant::now();
 
+    // FR-13.6, once the jig is known good, so a refused run removes nothing.
+    // Before the walk, so what is removed is not walked.
+    let removed = if cleanup.asked {
+        retention::remove_old_runs(base, &output_dir, cleanup.started)?
+    } else {
+        Vec::new()
+    };
+
     // Created before the walk. Created afterwards, FR-2.2c's exclusion below
     // would hold only by accident, for a directory bolt had not made yet.
     create_dir(&output_dir.join(WORK_DIR))?;
@@ -594,10 +639,12 @@ fn carry_out(
 
     let progress = run_tasks(&scope, &jig, plans, &walked)?;
 
-    merge::merge(&output_dir, base, &run_reasons(progress.expired)).map(|folded| Outcome {
-        executions: progress.executions,
-        stopped: progress.stopped,
-        ..folded
+    merge::merge(&output_dir, base, &run_reasons(progress.expired), &removed).map(|folded| {
+        Outcome {
+            executions: progress.executions,
+            stopped: progress.stopped,
+            ..folded
+        }
     })
 }
 

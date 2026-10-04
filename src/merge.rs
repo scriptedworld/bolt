@@ -34,7 +34,15 @@ use crate::{Error, Outcome};
 /// FR-4.14 asks for when a run times out before anything finished.
 ///
 /// [`Error::Io`] when the result cannot be written.
-pub fn merge(output_dir: &Path, base: &Path, reasons: &[Value]) -> Result<Outcome, Error> {
+///
+/// `removed` names the run directories FR-13.6's cleanup removed before this
+/// run, recorded as `metadata.removed` where there were any.
+pub fn merge(
+    output_dir: &Path,
+    base: &Path,
+    reasons: &[Value],
+    removed: &[String],
+) -> Result<Outcome, Error> {
     let work = output_dir.join(WORK_DIR);
     let mut entries: Vec<_> = fs::read_dir(&work)
         .map_err(|source| Error::Io {
@@ -79,6 +87,9 @@ pub fn merge(output_dir: &Path, base: &Path, reasons: &[Value]) -> Result<Outcom
     });
     if !success {
         result["reasons"] = Value::Array(folded.reasons);
+    }
+    if !removed.is_empty() {
+        result["metadata"]["removed"] = json!(removed);
     }
     let path = output_dir.join(RESULT_FILE);
     crate::run::save(&path, &result, &wrench::schemas::ENVELOPE)?;
