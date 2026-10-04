@@ -45,8 +45,12 @@ Cargo.lock
 #
 # `bin/*.py` matched `bin/count-selection.py`, which no longer exists, so `bin/`
 # holds nothing of this project's but the built binary named above.
+#
+# A definitions file toolbox ships is a link like the jigs, and is named exactly
+# so the shape patterns still cannot reach a definitions file of bolt's own.
 bolt.*-quality.yaml
 bolt.secrets.yaml
+bolt.requirements-directory.definitions.yaml
 bin/*.py
 adapters/
 config/

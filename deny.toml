@@ -12,6 +12,7 @@
 # `cargo tree --target x86_64-unknown-linux-gnu` contains it zero times. A
 # licence that does not ship is not one bolt is under. Scoping the targets says
 # so, where an allow entry would have claimed the opposite.
+[graph]
 targets = [
     { triple = "x86_64-unknown-linux-gnu" },
     { triple = "x86_64-unknown-linux-musl" },
