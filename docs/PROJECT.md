@@ -24,15 +24,18 @@ written that way decay into shell scripts nobody will touch.
 
 ### Anvil is where bolt is to run, and `requires` is its manifest
 
-**Anvil is not built.** Its repository holds documentation and no Dockerfiles.
-The design is recorded here because two of bolt's requirements are shaped by it,
-and a reader who meets those requirements without it cannot tell why they are
-drawn the way they are.
+**Anvil is mostly unbuilt.** Its `base` image has a Dockerfile and the layers
+above it do not. The design is recorded here because two of bolt's
+requirements are shaped by it, and a reader who meets those requirements
+without it cannot tell why they are drawn the way they are.
 
 The design is Docker-based, with images carrying the toolchain, bolt itself, the
-common quality tooling and its configuration. They are execution environments
-and not places a person works: the tooling a jig needs is present and the same
-everywhere.
+common quality tooling and its configuration. The tree from `base` to each
+`-dev` image is execution environments, built to run a gate: the tooling a jig
+needs is present and the same everywhere. A workplace layer sits on top of a
+`-dev` image for the devcontainer, carrying the reading tools a working session
+needs, and is not where a gate runs. anvil's `README.md`, "The layers", has the
+split.
 
 The coupling to bolt is `requires:`, and it is tighter than it looks. From the
 ecosystem architecture bolt is derived from:
