@@ -44,9 +44,24 @@ allow = [
     "Unicode-3.0",
     "Zlib",
 ]
-# A dependency whose licence is unstated is refused, never assumed permissive.
-# A crate with no licence field is unlicensed.
+# An allowed licence no crate in the graph carries is not an error. The list
+# above is a policy, not an inventory of what the graph holds today.
 unused-allowed-license = "allow"
+
+# A crate that names only a licence file, with no licence expression, fails
+# toolbox's licences task until somebody has read the file, because
+# cargo-deny matches the text rather than reading it. A clarify is the record
+# of that reading, and its hash pins the text that was read, so a release that
+# changes the file fails again until it is read again. The ruling is silo's
+# docs/DECISIONS/a-licence-file-crate-is-read-before-it-passes.md.
+#
+# libyaml-safer reaches bolt through wrench. Its LICENSE-MIT in 0.3.0 is MIT's
+# grant and conditions word for word. The hash is XXH32 of the file with CRLF
+# turned to LF, which is how cargo-deny hashes it.
+[[licenses.clarify]]
+crate = "libyaml-safer"
+expression = "MIT"
+license-files = [{ path = "LICENSE-MIT", hash = 0x386ca1bc }]
 
 [bans]
 # Two versions of one crate is usually a lockfile that has not been reconciled,
