@@ -48,10 +48,12 @@ allow = [
 # above is a policy, not an inventory of what the graph holds today.
 unused-allowed-license = "allow"
 
-# A crate that names only a licence file, with no licence expression, fails
-# toolbox's licences task until somebody has read the file, because
-# cargo-deny matches the text rather than reading it. A clarify is the record
-# of that reading, and its hash pins the text that was read, so a release that
+# A crate that names only a licence file, with no licence expression, draws a
+# no-license-field warning, and cargo-deny then matches the file's text
+# against known licences rather than reading it, so an altered text can pass.
+# Run with that warning denied, `cargo deny check -D no-license-field`, such
+# a crate fails until somebody has read the file. A clarify is the record of
+# that reading, and its hash pins the text that was read, so a release that
 # changes the file fails again until it is read again. The ruling is silo's
 # docs/DECISIONS/a-licence-file-crate-is-read-before-it-passes.md.
 #
